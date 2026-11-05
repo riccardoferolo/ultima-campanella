@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { R } from '../regole.js';
+import { ZONE } from '../mappa.js';
 import { creaTexture } from './texture.js';
 import { creaMaterialiArmi } from './armi3d.js';
 import { costruisciScuola } from './scuola3d.js';
@@ -14,6 +15,10 @@ const FOV = 72;
 const FOV_MIRA = 52;
 const FOV_CANNOCCHIALE = 20;
 const URL_ZOMBIE = './modelli/zombie.glb';
+const CIELO_APERTO = 0x0b1322;
+const NEBBIA_DENTRO = 24;
+const NEBBIA_FUORI = 40;
+const aperta = (x, z) => ZONE.some(zona => zona.aperto && x >= zona.x0 && x <= zona.x1 && z >= zona.z0 && z <= zona.z1);
 
 export async function creaMondo(contenitore) {
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
@@ -96,6 +101,11 @@ export async function creaMondo(contenitore) {
       camera.updateProjectionMatrix();
     }
     lampo.intensity = vista1p.lampoAcceso ? 14 : 0;
+    const fuori = aperta(io.x, io.z);
+    const fattore = Math.min(1, dt * 2);
+    scena.fog.far += ((fuori ? NEBBIA_FUORI : NEBBIA_DENTRO) - scena.fog.far) * fattore;
+    scena.fog.color.lerp(new THREE.Color(fuori ? CIELO_APERTO : BUIO), fattore);
+    scena.background.copy(scena.fog.color);
     scuola.aggiorna(vista, dt, tempo);
     zombi.aggiorna(vista, dt);
     aggiornaCompagni(vista, mioId, dt);

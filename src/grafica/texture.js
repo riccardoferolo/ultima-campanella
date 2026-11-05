@@ -155,7 +155,72 @@ export function creaTexture() {
       ctx.fillRect(0, y, l, 1);
     }
   });
-  return { muro, piastrelle, parquet, soffitto, legno, porta, armadietti, terra, lavagna, metallo, legnoChiaro };
+  const linoleum = disegna(LATO, LATO, (ctx, l, a, caso) => {
+    for (let x = 0; x < l; x += 32) for (let y = 0; y < a; y += 32) {
+      ctx.fillStyle = ((x + y) / 32) % 2 ? '#b8ad86' : '#6f8a6a';
+      ctx.fillRect(x, y, 32, 32);
+    }
+    rumore(ctx, l, a, caso, ['#9a916e', '#5c7358', '#c9bf9a', '#4a4536'], 500);
+    macchie(ctx, l, a, caso, 'rgba(60,45,25,0.35)', 3);
+  });
+  const cemento = disegna(LATO, LATO, (ctx, l, a, caso) => {
+    ctx.fillStyle = '#5d5c58';
+    ctx.fillRect(0, 0, l, a);
+    rumore(ctx, l, a, caso, ['#4e4d49', '#6b6a65', '#3f3e3a', '#74706a'], 900);
+    ctx.strokeStyle = '#2f2e2b';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(4, 10);
+    ctx.lineTo(22, 26);
+    ctx.lineTo(30, 24);
+    ctx.lineTo(50, 44);
+    ctx.stroke();
+    macchie(ctx, l, a, caso, 'rgba(40,30,15,0.5)', 4);
+  });
+  const asfalto = disegna(LATO, LATO, (ctx, l, a, caso) => {
+    ctx.fillStyle = '#2f3032';
+    ctx.fillRect(0, 0, l, a);
+    rumore(ctx, l, a, caso, ['#3a3b3d', '#262729', '#45464a', '#1f2022'], 1100);
+    ctx.fillStyle = 'rgba(210,200,160,0.55)';
+    ctx.fillRect(0, 31, l, 2);
+    macchie(ctx, l, a, caso, 'rgba(20,20,20,0.6)', 3);
+  });
+  const rete = disegna(32, 32, (ctx, l, a) => {
+    ctx.clearRect(0, 0, l, a);
+    ctx.strokeStyle = '#8d9499';
+    ctx.lineWidth = 1;
+    for (let i = -32; i < 64; i += 8) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + 32, 32);
+      ctx.moveTo(i + 32, 0);
+      ctx.lineTo(i, 32);
+      ctx.stroke();
+    }
+  });
+  const pulmino = disegna(LATO * 2, LATO, (ctx, l, a, caso) => {
+    ctx.fillStyle = '#d9a21b';
+    ctx.fillRect(0, 0, l, a);
+    rumore(ctx, l, a, caso, ['#b9861a', '#e5b43a', '#6b4a1a'], 700);
+    ctx.fillStyle = '#1b2228';
+    for (let x = 6; x < l - 10; x += 20) ctx.fillRect(x, 10, 15, 16);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 34, l, 4);
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('SCUOLABUS', 30, 50);
+    macchie(ctx, l, a, caso, 'rgba(90,50,20,0.6)', 5);
+  });
+  const corteccia = disegna(16, 32, (ctx, l, a, caso) => {
+    ctx.fillStyle = '#3b2c1e';
+    ctx.fillRect(0, 0, l, a);
+    rumore(ctx, l, a, caso, ['#2a1f15', '#4a3828'], 120);
+  });
+  const fogliame = disegna(32, 32, (ctx, l, a, caso) => {
+    ctx.fillStyle = '#1f3a1e';
+    ctx.fillRect(0, 0, l, a);
+    rumore(ctx, l, a, caso, ['#15281a', '#2b4d24', '#183020'], 300);
+  });
+  return { muro, piastrelle, parquet, soffitto, legno, porta, armadietti, terra, lavagna, metallo, legnoChiaro, linoleum, cemento, asfalto, rete, pulmino, corteccia, fogliame };
 }
 
 export function texturaTesto(righe, { larghezza = 128, altezza = 64, sfondo = null, colore = '#f2efe6', font = 'bold 14px monospace', bordo = null } = {}) {

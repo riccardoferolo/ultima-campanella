@@ -149,6 +149,7 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 @keyframes sale { to { transform: translateY(-24px); opacity: 0; } }
 .arma { display: grid; justify-items: end; }
 .arma span { color: var(--tenue); font-size: 20px; }
+.arma span.potenziata { color: #c9a2ff; text-shadow: 0 0 8px rgba(164, 92, 255, 0.8), 0 2px 0 #000; }
 .arma b { font-size: 40px; font-weight: 400; }
 .arma b.poche { color: var(--sangue-chiaro); }
 .bibite { display: flex; gap: 6px; }

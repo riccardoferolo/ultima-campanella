@@ -3,6 +3,7 @@ import { FINESTRE } from './mappa.js';
 export const STATI_ZOMBIE = Object.freeze(['arriva', 'assi', 'scavalca', 'dentro', 'attacco', 'morto']);
 export const STATI_GIOCATORE = Object.freeze(['vivo', 'terra', 'morto']);
 export const FASI = Object.freeze(['intervallo', 'gioco', 'fine']);
+export const STATI_POTENZIATORE = Object.freeze(['libero', 'lavora', 'pronta']);
 
 const r2 = n => Math.round(n * 100) / 100;
 
@@ -22,6 +23,8 @@ export function faiIstantanea(stato) {
       pr: r2(g.progressoRianimazione), ri: g.rianimando ? 1 : 0, u: g.uccisioni, tp: g.teletrasporto,
     })),
     c: [stato.cassa.stato === 'aperta' ? 1 : 0, stato.cassa.arma ?? '', stato.cassa.per ?? '', r2(stato.cassa.timer)],
+    e: stato.corrente ? 1 : 0,
+    k: [STATI_POTENZIATORE.indexOf(stato.potenziatore.stato), stato.potenziatore.arma ?? '', stato.potenziatore.per ?? '', r2(stato.potenziatore.timer)],
   };
 }
 
@@ -40,6 +43,8 @@ export function espandi(ist) {
       rianimando: !!g.ri, uccisioni: g.u, teletrasporto: g.tp,
     })),
     cassa: { stato: ist.c[0] ? 'aperta' : 'chiusa', arma: ist.c[1] || null, per: ist.c[2] || null, timer: ist.c[3] },
+    corrente: !!ist.e,
+    potenziatore: { stato: STATI_POTENZIATORE[ist.k[0]], arma: ist.k[1] || null, per: ist.k[2] || null, timer: ist.k[3] },
   };
 }
 

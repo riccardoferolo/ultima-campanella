@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { modelloArma, creaBraccio } from './armi3d.js';
+import { modelloArma, creaBraccio, creaManoSinistra } from './armi3d.js';
 
 const RIPOSO = new THREE.Vector3(0.17, -0.17, -0.36);
 const MIRA = new THREE.Vector3(0, -0.075, -0.3);
@@ -32,6 +32,8 @@ export function creaVista1p(materialiArmi) {
   scena.add(luce);
   const supporto = new THREE.Group();
   supporto.add(creaBraccio(materialiArmi));
+  const manoSinistra = creaManoSinistra(materialiArmi);
+  supporto.add(manoSinistra);
   scena.add(supporto);
   const modelli = new Map();
   const lampo = new THREE.Sprite(new THREE.SpriteMaterial({ map: texturaLampo(), blending: THREE.AdditiveBlending, transparent: true, depthTest: false }));
@@ -58,6 +60,8 @@ export function creaVista1p(materialiArmi) {
     const m = modelli.get(tipo);
     m.gruppo.visible = true;
     lampo.position.copy(m.bocca);
+    manoSinistra.visible = m.presa !== null;
+    if (m.presa) manoSinistra.position.copy(m.presa);
     attuale = tipo;
   }
 

@@ -37,7 +37,9 @@ function eIstantanea(ist) {
     && Array.isArray(ist.w) && ist.w.every(numero)
     && Array.isArray(ist.p) && ist.p.every(p => testo(p))
     && Array.isArray(ist.g) && ist.g.every(eGiocatore)
-    && Array.isArray(ist.c) && ist.c.length === 4;
+    && Array.isArray(ist.c) && ist.c.length === 4
+    && numero(ist.e) && Array.isArray(ist.k) && ist.k.length === 4 && [0, 1, 2].includes(ist.k[0]) && numero(ist.k[3])
+    && (ist.k[1] === '' || arma(ist.k[1]));
 }
 
 function eAzione(a) {

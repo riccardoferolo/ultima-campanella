@@ -38,9 +38,12 @@ export const R = Object.freeze({
 
   COSTO_CASSA: 950,
   DURATA_CASSA: 8,
+  COSTO_POTENZIA: 5000,
+  DURATA_POTENZIA: 3,
+  ATTESA_RITIRO: 10,
 });
 
-export const ARMI = Object.freeze({
+const ARMI_BASE = Object.freeze({
   pistola: Object.freeze({ nome: 'Pistola', danno: 40, cadenza: 0.22, automatica: false, caricatore: 8, riserva: 48, ricarica: 1.4, pallini: 1, dispersione: 0.004 }),
   pompa: Object.freeze({ nome: 'Fucile a pompa', danno: 35, cadenza: 0.85, automatica: false, caricatore: 6, riserva: 36, ricarica: 3, pallini: 8, dispersione: 0.07 }),
   mitra: Object.freeze({ nome: 'Mitra', danno: 32, cadenza: 0.075, automatica: true, caricatore: 30, riserva: 150, ricarica: 2.2, pallini: 1, dispersione: 0.03 }),
@@ -49,6 +52,38 @@ export const ARMI = Object.freeze({
   precisione: Object.freeze({ nome: 'Fucile di precisione', danno: 500, cadenza: 1.2, automatica: false, caricatore: 5, riserva: 30, ricarica: 3, pallini: 1, dispersione: 0, mirino: true }),
   raggi: Object.freeze({ nome: 'Pistola a raggi', danno: 600, cadenza: 0.35, automatica: false, caricatore: 20, riserva: 160, ricarica: 2.6, pallini: 1, dispersione: 0.006, esplosione: Object.freeze({ raggio: 1.8, danno: 400 }) }),
 });
+
+const NOMI_POTENZIATI = Object.freeze({
+  pistola: 'Pistola Rovente',
+  pompa: 'Pompa Tempesta',
+  mitra: 'Mitra Vespa',
+  assalto: 'Assalto Lupo',
+  mitragliatrice: 'Mitragliatrice Tuono',
+  precisione: 'Precisione Falco',
+  raggi: 'Raggi Supernova',
+});
+
+function potenzia(base, chiave) {
+  return Object.freeze({
+    ...base,
+    nome: NOMI_POTENZIATI[chiave],
+    danno: base.danno * 2,
+    caricatore: Math.round(base.caricatore * 1.5),
+    riserva: base.riserva * 2,
+    ricarica: base.ricarica * 0.85,
+    esplosione: base.esplosione ? Object.freeze({ raggio: base.esplosione.raggio * 1.4, danno: base.esplosione.danno * 2 }) : undefined,
+    potenziata: true,
+    base: chiave,
+  });
+}
+
+export const ARMI = Object.freeze({
+  ...ARMI_BASE,
+  ...Object.fromEntries(Object.entries(ARMI_BASE).map(([chiave, arma]) => [`${chiave}+`, potenzia(arma, chiave)])),
+});
+
+export const versionePotenziata = arma => (arma.endsWith('+') ? null : `${arma}+`);
+export const armaBase = arma => (arma.endsWith('+') ? arma.slice(0, -1) : arma);
 
 export const COLTELLO = Object.freeze({ danno: 150, attesa: 0.6, portata: 1.6 });
 export const ARMI_CASSA = Object.freeze(['pompa', 'mitra', 'assalto', 'mitragliatrice', 'precisione', 'raggi']);

@@ -253,9 +253,12 @@ function suEventi(eventi) {
       case 'acquisto':
         if (!perMe) break;
         allinea(arsenale, e.armi, e.arma);
-        audio.suona('acquisto');
+        audio.suona(e.potenziata ? 'potenziata' : 'acquisto');
         hud.avviso(ARMI[e.arma].nome, 'bene');
         break;
+      case 'corrente': audio.suona('corrente'); hud.avviso('Corrente accesa!', 'bene'); break;
+      case 'potenzia': if (perMe) { audio.suona('potenzia'); hud.avviso('Potenziamento in corso…', 'bene'); } break;
+      case 'potenziataPronta': if (perMe) hud.avviso("Ritira l'arma potenziata!", 'bene'); break;
       case 'munizioni': if (perMe) { riempi(arsenale, e.arma); audio.suona('acquisto'); } break;
       case 'bevanda': if (perMe) { audio.suona('bevanda'); hud.avviso(BEVANDE[e.bevanda].nome, 'bene'); } break;
       case 'cassa': if (perMe) { audio.suona('cassa'); hud.avviso(`Prendi: ${ARMI[e.arma].nome}`, 'bene'); } break;
@@ -487,7 +490,7 @@ function usaArmi(lettura, me, vista, dt) {
 }
 
 function interagisci(lettura, me, vista) {
-  const interazione = me.stato === 'vivo' && s.fase === 'gioco' ? interazioneVicina({ id: s.mioId, x: io.x, z: io.z, armi: me.armi, bevande: me.bevande }, vista) : null;
+  const interazione = me.stato === 'vivo' && s.fase === 'gioco' ? interazioneVicina({ id: s.mioId, x: io.x, z: io.z, armi: me.armi, bevande: me.bevande, armaAttiva: armaAttiva(arsenale).tipo }, vista) : null;
   if (locale.inRianimazione && (!lettura.f || interazione?.tipo !== 'rianima')) {
     inviaAzione({ tipo: 'rianima', attivo: false });
     locale.inRianimazione = false;
@@ -495,7 +498,7 @@ function interagisci(lettura, me, vista) {
   if (!interazione) return null;
   const oraS = performance.now() / 1000;
   const ripetuto = locale.ultimoAcquisto.id === interazione.acquisto && oraS - locale.ultimoAcquisto.quando < RIPETI_ACQUISTO_DOPO_S;
-  if (lettura.fPremuto && interazione.tipo === 'compra' && !ripetuto) {
+  if (lettura.fPremuto && interazione.tipo === 'compra' && !ripetuto && Number.isFinite(interazione.costo)) {
     if (interazione.costo > me.punti) hud.avviso('Non hai abbastanza punti');
     else {
       inviaAzione({ tipo: 'compra', acquisto: interazione.acquisto, arma: armaAttiva(arsenale).tipo });

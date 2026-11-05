@@ -1,4 +1,4 @@
-import { R, ARMI, BEVANDE } from './regole.js';
+import { R, ARMI, BEVANDE, armaBase, versionePotenziata } from './regole.js';
 import { FINESTRE, PORTE, ACQUISTI, zoneAperte } from './mappa.js';
 
 const distanza = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -29,9 +29,19 @@ export function interazioneVicina(io, vista) {
   return candidati[0] ?? null;
 }
 
+function descriviPotenziatore(io, vista) {
+  const macchina = vista.potenziatore;
+  if (!vista.corrente) return { costo: Infinity, testo: 'Il potenziatore non ha corrente: accendila in caldaia' };
+  if (macchina.stato === 'pronta' && macchina.per === io.id) return { costo: 0, testo: `Premi F per prendere: ${ARMI[macchina.arma].nome}` };
+  if (macchina.stato !== 'libero') return { costo: Infinity, testo: macchina.per === io.id ? 'Il potenziatore sta lavorando…' : 'Il potenziatore è occupato' };
+  const potenziata = io.armaAttiva ? versionePotenziata(io.armaAttiva) : null;
+  if (!potenziata) return { costo: Infinity, testo: 'Questa arma è già potenziata' };
+  return { costo: R.COSTO_POTENZIA, testo: `Premi F per potenziare: ${ARMI[io.armaAttiva].nome} [${R.COSTO_POTENZIA}]` };
+}
+
 function descrivi(a, io, vista) {
   if (a.tipo === 'arma') {
-    const possiede = io.armi.includes(a.arma);
+    const possiede = io.armi.some(x => armaBase(x) === a.arma);
     const costo = possiede ? a.munizioni : a.costo;
     return { costo, testo: possiede ? `Premi F per le munizioni: ${ARMI[a.arma].nome} [${costo}]` : `Premi F per comprare: ${ARMI[a.arma].nome} [${costo}]` };
   }
@@ -40,6 +50,10 @@ function descrivi(a, io, vista) {
     if (io.bevande.includes(a.bevanda)) return { costo: Infinity, testo: `${bevanda.nome}: ce l'hai già` };
     return { costo: bevanda.costo, testo: `Premi F per bere: ${bevanda.nome}, ${bevanda.descrizione} [${bevanda.costo}]` };
   }
+  if (a.tipo === 'interruttore') {
+    return vista.corrente ? { costo: Infinity, testo: 'La corrente è accesa' } : { costo: 0, testo: 'Premi F per accendere la corrente' };
+  }
+  if (a.tipo === 'potenziatore') return descriviPotenziatore(io, vista);
   const cassa = vista.cassa;
   if (cassa.stato === 'aperta' && cassa.per === io.id) return { costo: 0, testo: `Premi F per prendere: ${ARMI[cassa.arma].nome}` };
   if (cassa.stato === 'aperta') return { costo: Infinity, testo: 'La cassa è occupata' };

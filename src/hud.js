@@ -65,6 +65,7 @@ export function creaHud() {
       n.round.classList.toggle('lampeggia', vista.fase === 'intervallo' && vista.round > 0);
       disegnaPunti(vista, mioId);
       n.nomeArma.textContent = ARMI[arma.tipo].nome;
+      n.nomeArma.classList.toggle('potenziata', arma.tipo.endsWith('+'));
       n.munizioni.textContent = `${arma.caricatore} / ${arma.riserva}`;
       n.munizioni.classList.toggle('poche', arma.caricatore <= Math.ceil(ARMI[arma.tipo].caricatore / 4));
       const bevande = io?.bevande ?? [];

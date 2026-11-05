@@ -1,4 +1,4 @@
-import { R, ARMI_CASSA, PESI_CASSA, BEVANDE, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa } from './regole.js';
+import { R, ARMI_CASSA, PESI_CASSA, BEVANDE, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa } from './regole.js';
 import { passoCaso } from './caso.js';
 import { FINESTRE, PORTE, ACQUISTI, PARTENZE, zoneAperte, ostacoliPerGiocatori } from './mappa.js';
 import { muoviCerchio, vistaLibera } from './fisica.js';
@@ -37,6 +37,8 @@ export function creaPartita({ seme, giocatori = [] }) {
     porte: [],
     giocatori: [],
     cassa: { stato: 'chiusa', arma: null, per: null, timer: 0 },
+    corrente: false,
+    potenziatore: { stato: 'libero', arma: null, per: null, timer: 0 },
     campo: null,
     attesaCampo: 0,
   };
@@ -107,12 +109,22 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   if (distanza(giocatore, acquisto.posizione) > R.DISTANZA_ACQUISTO + TOLLERANZA_DISTANZA) return;
 
   if (acquisto.tipo === 'arma') {
-    const possiede = giocatore.armi.includes(acquisto.arma);
-    const costo = possiede ? acquisto.munizioni : acquisto.costo;
+    const posseduta = giocatore.armi.find(a => armaBase(a) === acquisto.arma);
+    const costo = posseduta ? acquisto.munizioni : acquisto.costo;
     if (giocatore.punti < costo) return;
     giocatore.punti -= costo;
-    if (possiede) eventi.push({ k: 'munizioni', a: giocatore.id, arma: acquisto.arma });
+    if (posseduta) eventi.push({ k: 'munizioni', a: giocatore.id, arma: posseduta });
     else prendiArma(stato, giocatore, acquisto.arma, eventi);
+    return;
+  }
+  if (acquisto.tipo === 'interruttore') {
+    if (stato.corrente) return;
+    stato.corrente = true;
+    eventi.push({ k: 'corrente', da: giocatore.id });
+    return;
+  }
+  if (acquisto.tipo === 'potenziatore') {
+    potenziatore(stato, giocatore, eventi);
     return;
   }
   if (acquisto.tipo === 'bevanda') {
@@ -136,9 +148,42 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   }
   if (cassa.stato !== 'chiusa' || giocatore.punti < R.COSTO_CASSA) return;
   giocatore.punti -= R.COSTO_CASSA;
-  const arma = sceltaPesata(ARMI_CASSA.filter(a => !giocatore.armi.includes(a)), caso(stato));
+  const possedute = new Set(giocatore.armi.map(armaBase));
+  const arma = sceltaPesata(ARMI_CASSA.filter(a => !possedute.has(a)), caso(stato));
   Object.assign(cassa, { stato: 'aperta', arma, per: giocatore.id, timer: R.DURATA_CASSA });
   eventi.push({ k: 'cassa', a: giocatore.id, arma });
+}
+
+function potenziatore(stato, giocatore, eventi) {
+  const macchina = stato.potenziatore;
+  if (macchina.stato === 'pronta' && macchina.per === giocatore.id) {
+    const da = giocatore.armi.indexOf(armaBase(macchina.arma));
+    if (da >= 0) giocatore.armi[da] = macchina.arma;
+    else if (giocatore.armi.length < 2) giocatore.armi.push(macchina.arma);
+    else giocatore.armi[giocatore.armi.indexOf(giocatore.armaAttiva)] = macchina.arma;
+    giocatore.armaAttiva = macchina.arma;
+    eventi.push({ k: 'acquisto', a: giocatore.id, arma: macchina.arma, armi: [...giocatore.armi], potenziata: true });
+    Object.assign(macchina, { stato: 'libero', arma: null, per: null, timer: 0 });
+    return;
+  }
+  const potenziata = versionePotenziata(giocatore.armaAttiva);
+  if (!stato.corrente || macchina.stato !== 'libero' || !potenziata || giocatore.punti < R.COSTO_POTENZIA) return;
+  giocatore.punti -= R.COSTO_POTENZIA;
+  Object.assign(macchina, { stato: 'lavora', arma: potenziata, per: giocatore.id, timer: R.DURATA_POTENZIA });
+  eventi.push({ k: 'potenzia', a: giocatore.id, arma: potenziata });
+}
+
+function aggiornaPotenziatore(stato, dt, eventi) {
+  const macchina = stato.potenziatore;
+  if (macchina.stato === 'libero') return;
+  macchina.timer -= dt;
+  if (macchina.timer > 0) return;
+  if (macchina.stato === 'lavora') {
+    Object.assign(macchina, { stato: 'pronta', timer: R.ATTESA_RITIRO });
+    eventi.push({ k: 'potenziataPronta', a: macchina.per, arma: macchina.arma });
+    return;
+  }
+  Object.assign(macchina, { stato: 'libero', arma: null, per: null, timer: 0 });
 }
 
 export function sceltaPesata(scelte, estratto) {
@@ -409,6 +454,7 @@ export function passo(stato, dt, { posizioni = {}, azioni = [] } = {}) {
   muoviZombie(stato, dt, eventi);
   aggiornaGiocatori(stato, dt, eventi);
   aggiornaCassa(stato, dt, eventi);
+  aggiornaPotenziatore(stato, dt, eventi);
   if (stato.giocatori.length > 0 && vivi(stato).length === 0) {
     stato.fase = 'fine';
     eventi.push({ k: 'fine', round: stato.round, giocatori: stato.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });
