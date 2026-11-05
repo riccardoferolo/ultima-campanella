@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ultima Campanella</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%A7%9F%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Creepster&family=VT323&display=swap">
+  <script type="module" crossorigin src="./assets/index-Bh_YC2HB.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B_Bx7GYp.css">
+</head>
+<body>
+  <div id="mondo"></div>
+
+  <div id="hud" hidden>
+    <div id="vignetta" class="vignetta"></div>
+    <div id="cannocchiale" class="cannocchiale" hidden></div>
+    <div id="mirino" class="mirino"><i></i><i></i><i></i><i></i></div>
+    <div id="segno" class="segno">✕</div>
+    <div id="round" class="round"></div>
+    <div class="pannello-destro">
+      <div id="punti" class="punti"></div>
+      <div class="arma"><span id="nome-arma"></span><b id="munizioni"></b></div>
+      <div id="bibite" class="bibite"></div>
+    </div>
+    <div id="avviso" class="avviso"></div>
+    <div id="suggerimento" class="suggerimento"></div>
+    <div id="barra-rianima" class="barra-rianima" hidden><span>Rianimazione</span><div><i></i></div></div>
+    <div id="stato-terra" class="stato-terra" hidden></div>
+    <div id="rete" class="rete"></div>
+    <div id="clicca" class="clicca" hidden><b>Clicca per giocare</b><span>Esc per liberare il mouse</span></div>
+  </div>
+
+  <section id="schermata-inizio" class="schermata">
+    <form class="scheda" id="modulo-inizio" novalidate>
+      <h1>Ultima<br>Campanella</h1>
+      <p class="sotto">Una scuola di notte. Tu, un amico e i morti che bussano alle finestre.</p>
+      <label class="campo">Il tuo nome
+        <input id="nome" maxlength="16" autocomplete="off" spellcheck="false">
+      </label>
+      <button id="crea" type="button" class="primario" disabled>Caricamento…</button>
+      <div class="oppure"><span>oppure entra nella stanza di un amico</span></div>
+      <div class="riga">
+        <label class="campo stretto">Codice
+          <input id="codice" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD">
+        </label>
+        <button id="entra" type="button" disabled>Entra</button>
+      </div>
+      <p id="errore-inizio" class="errore" role="alert"></p>
+      <p class="comandi">WASD muovi · Shift corri · Mouse mira · Clic spara · Destro punta · R ricarica · F compra, ripara, rianima · V coltello · Q o rotella cambia arma</p>
+    </form>
+  </section>
+
+  <section id="schermata-stanza" class="schermata" hidden>
+    <div class="scheda">
+      <h2>Stanza <span id="t-codice" class="codice"></span></h2>
+      <div id="blocco-link" class="riga">
+        <input id="link" readonly tabindex="-1">
+        <button id="copia" type="button">Copia link</button>
+      </div>
+      <p id="t-stato" class="stato"></p>
+      <button id="parti" type="button" class="primario">Entra nella scuola</button>
+      <p class="nota" id="nota-stanza"></p>
+    </div>
+  </section>
+
+  <section id="schermata-fine" class="schermata velata" hidden>
+    <div class="scheda">
+      <h2 class="titolo-fine">Siete morti</h2>
+      <p id="t-dettaglio" class="dettaglio"></p>
+      <div id="t-tabella" class="tabella"></div>
+      <button id="rigioca" type="button" class="primario">Rigioca</button>
+      <p id="t-attesa-host" class="nota"></p>
+    </div>
+  </section>
+
+</body>
+</html>
