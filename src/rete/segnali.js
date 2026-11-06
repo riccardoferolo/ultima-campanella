@@ -4,7 +4,13 @@ const CODA_MASSIMA = 200;
 
 function creaAscoltatori() {
   const elenco = new Set();
-  return { aggiungi: cb => elenco.add(cb), avvisa: valore => elenco.forEach(cb => cb(valore)) };
+  return {
+    aggiungi: cb => {
+      elenco.add(cb);
+      return () => elenco.delete(cb);
+    },
+    avvisa: valore => elenco.forEach(cb => cb(valore)),
+  };
 }
 
 function segnaliLocali(stanza) {

@@ -2,15 +2,22 @@ import { SERVER_ICE, ATTESA_RISERVA_MS, CIAO_OGNI_MS } from './configurazione.js
 import { valida } from './protocollo.js';
 
 const OSPITE_SCADUTO_MS = 5000;
+export const OSPITI_MASSIMI = 3;
 const RIPROVA_ACCOGLIENZA_MS = 2500;
 const BUFFER_MASSIMO = 64 * 1024;
 
 function creaAscoltatori() {
   const elenco = new Set();
-  return { aggiungi: cb => elenco.add(cb), avvisa: valore => elenco.forEach(cb => cb(valore)) };
+  return {
+    aggiungi: cb => {
+      elenco.add(cb);
+      return () => elenco.delete(cb);
+    },
+    avvisa: valore => elenco.forEach(cb => cb(valore)),
+  };
 }
 
-export function collega({ segnali, sonoHost, mioId, soloRiserva = false }) {
+export function collega({ segnali, sonoHost, mioId, soloRiserva = false, ospite = null }) {
   const messaggi = creaAscoltatori();
   const stati = creaAscoltatori();
   let altroId = null;
@@ -151,17 +158,8 @@ export function collega({ segnali, sonoHost, mioId, soloRiserva = false }) {
   function suSegnale(msg) {
     if (!msg || typeof msg !== 'object' || typeof msg.da !== 'string' || msg.da === mioId) return;
     if (sonoHost && msg.tipo === 'ciao') {
-      if (msg.da === altroId) {
-        const ferma = modo === 'collegamento' && performance.now() - ultimaAccoglienza > RIPROVA_ACCOGLIENZA_MS;
-        if (ferma) accogliOspite(msg.da).catch(ripiega);
-        return;
-      }
-      const occupata = altroId && performance.now() - ultimoRicevuto < OSPITE_SCADUTO_MS;
-      if (occupata) {
-        segnali.invia({ tipo: 'occupata', da: mioId, a: msg.da });
-        return;
-      }
-      accogliOspite(msg.da).catch(ripiega);
+      const ferma = msg.da === altroId && modo === 'collegamento' && performance.now() - ultimaAccoglienza > RIPROVA_ACCOGLIENZA_MS;
+      if (ferma) accogliOspite(msg.da).catch(ripiega);
       return;
     }
     if (msg.a !== mioId) return;
@@ -181,7 +179,8 @@ export function collega({ segnali, sonoHost, mioId, soloRiserva = false }) {
     } else if (msg.tipo === 'gioco') riceviGioco(msg.m);
   }
 
-  segnali.suMessaggio(suSegnale);
+  const smetti = segnali.suMessaggio(suSegnale);
+  if (sonoHost && ospite) accogliOspite(ospite).catch(ripiega);
   if (!sonoHost) {
     const ciao = () => segnali.invia({ tipo: 'ciao', da: mioId });
     ciao();
@@ -204,10 +203,69 @@ export function collega({ segnali, sonoHost, mioId, soloRiserva = false }) {
       }
       if (altroId && (modo === 'riserva' || modo === 'diretto')) versoAltro('gioco', { m }, { scartabile: veloce });
     },
-    chiudi() {
+    chiudiConnessione() {
       clearInterval(timerCiao);
       clearTimeout(timerRiserva);
       chiudiPc();
+      smetti?.();
+    },
+    chiudi() {
+      this.chiudiConnessione();
+      segnali.chiudi();
+    },
+  };
+}
+
+export function collegaHost({ segnali, mioId, soloRiserva = false, massimo = OSPITI_MASSIMI }) {
+  const messaggi = creaAscoltatori();
+  const stati = creaAscoltatori();
+  const ospiti = new Map();
+  const attivo = peer => peer.modo === 'collegamento' || peer.silenzio() < OSPITE_SCADUTO_MS;
+
+  function rimuovi(id) {
+    const peer = ospiti.get(id);
+    if (!peer) return;
+    peer.chiudiConnessione();
+    ospiti.delete(id);
+    stati.avvisa();
+  }
+
+  segnali.suMessaggio(msg => {
+    if (!msg || msg.tipo !== 'ciao' || typeof msg.da !== 'string' || msg.da === mioId || ospiti.has(msg.da)) return;
+    for (const [id, peer] of [...ospiti]) if (!attivo(peer)) rimuovi(id);
+    if (ospiti.size >= massimo) {
+      segnali.invia({ tipo: 'occupata', da: mioId, a: msg.da });
+      return;
+    }
+    const id = msg.da;
+    const peer = collega({ segnali, sonoHost: true, mioId, soloRiserva, ospite: id });
+    peer.suMessaggio(m => messaggi.avvisa({ m, id }));
+    peer.suStato(() => stati.avvisa());
+    ospiti.set(id, peer);
+    stati.avvisa();
+  });
+
+  return {
+    get modo() {
+      const modi = [...ospiti.values()].map(p => p.modo);
+      if (modi.includes('diretto')) return 'diretto';
+      if (modi.includes('riserva')) return 'riserva';
+      return modi.length ? 'collegamento' : 'attesa';
+    },
+    collegato: id => ['diretto', 'riserva'].includes(ospiti.get(id)?.modo),
+    silenzio: id => ospiti.get(id)?.silenzio() ?? Infinity,
+    suMessaggio: cb => messaggi.aggiungi(({ m, id }) => cb(m, id)),
+    suStato: stati.aggiungi,
+    invia(m, opzioni) {
+      for (const peer of ospiti.values()) peer.invia(m, opzioni);
+    },
+    inviaA(id, m, opzioni) {
+      ospiti.get(id)?.invia(m, opzioni);
+    },
+    rimuovi,
+    chiudi() {
+      for (const peer of ospiti.values()) peer.chiudiConnessione();
+      ospiti.clear();
       segnali.chiudi();
     },
   };

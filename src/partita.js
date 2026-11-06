@@ -1,6 +1,6 @@
 import {
   R, ARMI, ARMI_CASSA, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
-  dannoGranata, moltiplicatoreBoss, faseCustode, saltiArco,
+  dannoGranata, moltiplicatoreBoss, faseCustode, saltiArco, fattoreOrda,
 } from './regole.js';
 import { passoCaso } from './caso.js';
 import {
@@ -758,7 +758,7 @@ function avanzaFase(stato, dt, eventi) {
     stato.round += 1;
     stato.bonusRound = 0;
     stato.fase = 'gioco';
-    stato.daGenerare = zombieDelRound(stato.round);
+    stato.daGenerare = Math.round(zombieDelRound(stato.round) * fattoreOrda(stato.giocatori.length));
     stato.attesaComparsa = 1;
     stato.presideTra = stato.round % R.OGNI_PRESIDE === 0 ? R.PRESIDE_DOPO : null;
     for (const g of stato.giocatori) {

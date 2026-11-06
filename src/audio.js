@@ -1,6 +1,29 @@
 import { ARMI } from './regole.js';
 
 const VOLUME = 0.5;
+const VOLUME_MUSICA = 0.32;
+const CHIAVE_MUSICA = 'campanella.musica';
+const ANTICIPO_S = 0.25;
+const PROGRAMMA_OGNI_MS = 60;
+const BPM = Object.freeze({ silenzio: 60, calma: 56, round: 74, preside: 116, custode: 132 });
+const LIVELLI = Object.freeze({ silenzio: 0, calma: 0.55, round: 0.75, preside: 0.9, custode: 1 });
+const ACCORDI = Object.freeze({
+  normale: [[57, 60, 64], [53, 57, 60], [50, 53, 57], [52, 56, 59]],
+  custode: [[57, 60, 64], [58, 62, 65], [57, 60, 63], [56, 59, 62]],
+});
+const hz = nota => 440 * 2 ** ((nota - 69) / 12);
+
+function leggiPreferenza() {
+  try { return localStorage.getItem(CHIAVE_MUSICA) !== 'no'; } catch { return true; }
+}
+function salvaPreferenza(si) {
+  try {
+    localStorage.setItem(CHIAVE_MUSICA, si ? 'si' : 'no');
+    return true;
+  } catch {
+    return false;
+  }
+}
 const SPARI = Object.freeze({
   pistola: { durata: 0.18, filtro: 1800, volume: 0.6, botto: 110 },
   revolver: { durata: 0.3, filtro: 1300, volume: 0.85, botto: 75 },
@@ -49,6 +72,97 @@ export function creaAudio() {
   }
 
   const pronto = () => ctx && ctx.state === 'running';
+  const musica = { accesa: leggiPreferenza(), stato: 'silenzio', intensita: 0, uscita: null, filtro: null, pad: [], timer: null, passo: 0, prossimo: 0 };
+
+  function avviaMusica() {
+    if (musica.uscita || !ctx) return;
+    musica.uscita = ctx.createGain();
+    musica.uscita.gain.value = 0;
+    musica.uscita.connect(uscita);
+    musica.filtro = ctx.createBiquadFilter();
+    musica.filtro.type = 'lowpass';
+    musica.filtro.frequency.value = 500;
+    const volumePad = ctx.createGain();
+    volumePad.gain.value = 0.045;
+    musica.filtro.connect(volumePad).connect(musica.uscita);
+    for (let i = 0; i < 3; i++) {
+      for (const scarto of [-7, 7]) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.detune.value = scarto;
+        o.frequency.value = hz(ACCORDI.normale[0][i] - 12);
+        o.connect(musica.filtro);
+        o.start();
+        musica.pad.push({ o, voce: i });
+      }
+    }
+    musica.prossimo = ctx.currentTime + 0.1;
+    musica.timer = setInterval(programma, PROGRAMMA_OGNI_MS);
+  }
+
+  function colpoMusica(frequenza, t, { durata = 0.2, tipo = 'sine', volume = 0.2, scendi = null, filtro = null } = {}) {
+    const osc = ctx.createOscillator();
+    osc.type = tipo;
+    osc.frequency.setValueAtTime(frequenza, t);
+    if (scendi) osc.frequency.exponentialRampToValueAtTime(scendi, t + durata);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(volume, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + durata);
+    let catena = osc;
+    if (filtro) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = filtro;
+      f.Q.value = 2;
+      catena = osc.connect(f);
+    }
+    catena.connect(g).connect(musica.uscita);
+    osc.start(t);
+    osc.stop(t + durata + 0.05);
+  }
+
+  function suonaPasso(n, t, durata) {
+    const stato = musica.stato;
+    const battuta = Math.floor(n / 16) % 4;
+    const sedicesimo = n % 16;
+    const accordo = ACCORDI[stato === 'custode' ? 'custode' : 'normale'][battuta];
+    if (sedicesimo === 0) for (const { o, voce } of musica.pad) o.frequency.setTargetAtTime(hz(accordo[voce] - 12), t, 0.25);
+    if (stato === 'calma' || stato === 'silenzio') {
+      if (sedicesimo === 0 && Math.random() < 0.55) colpoMusica(hz(accordo[Math.floor(Math.random() * 3)] + 12), t, { durata: 2.6, volume: 0.05 });
+      return;
+    }
+    const capo = stato === 'preside' || stato === 'custode';
+    const forte = capo || musica.intensita > 0.45;
+    const cassa = forte ? sedicesimo % 4 === 0 : sedicesimo === 0 || sedicesimo === 3;
+    if (cassa) colpoMusica(95, t, { durata: 0.32, volume: 0.42, scendi: 38 });
+    if (stato === 'custode' && sedicesimo === 10) colpoMusica(95, t, { durata: 0.25, volume: 0.3, scendi: 40 });
+    if (sedicesimo % (capo ? 4 : 8) === 0) colpoMusica(hz(accordo[0] - 24), t, { durata: durata * (capo ? 3 : 6), tipo: 'triangle', volume: 0.22 });
+    if (forte && sedicesimo % 2 === 0) colpoMusica(hz(accordo[(sedicesimo / 2) % 3] + (capo ? 12 : 0)), t, { durata: 0.09, tipo: 'sawtooth', volume: capo ? 0.05 : 0.035, filtro: 1400 });
+    if (capo && sedicesimo === 0 && battuta % 2 === 0) colpoMusica(hz(accordo[0] + 6), t, { durata: durata * 8, tipo: 'sawtooth', volume: 0.03, filtro: 900 });
+    if (sedicesimo === 8 && musica.intensita > 0.7) colpoMusica(5000, t, { durata: 0.05, tipo: 'square', volume: 0.012, filtro: 7000 });
+  }
+
+  function programma() {
+    if (!pronto() || !musica.uscita) return;
+    const durata = 60 / BPM[musica.stato] / 4;
+    if (musica.prossimo < ctx.currentTime) musica.prossimo = ctx.currentTime + 0.05;
+    while (musica.prossimo < ctx.currentTime + ANTICIPO_S) {
+      suonaPasso(musica.passo, musica.prossimo, durata);
+      musica.passo += 1;
+      musica.prossimo += durata;
+    }
+  }
+
+  function regolaMusica() {
+    if (!musica.uscita) return;
+    const t = ctx.currentTime;
+    const volume = musica.accesa ? LIVELLI[musica.stato] * VOLUME_MUSICA : 0;
+    musica.uscita.gain.cancelScheduledValues(t);
+    musica.uscita.gain.setTargetAtTime(volume, t, 0.8);
+    const capo = musica.stato === 'preside' || musica.stato === 'custode';
+    musica.filtro.frequency.setTargetAtTime(capo ? 2400 : 380 + musica.intensita * 1500, t, 0.8);
+  }
 
   function soffio({ durata, da, a = da, tipo = 'lowpass', volume = 0.5, ritardo = 0, destinazione = uscita }) {
     const t = ctx.currentTime + ritardo;
@@ -142,6 +256,22 @@ export function creaAudio() {
 
   return {
     prepara,
+    musica(stato, intensita) {
+      if (!pronto()) return;
+      avviaMusica();
+      const cambiaStato = stato !== musica.stato;
+      const cambiaIntensita = Math.abs(intensita - musica.intensita) > 0.05;
+      if (!cambiaStato && !cambiaIntensita) return;
+      musica.stato = stato;
+      musica.intensita = intensita;
+      regolaMusica();
+    },
+    alternaMusica() {
+      musica.accesa = !musica.accesa;
+      salvaPreferenza(musica.accesa);
+      regolaMusica();
+      return musica.accesa;
+    },
     suona(nome) {
       if (pronto()) SUONI[nome]?.();
     },

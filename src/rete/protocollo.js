@@ -66,7 +66,7 @@ function eAzione(a) {
 
 const CONTROLLI = {
   ciao: m => pulisciNome(m.nome) !== null && testo(m.id),
-  lobby: m => pulisciNome(m.nomeHost) !== null,
+  lobby: m => pulisciNome(m.nomeHost) !== null && (m.giocatori === undefined || (Array.isArray(m.giocatori) && m.giocatori.length <= 4 && m.giocatori.every(n => typeof n === 'string'))),
   inizia: m => numero(m.seme),
   g: m => [m.x, m.z, m.yaw, m.pitch, m.colpi, m.tp].every(numero) && arma(m.arma),
   az: m => eAzione(m.a),

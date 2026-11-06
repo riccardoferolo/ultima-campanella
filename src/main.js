@@ -9,7 +9,7 @@ import { interazioneVicina } from './interazioni.js';
 import { creaPartita, passo, aggiungiGiocatore, rimuoviGiocatore } from './partita.js';
 import { faiIstantanea, espandi, interpola } from './istantanea.js';
 import { apriSegnali } from './rete/segnali.js';
-import { collega } from './rete/collegamento.js';
+import { collega, collegaHost } from './rete/collegamento.js';
 import { codiceStanza, normalizzaCodice, pulisciNome } from './rete/protocollo.js';
 import { creaMondo } from './grafica/scena.js';
 import { creaComandi } from './comandi.js';
@@ -34,7 +34,7 @@ const VUOTO_OGNI_S = 0.3;
 const LAMENTI_AL_SECONDO = 0.12;
 const BUFFER_MASSIMO = 40;
 const PORTATA_RAGGI = 60;
-const AZIONI_REMOTE_MASSIME = 64;
+const AZIONI_REMOTE_MASSIME = 160;
 const RIPETI_ACQUISTO_DOPO_S = 1;
 const SALTO_ARCO = 6;
 const ALTEZZA_SCARICA = 1.25;
@@ -54,8 +54,10 @@ const s = {
   sonoHost: false,
   stanza: null,
   coll: null,
-  nomeAltro: null,
-  idAltro: null,
+  nomeHost: null,
+  ospiti: new Map(),
+  nomiStanza: [],
+  pingOspiti: new Map(),
   fase: 'inizio',
   partita: null,
   semeCorrente: null,
@@ -65,7 +67,6 @@ const s = {
   vista: null,
   azioniLocali: [],
   azioniRemote: [],
-  remoto: null,
   accumulo: 0,
   ultimaIstantanea: 0,
   ultimoInvioG: 0,
@@ -113,8 +114,12 @@ function inviaAzione(azione) {
   else s.coll?.invia({ t: 'az', a: azione });
 }
 
+const elencoNomi = nomi => (nomi.length < 2 ? nomi.join('') : `${nomi.slice(0, -1).join(', ')} e ${nomi[nomi.length - 1]}`);
+const amici = () => (s.sonoHost ? [...s.ospiti.values()].map(o => o.nome) : s.nomiStanza.filter(n => n !== s.nome));
+
 function testoRete() {
-  if (!s.coll || !s.idAltro && s.sonoHost) return s.sonoHost ? 'da solo' : '';
+  if (!s.coll) return '';
+  if (s.sonoHost && s.ospiti.size === 0) return 'da solo';
   if (s.coll.modo === 'diretto') return `diretto${s.ping !== null ? ` · ${s.ping} ms` : ''}`;
   if (s.coll.modo === 'riserva') return `via Supabase${s.ping !== null ? ` · ${s.ping} ms` : ''}`;
   return 'collegamento…';
@@ -126,25 +131,27 @@ function aggiornaStanza() {
   $('blocco-link').hidden = !s.sonoHost;
   $('parti').hidden = !s.sonoHost;
   if (s.coll?.modo === 'occupata') {
-    stato.textContent = 'Questa stanza ha già due giocatori.';
+    stato.textContent = 'Questa stanza è piena: ci sono già 4 giocatori.';
     stato.dataset.tipo = 'errore';
   } else if (s.statoSegnali === 'offline' && !collegato()) {
     stato.textContent = 'Il server dei collegamenti non risponde, riprovo…';
     stato.dataset.tipo = 'errore';
-  } else if (collegato() && s.nomeAltro) {
-    stato.textContent = `Insieme a ${s.nomeAltro} ${s.coll.modo === 'diretto' ? '(diretto)' : '(via Supabase)'}`;
+  } else if (collegato() && amici().length) {
+    const posti = s.sonoHost ? ` · ${4 - 1 - s.ospiti.size} posti liberi` : '';
+    stato.textContent = `Insieme a ${elencoNomi(amici())} ${s.coll.modo === 'diretto' ? '(diretto)' : '(via Supabase)'}${posti}`;
     stato.dataset.tipo = 'ok';
   } else {
-    stato.textContent = s.sonoHost ? 'Aspetto il tuo amico… mandagli il link. Puoi anche entrare da solo.' : 'Mi collego alla stanza…';
+    stato.textContent = s.sonoHost ? 'Aspetto i tuoi amici (fino a 3)… mandagli il link. Puoi anche entrare da solo.' : 'Mi collego alla stanza…';
     stato.dataset.tipo = 'attesa';
   }
-  $('parti').textContent = s.nomeAltro && collegato() ? 'Entrate nella scuola' : 'Entra da solo';
-  $('nota-stanza').textContent = s.sonoHost ? 'Se il tuo amico arriva dopo, entra direttamente nella partita.' : s.nomeAltro ? `Aspetta che ${s.nomeAltro} apra la scuola.` : '';
+  $('parti').textContent = amici().length && collegato() ? 'Entrate nella scuola' : 'Entra da solo';
+  $('nota-stanza').textContent = s.sonoHost ? 'Chi arriva dopo entra direttamente nella partita.' : s.nomeHost ? `Aspetta che ${s.nomeHost} apra la scuola.` : '';
 }
 
 function inviaLobby() {
   if (!s.sonoHost || !collegato()) return;
-  s.coll.invia({ t: 'lobby', nomeHost: s.nome, ospite: s.idAltro });
+  const giocatori = [s.nome, ...[...s.ospiti.values()].map(o => o.nome)];
+  for (const id of s.ospiti.keys()) s.coll.inviaA(id, { t: 'lobby', nomeHost: s.nome, ospite: id, giocatori });
   if (s.fase === 'gioco') s.coll.invia({ t: 'inizia', seme: s.semeCorrente });
 }
 
@@ -158,7 +165,7 @@ function entraInStanza(sonoHost, stanza) {
     s.statoSegnali = stato;
     aggiornaStanza();
   });
-  s.coll = collega({ segnali, sonoHost, mioId: s.mioId, soloRiserva: SOLO_RISERVA });
+  s.coll = sonoHost ? collegaHost({ segnali, mioId: s.mioId, soloRiserva: SOLO_RISERVA }) : collega({ segnali, sonoHost, mioId: s.mioId, soloRiserva: SOLO_RISERVA });
   s.coll.suStato(() => {
     aggiornaStanza();
     if (collegato()) inviaLobby();
@@ -196,7 +203,7 @@ function iniziaPartita(seme, daClic = false) {
   s.accumulo = 0;
   s.azioniLocali = [];
   s.azioniRemote = [];
-  s.remoto = null;
+  s.ospiti.forEach(o => { o.remoto = null; });
   s.colpiVisti.clear();
   azzera(arsenale);
   Object.assign(io, { pronto: false, tp: 0, colpi: 0, pitch: 0 });
@@ -204,7 +211,7 @@ function iniziaPartita(seme, daClic = false) {
   mondo.svuota();
   if (s.sonoHost) {
     const giocatori = [{ id: s.mioId, nome: s.nome }];
-    if (s.idAltro && collegato()) giocatori.push({ id: s.idAltro, nome: s.nomeAltro });
+    for (const [id, o] of s.ospiti) if (s.coll.collegato(id)) giocatori.push({ id, nome: o.nome });
     s.partita = creaPartita({ seme, giocatori, sala: true });
   }
   mostraSchermata(null);
@@ -238,7 +245,7 @@ function mostraFine(evento) {
     return riga;
   }));
   $('rigioca').hidden = !s.sonoHost;
-  $('t-attesa-host').textContent = s.sonoHost ? '' : `Aspetta che ${s.nomeAltro} faccia ripartire.`;
+  $('t-attesa-host').textContent = s.sonoHost ? '' : `Aspetta che ${s.nomeHost ?? "chi ha creato la stanza"} faccia ripartire.`;
   mostraSchermata('schermata-fine');
   if (s.sonoHost) $('rigioca').focus();
 }
@@ -332,40 +339,45 @@ function suEventi(eventi) {
   }
 }
 
-function suMessaggio(m) {
+function suMessaggio(m, da) {
   switch (m.t) {
-    case 'ciao':
-      if (!s.sonoHost) return;
-      s.nomeAltro = pulisciNome(m.nome);
-      if (s.partita && s.idAltro && s.idAltro !== m.id) rimuoviGiocatore(s.partita, s.idAltro);
-      s.idAltro = m.id;
-      if (s.fase === 'gioco' && s.partita) aggiungiGiocatore(s.partita, { id: m.id, nome: s.nomeAltro });
+    case 'ciao': {
+      if (!s.sonoHost || !da || m.id !== da) return;
+      const nome = pulisciNome(m.nome) ?? 'Amico';
+      const ospite = s.ospiti.get(da) ?? { nome, remoto: null };
+      ospite.nome = nome;
+      s.ospiti.set(da, ospite);
+      if (s.fase === 'gioco' && s.partita) aggiungiGiocatore(s.partita, { id: da, nome });
       inviaLobby();
       aggiornaStanza();
       return;
+    }
     case 'lobby':
       if (s.sonoHost) return;
       s.lobbyRicevuta = m.ospite === s.mioId;
-      s.nomeAltro = pulisciNome(m.nomeHost);
+      s.nomeHost = pulisciNome(m.nomeHost);
+      s.nomiStanza = (m.giocatori ?? []).map(pulisciNome).filter(Boolean);
       aggiornaStanza();
       return;
     case 'inizia':
       if (s.sonoHost || (s.fase === 'gioco' && m.seme === s.semeCorrente)) return;
       iniziaPartita(m.seme);
       return;
-    case 'g':
-      if (!s.sonoHost) return;
-      riprendiOspite();
-      s.remoto = { x: m.x, z: m.z, yaw: m.yaw, pitch: m.pitch, arma: m.arma, colpi: m.colpi, tp: m.tp };
+    case 'g': {
+      const ospite = s.sonoHost ? s.ospiti.get(da) : null;
+      if (!ospite) return;
+      riprendiOspite(da);
+      ospite.remoto = { x: m.x, z: m.z, yaw: m.yaw, pitch: m.pitch, arma: m.arma, colpi: m.colpi, tp: m.tp };
       return;
+    }
     case 'az':
-      if (!s.sonoHost || !s.idAltro) return;
-      riprendiOspite();
+      if (!s.sonoHost || !s.ospiti.has(da)) return;
+      riprendiOspite(da);
       if (s.azioniRemote.length >= AZIONI_REMOTE_MASSIME) {
         const scartabile = s.azioniRemote.findIndex(a => a.tipo === 'colpo' || a.tipo === 'assa');
         s.azioniRemote.splice(scartabile >= 0 ? scartabile : 0, 1);
       }
-      s.azioniRemote.push({ ...m.a, da: s.idAltro });
+      s.azioniRemote.push({ ...m.a, da });
       return;
     case 'st': {
       if (s.sonoHost || s.fase === 'stanza' || m.g !== s.semeCorrente) return;
@@ -386,27 +398,45 @@ function suMessaggio(m) {
       if (!s.sonoHost) s.coll.invia({ t: 'pong', n: m.n });
       return;
     case 'pong':
-      if (s.sonoHost) s.ping = Math.round(performance.now() - m.n);
+      if (!s.sonoHost || !s.ospiti.has(da)) return;
+      s.pingOspiti.set(da, Math.round(performance.now() - m.n));
+      s.ping = Math.max(...s.pingOspiti.values());
       return;
     default:
   }
 }
 
-function riprendiOspite() {
-  if (s.fase !== 'gioco' || !s.partita || !s.idAltro || s.partita.giocatori.some(g => g.id === s.idAltro)) return;
-  aggiungiGiocatore(s.partita, { id: s.idAltro, nome: s.nomeAltro ?? 'Amico' });
+function riprendiOspite(id) {
+  const ospite = s.ospiti.get(id);
+  if (s.fase !== 'gioco' || !s.partita || !ospite || s.partita.giocatori.some(g => g.id === id)) return;
+  aggiungiGiocatore(s.partita, { id, nome: ospite.nome });
+}
+
+function pulisciOspiti() {
+  let cambiato = false;
+  for (const id of [...s.ospiti.keys()]) {
+    if (s.coll.silenzio(id) <= SILENZIO_RIMOZIONE_MS) continue;
+    if (s.partita?.giocatori.some(g => g.id === id)) rimuoviGiocatore(s.partita, id);
+    s.ospiti.delete(id);
+    s.pingOspiti.delete(id);
+    s.coll.rimuovi(id);
+    cambiato = true;
+  }
+  if (!cambiato) return;
+  s.ping = s.pingOspiti.size ? Math.max(...s.pingOspiti.values()) : null;
+  aggiornaStanza();
+  inviaLobby();
 }
 
 function tickHost(dt, ora) {
   const p = s.partita;
-  if (s.idAltro && p.giocatori.some(g => g.id === s.idAltro) && s.coll.silenzio() > SILENZIO_RIMOZIONE_MS) rimuoviGiocatore(p, s.idAltro);
   if (s.fase === 'gioco') {
     s.accumulo = Math.min(s.accumulo + dt, RECUPERO_MASSIMO_S);
     const eventi = [];
     while (s.accumulo >= R.PASSO) {
       const posizioni = {};
       if (io.pronto) posizioni[s.mioId] = { x: io.x, z: io.z, yaw: io.yaw, pitch: io.pitch, arma: armaAttiva(arsenale).tipo, colpi: io.colpi, tp: io.tp };
-      if (s.remoto && s.idAltro) posizioni[s.idAltro] = s.remoto;
+      for (const [id, o] of s.ospiti) if (o.remoto) posizioni[id] = o.remoto;
       const azioni = [...s.azioniLocali.splice(0), ...s.azioniRemote.splice(0)];
       eventi.push(...passo(p, R.PASSO, { posizioni, azioni }));
       s.accumulo -= R.PASSO;
@@ -431,6 +461,7 @@ function tick() {
   const ora = performance.now();
   const dt = Math.min(RECUPERO_MASSIMO_S, (ora - ultimoTick) / 1000);
   ultimoTick = ora;
+  if (s.sonoHost && s.coll && s.fase !== 'inizio') pulisciOspiti();
   if (s.coll && collegato()) {
     if (s.sonoHost && ora - s.ultimoPing > PING_OGNI_MS) {
       s.coll.invia({ t: 'ping', n: ora });
@@ -563,7 +594,15 @@ function disegnaArco(e) {
 
 const vistaGiocatore = id => s.vista?.giocatori.find(g => g.id === id) ?? null;
 
+function statoMusica(vista) {
+  if (vista.fase === 'fine' || vista.fase === 'vinta') return 'silenzio';
+  if (vista.fase === 'finale') return 'custode';
+  if (vista.fase !== 'gioco') return 'calma';
+  return vista.zombie.some(z => z.tipo === 'preside' && z.stato !== 'morto') ? 'preside' : 'round';
+}
+
 function usaArmi(lettura, me, vista, dt) {
+  if (lettura.azioni.includes('musica')) hud.avviso(audio.alternaMusica() ? 'Musica accesa' : 'Musica spenta', 'bene');
   if (aggiornaArsenale(arsenale, dt)) audio.suona('ricarica');
   if (me.stato !== 'vivo' || s.fase !== 'gioco') return;
   for (const azione of lettura.azioni) {
@@ -673,6 +712,7 @@ function ciclo(ora) {
       usaArmi(lettura, me, vista, dt);
       const interazione = interagisci(lettura, me, vista);
       suoniAmbiente(vista, dt);
+      audio.musica(statoMusica(vista), Math.min(1, vista.round / 12));
       const ferito = vista.giocatori.find(g => g.id !== s.mioId && g.stato === 'terra');
       const tipo = armaAttiva(arsenale).tipo;
       const cannocchiale = io.inMira && ARMI[tipo].mirino === true;
@@ -759,7 +799,7 @@ creaMondo($('mondo')).then(m => {
 
 if (import.meta.env.DEV) {
   window.__gioco = {
-    stato: () => ({ fps: Math.round(fps), fase: s.fase, mioId: s.mioId, modo: s.coll?.modo ?? null, vista: s.vista, io: { ...io }, arma: { ...armaAttiva(arsenale) }, armi: arsenale.armi.map(a => a.tipo), nomeAltro: s.nomeAltro, buffer: s.buffer.length }),
+    stato: () => ({ fps: Math.round(fps), fase: s.fase, mioId: s.mioId, modo: s.coll?.modo ?? null, vista: s.vista, io: { ...io }, arma: { ...armaAttiva(arsenale) }, armi: arsenale.armi.map(a => a.tipo), amici: amici(), buffer: s.buffer.length }),
     partita: () => s.partita,
     puntaA(x, y, z) {
       io.yaw = Math.atan2(x - io.x, z - io.z);

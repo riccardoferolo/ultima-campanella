@@ -1,6 +1,6 @@
 # Ultima Campanella
 
-Sparatutto co-op in prima persona contro gli zombie, in due online, grafica in stile PS1.
+Sparatutto co-op in prima persona contro gli zombie, online da 1 a 4 giocatori, grafica realistica.
 Si gioca su https://riccardoferolo.github.io/ultima-campanella/
 
 ## Avvio in locale
@@ -20,6 +20,8 @@ npm test
 - Easter egg: tre frammenti di meteorite nascosti nella mappa e la vecchia campanella dell'atrio.
 - Armi aliene con un effetto loro: Singolarità (sfera che apre un buco nero, risucchia e implode), Criogeno
   (congela gli zombie in statue che si frantumano con un colpo), Arco Voltaico (fulmine che salta fino a 6 zombie, 12 potenziato).
+- Fino a 4 giocatori nella stessa stanza (chi la crea più tre amici); in tre e in quattro più zombie e boss più resistenti.
+- Musica che cresce coi round, con temi per il Preside e per il Custode (tasto M per spegnerla o riaccenderla).
 - Granate (tasto G): due all'inizio, due in più a ogni round, massimo quattro.
 - Zombie che barcollano quando li colpisci e perdono la testa col colpo in testa.
 - Il Preside, un boss che arriva ogni cinque round.

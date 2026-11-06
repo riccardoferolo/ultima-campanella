@@ -203,8 +203,8 @@ export function scatolaAcquisto(acquisto) {
     : { x0: x - lungo, z0: z - largo, x1: x + lungo, z1: z + largo };
 }
 
-export const PARTENZE = Object.freeze([Object.freeze({ x: -1.5, z: 0 }), Object.freeze({ x: 1.5, z: 0 })]);
-export const PARTENZE_SALA = Object.freeze([Object.freeze({ x: -45, z: -1.2 }), Object.freeze({ x: -45, z: 1.2 })]);
+export const PARTENZE = Object.freeze([{ x: -1.5, z: 0 }, { x: 1.5, z: 0 }, { x: -1.5, z: -2.2 }, { x: 1.5, z: -2.2 }].map(Object.freeze));
+export const PARTENZE_SALA = Object.freeze([{ x: -45, z: -1.2 }, { x: -45, z: 1.2 }, { x: -46.6, z: -1.2 }, { x: -46.6, z: 1.2 }].map(Object.freeze));
 
 export const CARTELLO_PRONTI = Object.freeze({ x: -28.16, z: 0, verso: Object.freeze({ x: -1, z: 0 }) });
 

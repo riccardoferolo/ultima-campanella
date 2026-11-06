@@ -270,7 +270,11 @@ export function saltiArco(arma) {
 }
 
 export function moltiplicatoreBoss(giocatori) {
-  return giocatori >= 2 ? 1.7 : 1;
+  return giocatori >= 2 ? 1 + 0.7 * (giocatori - 1) : 1;
+}
+
+export function fattoreOrda(giocatori) {
+  return giocatori <= 2 ? 1 : 1 + 0.35 * (giocatori - 2);
 }
 
 export function faseCustode(vitaRelativa) {
