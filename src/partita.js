@@ -2,7 +2,7 @@ import {
   R, ARMI_CASSA, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
 } from './regole.js';
 import { passoCaso } from './caso.js';
-import { FINESTRE, PORTE, ACQUISTI, PARTENZE, PARTENZE_SALA, RASTRELLIERA, MANICHINI, FRAMMENTI, zoneAperte, ostacoliPerGiocatori } from './mappa.js';
+import { FINESTRE, PORTE, ACQUISTI, PARTENZE, PARTENZE_SALA, FRAMMENTI, zoneAperte, ostacoliPerGiocatori } from './mappa.js';
 import { muoviCerchio, vistaLibera } from './fisica.js';
 import { griglia, campoVerso, direzione } from './navigazione.js';
 
@@ -62,15 +62,7 @@ export function creaPartita({ seme, giocatori = [], sala = false }) {
     attesaCampo: 0,
   };
   giocatori.forEach(g => aggiungiGiocatore(stato, g));
-  if (sala) MANICHINI.forEach((m, i) => stato.zombie.push(nuovoManichino(stato, m, i)));
   return stato;
-}
-
-function nuovoManichino(stato, posizione, i) {
-  return {
-    id: stato.prossimoId++, x: posizione.x, z: posizione.z, yaw: -Math.PI / 2, stato: 'dentro', finestra: null, tipo: 'manichino',
-    vita: R.VITA_MANICHINO, vitaMax: R.VITA_MANICHINO, corre: false, variante: i, timer: 0, attesa: 0, bersaglio: null,
-  };
 }
 
 export function aggiungiGiocatore(stato, { id, nome }) {
@@ -235,18 +227,16 @@ export function sceltaPesata(scelte, estratto) {
 function colpisci(stato, giocatore, azione, eventi) {
   const zombie = stato.zombie.find(z => z.id === azione.zombie && z.stato !== 'morto');
   if (!zombie) return;
-  const manichino = zombie.tipo === 'manichino';
-  const danno = !manichino && stato.effetti.secco > 0 ? zombie.vita : Math.min(DANNO_MASSIMO_COLPO, Math.max(0, Number(azione.danno) || 0));
+  const danno = stato.effetti.secco > 0 ? zombie.vita : Math.min(DANNO_MASSIMO_COLPO, Math.max(0, Number(azione.danno) || 0));
   zombie.vita -= danno;
   if (zombie.vita > 0) {
-    if (!manichino) aggiungiPunti(stato, giocatore, R.PUNTI_COLPO);
+    aggiungiPunti(stato, giocatore, R.PUNTI_COLPO);
     eventi.push({ k: 'colpito', zombie: zombie.id, testa: !!azione.testa, da: giocatore.id });
     return;
   }
   zombie.stato = 'morto';
-  zombie.timer = manichino ? R.RINASCITA_MANICHINO : RESTA_A_TERRA_DA_MORTO;
+  zombie.timer = RESTA_A_TERRA_DA_MORTO;
   eventi.push({ k: 'ucciso', zombie: zombie.id, testa: !!azione.testa, da: giocatore.id, x: zombie.x, z: zombie.z });
-  if (manichino) return;
   giocatore.uccisioni += 1;
   aggiungiPunti(stato, giocatore, (azione.coltello ? R.PUNTI_COLTELLO : azione.testa ? R.PUNTI_TESTA : R.PUNTI_UCCISIONE) * tipoDi(zombie).punti);
   forseBonus(stato, zombie, eventi);
@@ -272,7 +262,7 @@ function applicaBonus(stato, bonus, giocatore, eventi) {
   if (dati.durata) stato.effetti[bonus.tipo] = dati.durata;
   if (bonus.tipo === 'bomba') {
     for (const z of stato.zombie) {
-      if (z.stato === 'morto' || z.tipo === 'manichino') continue;
+      if (z.stato === 'morto') continue;
       z.stato = 'morto';
       z.timer = RESTA_A_TERRA_DA_MORTO;
       eventi.push({ k: 'ucciso', zombie: z.id, testa: false, da: null, x: z.x, z: z.z, bomba: true });
@@ -297,17 +287,6 @@ function aggiornaBonus(stato, dt, eventi) {
     }
     return bonus.timer > 0;
   });
-}
-
-function prova(stato, giocatore, armaVoluta, eventi) {
-  if (stato.fase !== 'attesa') return;
-  const posto = RASTRELLIERA.find(r => r.arma === armaVoluta);
-  if (!posto || distanza(giocatore, posto) > R.DISTANZA_PROVA + TOLLERANZA_DISTANZA) return;
-  if (giocatore.armi.includes(armaVoluta)) {
-    giocatore.armaAttiva = armaVoluta;
-    return;
-  }
-  prendiArma(stato, giocatore, armaVoluta, eventi, { prova: true });
 }
 
 function frammento(stato, giocatore, id, eventi) {
@@ -379,7 +358,6 @@ function eseguiAzioni(stato, azioni, eventi) {
     if (giocatore.stato !== 'vivo' || stato.fase === 'fine') continue;
     if (azione.tipo === 'colpo') colpisci(stato, giocatore, azione, eventi);
     else if (azione.tipo === 'pronto') giocatore.pronto = stato.fase === 'attesa' && !!azione.attivo;
-    else if (azione.tipo === 'prova') prova(stato, giocatore, String(azione.arma), eventi);
     else if (stato.fase === 'attesa') continue;
     else if (azione.tipo === 'compra') compra(stato, giocatore, String(azione.acquisto), azione.arma, eventi);
     else if (azione.tipo === 'assa') ricostruisci(stato, giocatore, azione.finestra, eventi);
@@ -393,7 +371,7 @@ function generaZombie(stato) {
   const finestra = finestre[Math.floor(caso(stato) * finestre.length)];
   const tipo = tipoZombie(stato.round, caso(stato));
   const dati = TIPI_ZOMBIE[tipo];
-  const corre = !!dati.corre || (tipo !== 'grasso' && caso(stato) < quotaCorridori(stato.round));
+  const corre = !!dati.corre || caso(stato) < quotaCorridori(stato.round);
   const vita = Math.round(vitaZombie(stato.round) * dati.vita);
   stato.zombie.push({
     id: stato.prossimoId++, x: finestra.comparsa.x + (caso(stato) - 0.5) * 2, z: finestra.comparsa.z + (caso(stato) - 0.5) * 2,
@@ -459,10 +437,6 @@ function muoviZombie(stato, dt, eventi) {
   }
   const ostacoli = ostacoliPerGiocatori(porte);
   for (const z of stato.zombie) {
-    if (z.tipo === 'manichino') {
-      aggiornaManichino(z, dt);
-      continue;
-    }
     z.attesa = Math.max(0, z.attesa - dt);
     const dati = tipoDi(z);
     const velocita = (z.corre ? R.VELOCITA_CORRE : R.VELOCITA_CAMMINA) * dati.velocita;
@@ -537,16 +511,8 @@ function muoviZombie(stato, dt, eventi) {
     z.z = nuova.z;
     z.yaw = Math.atan2(verso.x, verso.z);
   }
-  separa(stato.zombie.filter(z => z.tipo !== 'manichino' && (z.stato === 'dentro' || z.stato === 'arriva' || z.stato === 'assi')));
-  stato.zombie = stato.zombie.filter(z => z.tipo === 'manichino' || z.stato !== 'morto' || z.timer > 0);
-}
-
-function aggiornaManichino(z, dt) {
-  if (z.stato !== 'morto') return;
-  z.timer -= dt;
-  if (z.timer > 0) return;
-  z.stato = 'dentro';
-  z.vita = z.vitaMax;
+  separa(stato.zombie.filter(z => z.stato === 'dentro' || z.stato === 'arriva' || z.stato === 'assi'));
+  stato.zombie = stato.zombie.filter(z => z.stato !== 'morto' || z.timer > 0);
 }
 
 function separa(zombie) {

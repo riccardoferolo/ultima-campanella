@@ -1,5 +1,3 @@
-import { ARMI, ARMI_DI_BASE } from './regole.js';
-
 const SPESSORE = 0.3;
 export const ALTEZZA_SOFFITTO = 3.2;
 
@@ -156,23 +154,6 @@ export function scatolaAcquisto(acquisto) {
 export const PARTENZE = Object.freeze([Object.freeze({ x: -1.5, z: 0 }), Object.freeze({ x: 1.5, z: 0 })]);
 export const PARTENZE_SALA = Object.freeze([Object.freeze({ x: -45, z: -1.2 }), Object.freeze({ x: -45, z: 1.2 })]);
 
-const ARMI_IN_SALA = ARMI_DI_BASE.filter(a => !ARMI[a].segreta);
-const PER_PARETE = Math.ceil(ARMI_IN_SALA.length / 2);
-const PASSO_RASTRELLIERA = 18.4 / PER_PARETE;
-export const RASTRELLIERA = Object.freeze(ARMI_IN_SALA.map((arma, i) => {
-  const nord = i < PER_PARETE;
-  const k = nord ? i : i - PER_PARETE;
-  return Object.freeze({
-    arma,
-    x: -47.2 + PASSO_RASTRELLIERA * (k + 0.5),
-    z: nord ? -4.84 : 4.84,
-    verso: Object.freeze({ x: 0, z: nord ? 1 : -1 }),
-  });
-}));
-
-export const MANICHINI = Object.freeze([
-  Object.freeze({ x: -31.5, z: -2.6 }), Object.freeze({ x: -30.5, z: 0 }), Object.freeze({ x: -31.5, z: 2.6 }),
-]);
 export const CARTELLO_PRONTI = Object.freeze({ x: -28.16, z: 0, verso: Object.freeze({ x: -1, z: 0 }) });
 
 export const FRAMMENTI = Object.freeze([
@@ -183,40 +164,32 @@ export const FRAMMENTI = Object.freeze([
 
 const solido = (x, z, l, p) => Object.freeze({ x0: x - l / 2, z0: z - p / 2, x1: x + l / 2, z1: z + p / 2, altezza: 1 });
 export const ARREDI = Object.freeze([
-  { modello: 'Container_Red', x: 30.5, z: 13.5, rot: Math.PI / 2 },
-  { modello: 'Container_Green', x: 31, z: 25.5, rot: Math.PI / 2 + 0.08 },
-  { modello: 'Container_Green', x: 2.5, z: 36.5, rot: 0.05 },
-  { modello: 'WaterTower', x: 35, z: 36, rot: 0 },
-  { modello: 'TownSign', x: 13, z: 35.5, rot: 0 },
-  { modello: 'StreetLights', x: 21, z: 33.5, rot: Math.PI },
-  { modello: 'StreetLights', x: 30, z: 6, rot: -Math.PI / 2 },
-  { modello: 'Barrel', x: 25.2, z: 9, rot: 0.3, solido: solido(25.2, 9, 0.7, 0.7) },
-  { modello: 'Barrel', x: 24.4, z: 9.3, rot: 1.2, solido: solido(24.4, 9.3, 0.7, 0.7) },
-  { modello: 'TrafficCone_1', x: 13.8, z: 9.4, rot: 0 },
-  { modello: 'TrafficCone_2', x: 14.6, z: 9.1, rot: 0.6 },
-  { modello: 'TrafficBarrier_1', x: 9.5, z: 14.5, rot: Math.PI / 2, solido: solido(9.5, 14.5, 0.9, 1.56) },
-  { modello: 'PlasticBarrier', x: 22, z: 28.7, rot: 0.1, solido: solido(22, 28.7, 1.04, 0.4) },
-  { modello: 'TrashBag_1', x: 25.3, z: 28.9, rot: 0 },
-  { modello: 'TrashBag_2', x: 24.4, z: 29.2, rot: 2 },
-  { modello: 'Pallet', x: 25.2, z: 26.4, rot: 0.2 },
-  { modello: 'Pallet_Broken', x: 24.9, z: 11.4, rot: 1.4 },
-  { modello: 'Wheels_Stack', x: 18.5, z: 25.2, rot: 0, solido: solido(18.5, 25.2, 0.66, 0.6) },
-  { modello: 'FireHydrant', x: 9, z: 9.1, rot: 0.8 },
-  { modello: 'Blood_1', x: 15, z: 18, rot: 0.4 },
-  { modello: 'Blood_2', x: 3, z: -2.5, rot: 1.1 },
-  { modello: 'Blood_3', x: 0, z: 17, rot: 0 },
-  { modello: 'Blood_2', x: -9, z: 15, rot: 2.2 },
-  { modello: 'Blood_3', x: 20, z: 1, rot: 0.7 },
-  { modello: 'Blood_1', x: 2, z: 28, rot: 2.6 },
-  { modello: 'Pipes', x: 18.5, z: -12.9, rot: 0, solido: solido(18.5, -12.9, 0.75, 3.36) },
-  { modello: 'CinderBlock', x: 25.3, z: -15.3, rot: 0.3 },
-  { modello: 'CinderBlock', x: 25.1, z: -14.8, rot: 1.5 },
-  { modello: 'TrashBag_1', x: -10.2, z: 23.3, rot: 0 },
-  { modello: 'Barrel', x: 7.3, z: 23.1, rot: 0, solido: solido(7.3, 23.1, 0.7, 0.7) },
-  { modello: 'Chest', x: 9.6, z: -7.2, rot: 0, solido: solido(9.6, -7.2, 0.64, 0.48) },
-  { modello: 'Couch', x: -44.5, z: 3.9, rot: Math.PI, solido: solido(-44.5, 3.9, 3, 1.2) },
-  { modello: 'Barrel', x: -29, z: -4, rot: 0, solido: solido(-29, -4, 0.7, 0.7) },
-  { modello: 'Barrel', x: -29, z: 4, rot: 1, solido: solido(-29, 4, 0.7, 0.7) },
+  { modello: 'covered_car', x: 30.5, z: 13.5, rot: 0.15 },
+  { modello: 'covered_car', x: 31.2, z: 25.5, rot: -0.2 },
+  { modello: 'covered_car', x: 2.5, z: 36.5, rot: Math.PI / 2 + 0.1 },
+  { modello: 'barrel_03', x: 25.2, z: 9, rot: 0.3, solido: solido(25.2, 9, 0.65, 0.65) },
+  { modello: 'barrel_03', x: 24.4, z: 9.3, rot: 1.2, solido: solido(24.4, 9.3, 0.65, 0.65) },
+  { modello: 'old_military_crate', x: 9.5, z: 14.5, rot: Math.PI / 2, solido: solido(9.5, 14.5, 1, 1.85) },
+  { modello: 'metal_trash_can', x: 22, z: 28.9, rot: Math.PI, solido: solido(22, 28.9, 1.9, 0.6) },
+  { modello: 'trashbag', x: 25.3, z: 28.9, rot: 0 },
+  { modello: 'trashbag', x: 24.6, z: 29.2, rot: 2 },
+  { modello: 'wooden_crate_01', x: 25.2, z: 26.4, rot: 0.2 },
+  { modello: 'wooden_crate_01', x: 24.9, z: 11.4, rot: 1.4 },
+  { modello: 'barrel_03', x: 18.5, z: 25.2, rot: 0, solido: solido(18.5, 25.2, 0.65, 0.65) },
+  { modello: 'trashbag', x: 9, z: 9.1, rot: 0.8 },
+  { modello: 'wooden_crate_01', x: 18.6, z: -12.9, rot: Math.PI / 2 },
+  { modello: 'wooden_crate_01', x: 25.3, z: -15.2, rot: 0.3 },
+  { modello: 'trashbag', x: -10.2, z: 23.3, rot: 0 },
+  { modello: 'barrel_03', x: 7.3, z: 23.1, rot: 0, solido: solido(7.3, 23.1, 0.65, 0.65) },
+  { modello: 'old_military_crate', x: 10.2, z: -7.3, rot: 0, solido: solido(10.2, -7.3, 1.85, 1) },
+  { modello: 'metal_office_desk', x: -5.5, z: 2, rot: 0 },
+  { modello: 'painted_wooden_chair_01', x: -5.5, z: 2.75, rot: Math.PI },
+  { modello: 'sofa_02', x: -44.5, z: 4.3, rot: Math.PI, solido: solido(-44.5, 4.3, 1.85, 0.85) },
+  { modello: 'sofa_02', x: -40, z: 4.3, rot: Math.PI, solido: solido(-40, 4.3, 1.85, 0.85) },
+  { modello: 'painted_wooden_chair_01', x: -36, z: -4.4, rot: 0 },
+  { modello: 'painted_wooden_chair_01', x: -35, z: -4.4, rot: 0.2 },
+  { modello: 'barrel_03', x: -29, z: -4, rot: 0, solido: solido(-29, -4, 0.65, 0.65) },
+  { modello: 'barrel_03', x: -29, z: 4, rot: 1, solido: solido(-29, 4, 0.65, 0.65) },
 ].map(Object.freeze));
 
 export function zonaDi(x, z) {

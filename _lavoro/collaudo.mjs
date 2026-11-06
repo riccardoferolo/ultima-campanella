@@ -31,7 +31,7 @@ async function aspettaGioco(host, secondi) {
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ARGOMENTI });
 try {
-  const contesto = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const contesto = await browser.newContext({ viewport: { width: 640, height: 360 } });
   const host = await contesto.newPage();
   const ospite = await contesto.newPage();
   const errori = [];
@@ -64,26 +64,21 @@ try {
   const idOspite = (await stato(ospite)).mioId;
 
   verifica("si comincia nella sala d'attesa", (await partita(host, 'return p.fase')) === 'attesa');
-  await ospite.evaluate(async () => {
-    const m = await import('/src/mappa.js');
-    const posto = m.RASTRELLIERA.find(r => r.arma === 'laser');
-    window.__gioco.vaiA(posto.x, posto.z + posto.verso.z);
-  });
-  await aspettaGioco(host, 0.3);
   await ospite.evaluate(() => window.__gioco.azione({ tipo: 'prova', arma: 'laser' }));
   await aspettaGioco(host, 0.5);
   const armiProva = await partita(host, 'return p.giocatori.find(g => g.id === a).armi', idOspite);
   const armiClient = (await stato(ospite)).armi;
-  verifica("in sala l'amico prova un'arma dal muro", armiProva.includes('laser') && armiClient.includes('laser'), `${armiProva} / ${armiClient}`);
+  verifica("in sala non si provano armi", armiProva.join() === 'pistola' && armiClient.join() === 'pistola', `${armiProva} / ${armiClient}`);
+  verifica('in sala non ci sono zombie né manichini', (await partita(host, 'return p.zombie.length')) === 0);
   await ospite.evaluate(() => window.__gioco.azione({ tipo: 'pronto', attivo: true }));
-  await host.bringToFront();
+  await ospite.bringToFront();
   await host.evaluate(() => window.__gioco.azione({ tipo: 'pronto', attivo: true }));
   await aspettaGioco(host, 0.5);
   verifica('quando sono pronti tutti e due parte il conto alla rovescia', (await partita(host, 'return p.conto')) !== null);
   await aspettaGioco(host, 5.2);
   const dopoVia = await partita(host, 'return { fase: p.fase, armi: p.giocatori.map(g => g.armi.join()) }');
   verifica('finito il conto si entra nella scuola con la sola pistola', dopoVia.fase !== 'attesa' && dopoVia.armi.every(a => a === 'pistola'), JSON.stringify(dopoVia));
-  await aspettaGioco(host, 0.5);
+  await attendi(ospite, () => { const io = window.__gioco.stato().io; return Math.hypot(io.x - 1.5, io.z) < 0.6; }, 10000);
   const ospiteDentro = (await stato(ospite)).io;
   verifica("anche l'amico è stato portato nella scuola", Math.hypot(ospiteDentro.x - 1.5, ospiteDentro.z) < 0.6, `${ospiteDentro.x},${ospiteDentro.z}`);
 
@@ -96,13 +91,15 @@ try {
   await aspettaGioco(host, 4);
   await partita(host, `
     p.daGenerare = 0;
-    p.zombie = [{ id: 7777, x: 3, z: -2.5, yaw: 0, stato: 'dentro', finestra: 'a1', vita: 100000, vitaMax: 100000, corre: false, variante: 1, timer: 0, attesa: 9, bersaglio: null }];
+    p.zombie = [{ id: 7777, x: 3, z: -2.5, yaw: 0, stato: 'dentro', finestra: 'a1', vita: 100000, vitaMax: 100000, corre: false, variante: 1, timer: 0, attesa: 99, bersaglio: null }];
   `);
   await aspettaGioco(host, 0.4);
   const puntiPrima = await partita(host, 'return p.giocatori.find(g => g.id === a).punti', idOspite);
+  const vistoDallOspite = await attendi(ospite, () => window.__gioco.stato().vista?.zombie.some(z => z.id === 7777), 5000);
   await ospite.evaluate(async () => {
     for (let i = 0; i < 10 && window.__gioco.stato().arma.caricatore === 8; i++) {
       const z = window.__gioco.stato().vista.zombie.find(z => z.id === 7777);
+      if (!z) break;
       window.__gioco.puntaA(z.x, 1.1, z.z);
       window.__gioco.spara();
       await new Promise(r => setTimeout(r, 150));
@@ -113,7 +110,7 @@ try {
   const diag = await ospite.evaluate(() => { const st = window.__gioco.stato(); return { arma: st.arma, armi: st.armi, io: [st.io.x, st.io.z, st.io.yaw, st.io.pitch], z: st.vista.zombie.map(z => [z.id, z.x, z.z, z.stato, z.tipo]), fase: st.vista.fase }; });
   verifica('il colpo dell\'amico ferisce lo zombie e gli dà punti', dopo.punti > puntiPrima && dopo.vita < 100000, `punti ${puntiPrima} → ${dopo.punti} ${JSON.stringify(diag)}`);
   await ospite.screenshot({ path: `${FOTO}10-amico-spara.png` });
-  await partita(host, 'p.zombie = []');
+  await partita(host, "p.zombie = []; p.daGenerare = 0; p.fase = 'intervallo'; p.timerFase = 999;");
 
   await partita(host, `p.giocatori.find(g => g.id === a).punti = 3000`, idOspite);
   await ospite.evaluate(() => window.__gioco.vaiA(-5, 4.9));
@@ -135,15 +132,19 @@ try {
   verifica("dalla cassa l'amico prende la pistola a raggi", raggi, (await stato(ospite)).armi.join(','));
   await partita(host, `
     p.zombie = [
-      { id: 8801, x: 16, z: 2.5, yaw: 0, stato: 'dentro', finestra: 'p1', vita: 100000, vitaMax: 100000, corre: false, variante: 0, timer: 0, attesa: 9, bersaglio: null },
-      { id: 8802, x: 16.9, z: 2.6, yaw: 0, stato: 'dentro', finestra: 'p1', vita: 100000, vitaMax: 100000, corre: false, variante: 2, timer: 0, attesa: 9, bersaglio: null },
+      { id: 8801, x: 16, z: 2.5, yaw: 0, stato: 'dentro', finestra: 'p1', vita: 100000, vitaMax: 100000, corre: false, variante: 0, timer: 0, attesa: 99, bersaglio: null },
+      { id: 8802, x: 16.9, z: 2.6, yaw: 0, stato: 'dentro', finestra: 'p1', vita: 100000, vitaMax: 100000, corre: false, variante: 2, timer: 0, attesa: 99, bersaglio: null },
     ];
   `);
   await aspettaGioco(host, 0.6);
   await ospite.waitForTimeout(400);
-  await ospite.evaluate(() => {
-    window.__gioco.puntaA(16, 1.0, 2.5);
-    window.__gioco.spara();
+  await ospite.evaluate(async () => {
+    const pieno = window.__gioco.stato().arma.caricatore;
+    for (let i = 0; i < 10 && window.__gioco.stato().arma.caricatore === pieno; i++) {
+      window.__gioco.puntaA(16, 1.0, 2.5);
+      window.__gioco.spara();
+      await new Promise(r => setTimeout(r, 150));
+    }
   });
   await ospite.waitForTimeout(60);
   await ospite.screenshot({ path: `${FOTO}13-raggi.png` });
@@ -179,7 +180,7 @@ try {
   await host.evaluate(([x, z]) => window.__gioco.vaiA(x, z), [doveCaduto.x, doveCaduto.z - 1]);
   await aspettaGioco(host, 0.3);
   await host.keyboard.down('KeyF');
-  await aspettaGioco(host, 4.6);
+  await aspettaGioco(host, 6.5);
   await host.keyboard.up('KeyF');
   const rianimato = await partita(host, 'return p.giocatori.find(g => g.id === a).stato', idOspite);
   verifica('tenendo F l\'host rianima l\'amico', rianimato === 'vivo', rianimato);
@@ -187,7 +188,7 @@ try {
 
   await partita(host, `Object.assign(p.giocatori.find(g => g.id === a), { stato: 'morto', vita: 0 }); p.zombie = []; p.daGenerare = 0;`, idOspite);
   await aspettaGioco(host, 0.3);
-  await partita(host, 'p.timerFase = 0.3');
+  await partita(host, "p.fase = 'intervallo'; p.timerFase = 0.3");
   await aspettaGioco(host, 1.2);
   await ospite.bringToFront();
   await ospite.waitForTimeout(500);
@@ -208,7 +209,7 @@ try {
   const ripartita = await attendi(ospite, () => window.__gioco.stato().fase === 'gioco', 8000);
   verifica('rigioca riparte per tutti e due', ripartita && (await partita(host, 'return p.giocatori.length')) === 2);
 
-  await ospite.reload();
+  await ospite.reload({ waitUntil: 'domcontentloaded' });
   await ospite.waitForFunction(() => window.__gioco?.pronto(), null, { timeout: 60000 });
   await ospite.fill('#nome', 'Seba');
   await ospite.keyboard.press('Enter');

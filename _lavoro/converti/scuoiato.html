@@ -1,0 +1,45 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><base href="/"><title>scuoiato</title></head>
+<body style="margin:0;background:#222">
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+window.foto = async (scalaMagro, clip) => {
+  const scena = new THREE.Scene();
+  scena.background = new THREE.Color(0x556070);
+  scena.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.5));
+  const sole = new THREE.DirectionalLight(0xffffff, 2);
+  sole.position.set(2, 4, 5);
+  scena.add(sole);
+  const info = {};
+  const carica = async (url, scala, x, nomeClip) => {
+    const g = await new GLTFLoader().loadAsync(url);
+    g.scene.scale.setScalar(scala);
+    g.scene.position.x = x;
+    scena.add(g.scene);
+    const mixer = new THREE.AnimationMixer(g.scene);
+    const c = g.animations.find(a => a.name === nomeClip) ?? g.animations[0];
+    mixer.clipAction(c).play();
+    mixer.update(0.4);
+    g.scene.updateMatrixWorld(true);
+    const s = new THREE.Box3().setFromObject(g.scene);
+    info[url] = { clip: c.name, nomi: g.animations.map(a => a.name), altezza: +(s.max.y - s.min.y).toFixed(2), min: s.min.toArray().map(v => +v.toFixed(2)), max: s.max.toArray().map(v => +v.toFixed(2)) };
+  };
+  await carica('/public/modelli/zombie.glb', 0.01, -0.9, 'fermo');
+  await carica('/public/modelli/zombi_magro.glb', scalaMagro, 0.9, clip);
+  const asse = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.8, 0.05), new THREE.MeshBasicMaterial({ color: 0xff3333 }));
+  asse.position.set(0, 0.9, 0);
+  scena.add(asse);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(800, 500);
+  document.body.appendChild(renderer.domElement);
+  const camera = new THREE.PerspectiveCamera(40, 1.6, 0.1, 50);
+  camera.position.set(0, 1.1, 5.5);
+  camera.lookAt(0, 0.95, 0);
+  renderer.render(scena, camera);
+  return { info, img: renderer.domElement.toDataURL('image/png') };
+};
+window.pronto = true;
+</script>
+</body></html>

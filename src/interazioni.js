@@ -1,22 +1,10 @@
 import { R, ARMI, BEVANDE, armaBase, versionePotenziata } from './regole.js';
-import { FINESTRE, PORTE, ACQUISTI, RASTRELLIERA, FRAMMENTI, zoneAperte } from './mappa.js';
+import { FINESTRE, PORTE, ACQUISTI, FRAMMENTI, zoneAperte } from './mappa.js';
 
 const distanza = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
-function provaInSala(io) {
-  let migliore = null;
-  for (const posto of RASTRELLIERA) {
-    const d = distanza(posto, io);
-    if (d <= R.DISTANZA_PROVA && (!migliore || d < migliore.d)) migliore = { d, posto };
-  }
-  if (!migliore) return null;
-  const arma = migliore.posto.arma;
-  const inMano = io.armi.includes(arma);
-  return { tipo: 'prova', arma, acquisto: `prova:${arma}`, testo: inMano ? `${ARMI[arma].nome}: ce l'hai già` : `Premi F per provare: ${ARMI[arma].nome}` };
-}
-
 export function interazioneVicina(io, vista) {
-  if (vista.fase === 'attesa') return provaInSala(io);
+  if (vista.fase === 'attesa') return null;
   const compagno = vista.giocatori.find(g => g.id !== io.id && g.stato === 'terra' && distanza(g, io) <= R.RIANIMA_DISTANZA);
   if (compagno) return { tipo: 'rianima', testo: `Tieni premuto F per rianimare ${compagno.nome}`, bersaglio: compagno.id };
 

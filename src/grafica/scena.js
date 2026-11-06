@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { R } from '../regole.js';
 import { ZONE } from '../mappa.js';
-import { creaTexture } from './texture.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { creaTexture, caricaTextureReali } from './texture.js';
 import { caricaArmi, creaMaterialiArmi } from './armi3d.js';
 import { costruisciScuola } from './scuola3d.js';
 import { caricaZombi, creaGestoreZombi } from './zombi3d.js';
@@ -11,7 +12,11 @@ import { caricaOggetti, costruisciArredi, costruisciSala, creaBonus3d, creaSegre
 import { creaEffetti } from './effetti.js';
 import { creaVista1p } from './vista1p.js';
 
-const RIDUZIONE = 3;
+const SCALA_MINIMA = 0.5;
+const PASSO_SCALA = 0.1;
+const FPS_BASSI = 50;
+const FPS_ALTI = 58;
+const VERIFICA_OGNI_S = 1.5;
 const BUIO = 0x06080b;
 const FOV = 72;
 const FOV_MIRA = 52;
@@ -40,9 +45,11 @@ function precompila(renderer, scena, camera, extra) {
 const aperta = (x, z) => ZONE.some(zona => zona.aperto && x >= zona.x0 && x <= zona.x1 && z >= zona.z0 && z <= zona.z1);
 
 export async function creaMondo(contenitore) {
-  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
   renderer.autoClear = false;
   contenitore.appendChild(renderer.domElement);
 
@@ -65,17 +72,22 @@ export async function creaMondo(contenitore) {
   camera.add(torcia, mira, lampo);
   scena.add(camera);
 
+  const ambiente = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  scena.environment = ambiente;
+  scena.environmentIntensity = 0.12;
   const texture = creaTexture();
-  const [libreria, risorseZombi, personaggi, oggetti] = await Promise.all([caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti()]);
+  const [libreria, risorseZombi, personaggi, oggetti, reali] = await Promise.all([caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(), caricaTextureReali()]);
   const materialiArmi = creaMaterialiArmi(texture, libreria);
-  const scuola = costruisciScuola(scena, texture, materialiArmi, oggetti);
+  const scuola = costruisciScuola(scena, texture, materialiArmi, oggetti, reali);
   costruisciArredi(scena, oggetti);
-  costruisciSala(scena, texture, materialiArmi);
+  costruisciSala(scena);
   const bonus3d = creaBonus3d(scena);
   const segreti = creaSegreti(scena);
   const zombi = creaGestoreZombi(scena, risorseZombi);
   const effetti = creaEffetti(scena);
   const vista1p = creaVista1p(materialiArmi);
+  vista1p.scena.environment = ambiente;
+  vista1p.scena.environmentIntensity = 0.5;
   vista1p.mostra('pistola');
   precompila(renderer, scena, camera, [...[...risorseZombi.values()].map(r => clonaScheletro(r.modello)), ...personaggi.map(p => clonaScheletro(p.modello))]);
   precompila(renderer, vista1p.scena, vista1p.camera, []);
@@ -84,9 +96,12 @@ export async function creaMondo(contenitore) {
   let tempo = 0;
   let passo = 0;
 
+  let scala = 1;
+  let campioni = 0;
+  let sommaDt = 0;
   function dimensiona() {
-    const l = Math.max(1, Math.floor(contenitore.clientWidth / RIDUZIONE));
-    const a = Math.max(1, Math.floor(contenitore.clientHeight / RIDUZIONE));
+    const l = Math.max(1, Math.floor(contenitore.clientWidth * scala));
+    const a = Math.max(1, Math.floor(contenitore.clientHeight * scala));
     renderer.setSize(l, a, false);
     camera.aspect = l / a;
     camera.updateProjectionMatrix();
@@ -114,8 +129,22 @@ export async function creaMondo(contenitore) {
     }
   }
 
+  function adattaRisoluzione(dt) {
+    campioni += 1;
+    sommaDt += dt;
+    if (sommaDt < VERIFICA_OGNI_S) return;
+    const fps = campioni / sommaDt;
+    campioni = 0;
+    sommaDt = 0;
+    const nuova = fps < FPS_BASSI ? Math.max(SCALA_MINIMA, scala - PASSO_SCALA) : fps > FPS_ALTI ? Math.min(1, scala + PASSO_SCALA / 2) : scala;
+    if (Math.abs(nuova - scala) < 0.01) return;
+    scala = nuova;
+    dimensiona();
+  }
+
   function disegna(vista, { io, mioId, dt, arma, movimento, corsa, inMira, cannocchiale, ricarica, cambio, coltellata, aTerra, morto }) {
     tempo += dt;
+    adattaRisoluzione(dt);
     passo += dt * movimento * (corsa ? 13 : 9);
     const occhi = aTerra ? 0.45 : R.ALTEZZA_OCCHI;
     camera.position.set(io.x, occhi + Math.sin(passo) * ONDEGGIO * movimento * (inMira ? 0 : 1), io.z);

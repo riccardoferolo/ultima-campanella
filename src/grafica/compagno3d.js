@@ -4,9 +4,7 @@ import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.
 import { modelloArma } from './armi3d.js';
 import { texturaTesto } from './texture.js';
 
-const URL_PERSONAGGI = Object.freeze(['./modelli/sopravvissuto_matt.glb', './modelli/sopravvissuto_shaun.glb']);
-const SCALA = 1.3;
-const ARMI_DEL_MODELLO = /^(SMG|Knife|WoodenBat|Pistol|Shotgun)/;
+const URL_PERSONAGGI = Object.freeze(['./modelli/soldato.glb']);
 const DISSOLVENZA = 0.2;
 
 function etichetta(testo, colore) {
@@ -23,11 +21,6 @@ export async function caricaPersonaggi() {
     const gltf = await new GLTFLoader().loadAsync(url);
     gltf.scene.traverse(o => {
       if (o.isMesh) o.frustumCulled = false;
-      for (const m of o.isMesh ? [].concat(o.material) : []) {
-        if (!m.map) continue;
-        m.map.magFilter = THREE.NearestFilter;
-        m.map.needsUpdate = true;
-      }
     });
     return { modello: gltf.scene, clip: new Map(gltf.animations.map(a => [a.name, a])) };
   }));
@@ -35,29 +28,23 @@ export async function caricaPersonaggi() {
 
 export function creaCompagno(scena, nome, materialiArmi, personaggio) {
   const radice = new THREE.Group();
+  const postura = new THREE.Group();
   const corpo = clonaScheletro(personaggio.modello);
-  corpo.scale.setScalar(SCALA);
-  const nascondere = [];
+  corpo.rotation.y = Math.PI;
   let mano = null;
   corpo.traverse(o => {
-    if (ARMI_DEL_MODELLO.test(o.name)) nascondere.push(o);
-    if (!mano && o.isBone && /^Index1\.R$/.test(o.name)) mano = o;
+    if (!mano && o.isBone && /RightHand$/.test(o.name)) mano = o;
   });
-  nascondere.forEach(o => { o.visible = false; });
-  radice.add(corpo);
+  postura.add(corpo);
+  radice.add(postura);
   const supporto = new THREE.Group();
   radice.add(supporto);
   const mixer = new THREE.AnimationMixer(corpo);
   const azioni = new Map();
-  for (const [logico, nomeClip] of Object.entries({ fermo: 'Idle_Gun', cammina: 'Walk_Gun', corre: 'Run_Gun', terra: 'Death' })) {
+  for (const [logico, nomeClip] of Object.entries({ fermo: 'Idle', cammina: 'Walk', corre: 'Run' })) {
     const clip = personaggio.clip.get(nomeClip);
     if (!clip) continue;
-    const azione = mixer.clipAction(clip);
-    if (logico === 'terra') {
-      azione.setLoop(THREE.LoopOnce, 1);
-      azione.clampWhenFinished = true;
-    }
-    azioni.set(logico, azione);
+    azioni.set(logico, mixer.clipAction(clip));
   }
   let attuale = null;
   const armi = new Map();
@@ -85,8 +72,10 @@ export function creaCompagno(scena, nome, materialiArmi, personaggio) {
       radice.position.set(g.x, 0, g.z);
       radice.rotation.y = g.yaw;
       const aTerra = g.stato === 'terra';
-      suona(aTerra ? 'terra' : g.inMovimento ? (g.corsa ? 'corre' : 'cammina') : 'fermo');
+      suona(aTerra ? 'fermo' : g.inMovimento ? (g.corsa ? 'corre' : 'cammina') : 'fermo');
       mixer.update(dt);
+      postura.rotation.x = aTerra ? -Math.PI / 2 : 0;
+      postura.position.y = aTerra ? 0.25 : 0;
       nomeSprite.visible = !aTerra;
       allarme.visible = aTerra;
       supporto.visible = !aTerra;

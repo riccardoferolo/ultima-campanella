@@ -13,9 +13,9 @@ npm test
 
 ## Cosa c'è
 
-- Sala d'attesa 3D prima della partita: tutte le armi appese al muro da provare gratis (F), manichini su cui sparare, Invio quando sei pronto, conto alla rovescia di 5 secondi.
+- Sala d'attesa prima della partita: Invio quando sei pronto, conto alla rovescia di 5 secondi.
 - 52 armi (40 vere + 12 aliene), ognuna con la sua versione potenziata.
-- Sei tipi di zombie: normale, verde, Costola (striscia veloce), Braccione, Ciccione, cane infetto.
+- Due zombie realistici: quello di città e lo Scuoiato (più veloce, più fragile, fa più male).
 - Bonus lasciati dagli zombie: Bomba, Munizioni al massimo, Punti doppi, Colpo secco, Saldi, Carpentiere, Caricatore infinito.
 - Easter egg: tre frammenti di meteorite nascosti nella mappa e la vecchia campanella dell'atrio.
 

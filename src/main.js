@@ -528,8 +528,8 @@ function interagisci(lettura, me, vista) {
       locale.ultimoAcquisto = { id: interazione.acquisto, quando: oraS };
     }
   }
-  if (lettura.fPremuto && (interazione.tipo === 'prova' || interazione.tipo === 'frammento') && !ripetuto) {
-    inviaAzione(interazione.tipo === 'prova' ? { tipo: 'prova', arma: interazione.arma } : { tipo: 'frammento', id: interazione.id });
+  if (lettura.fPremuto && interazione.tipo === 'frammento' && !ripetuto) {
+    inviaAzione({ tipo: 'frammento', id: interazione.id });
     locale.ultimoAcquisto = { id: interazione.acquisto, quando: oraS };
   }
   if (lettura.f && interazione.tipo === 'rianima' && !locale.inRianimazione) {
@@ -575,7 +575,6 @@ function ciclo(ora) {
       comandi.applicaVista(io);
       muovi(lettura, me, dt);
       usaArmi(lettura, me, vista, dt);
-      if (vista.fase === 'attesa') for (const a of arsenale.armi) a.riserva = ARMI[a.tipo].riserva;
       const interazione = interagisci(lettura, me, vista);
       suoniAmbiente(vista, dt);
       const ferito = vista.giocatori.find(g => g.id !== s.mioId && g.stato === 'terra');

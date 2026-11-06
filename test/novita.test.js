@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { R, ARMI, ARMI_DI_BASE, ARMI_CASSA, TIPI_ZOMBIE, BONUS, ELENCO_BONUS, tipoZombie, pesiZombie } from '../src/regole.js';
-import { RASTRELLIERA, MANICHINI, FRAMMENTI, ACQUISTI, PARTENZE, PARTENZE_SALA, dentroSala, FINESTRE } from '../src/mappa.js';
+import { FRAMMENTI, ACQUISTI, PARTENZE, PARTENZE_SALA, dentroSala, FINESTRE } from '../src/mappa.js';
 import { creaPartita, passo, creaBonus } from '../src/partita.js';
 import { faiIstantanea, espandi } from '../src/istantanea.js';
 import { valida } from '../src/rete/protocollo.js';
@@ -42,40 +42,23 @@ test('ogni arma ha un modello, un nome e la sua versione potenziata', () => {
   assert.ok(!ARMI_CASSA.includes('disintegratore'), "l'arma segreta non esce dalla cassa");
 });
 
-test('la partita con la sala parte in attesa, coi giocatori nella sala e i manichini', () => {
+test('la partita con la sala parte in attesa, coi giocatori nella sala e senza zombie', () => {
   const stato = nellaSala();
   assert.equal(stato.fase, 'attesa');
   for (const g of stato.giocatori) assert.ok(dentroSala(g.x, g.z), `${g.nome} fuori dalla sala`);
-  assert.equal(stato.zombie.length, MANICHINI.length);
-  assert.ok(stato.zombie.every(z => z.tipo === 'manichino'));
+  assert.equal(stato.zombie.length, 0);
   assert.equal(avanza(stato, 5).filter(e => e.k === 'round').length, 0, 'nessun round finché non sono pronti');
 });
 
-test('in sala si prova un arma dal muro gratis, solo vicino alla rastrelliera', () => {
+test("in sala non si possono provare armi né comprare niente", () => {
   const stato = nellaSala();
-  const posto = RASTRELLIERA.find(r => r.arma === 'fucilePlasma');
   const io = giocatore(stato, 'a');
-  avanza(stato, R.PASSO, una('a', 'prova', { arma: 'fucilePlasma' }));
-  assert.deepEqual(io.armi, ['pistola'], 'da lontano non la prende');
-  Object.assign(io, { x: posto.x, z: posto.z + posto.verso.z });
-  const eventi = avanza(stato, R.PASSO, una('a', 'prova', { arma: 'fucilePlasma' }));
-  assert.deepEqual(io.armi, ['pistola', 'fucilePlasma']);
+  for (const azione of [{ tipo: 'prova', arma: 'laser' }, { tipo: 'compra', acquisto: 'cassa' }, { tipo: 'compra', acquisto: 'muro-pompa' }]) {
+    avanza(stato, R.PASSO, una('a', azione.tipo, azione));
+  }
+  assert.deepEqual(io.armi, ['pistola']);
   assert.equal(io.punti, R.PUNTI_INIZIALI);
-  assert.ok(eventi.some(e => e.k === 'acquisto' && e.arma === 'fucilePlasma'));
-});
-
-test('i manichini si sparano senza dare punti e tornano in piedi', () => {
-  const stato = nellaSala();
-  const manichino = stato.zombie[0];
-  avanza(stato, R.PASSO, una('a', 'colpo', { zombie: manichino.id, danno: 2000 }));
-  avanza(stato, R.PASSO, una('a', 'colpo', { zombie: manichino.id, danno: 2000 }));
-  assert.equal(manichino.stato, 'morto');
-  assert.equal(giocatore(stato, 'a').punti, R.PUNTI_INIZIALI);
-  assert.equal(giocatore(stato, 'a').uccisioni, 0);
-  avanza(stato, R.RINASCITA_MANICHINO + 0.1);
-  assert.equal(manichino.stato, 'dentro');
-  assert.equal(manichino.vita, R.VITA_MANICHINO);
-  assert.equal(stato.zombie.length, MANICHINI.length);
+  assert.equal(valida({ t: 'az', a: { tipo: 'prova', arma: 'laser' } }), null, 'il messaggio di prova è rifiutato');
 });
 
 test('quando tutti sono pronti parte il conto alla rovescia, poi la partita vera', () => {
@@ -88,7 +71,7 @@ test('quando tutti sono pronti parte il conto alla rovescia, poi la partita vera
   const via = avanza(stato, R.CONTO_ALLA_ROVESCIA + 0.1);
   assert.ok(via.some(e => e.k === 'via'));
   assert.equal(stato.fase, 'intervallo');
-  assert.equal(stato.zombie.length, 0, 'i manichini spariscono');
+  assert.equal(stato.zombie.length, 0);
   stato.giocatori.forEach((g, i) => {
     assert.deepEqual(g.armi, ['pistola']);
     assert.equal(g.punti, R.PUNTI_INIZIALI);
@@ -109,28 +92,28 @@ test('se uno torna non pronto il conto alla rovescia si annulla', () => {
   assert.ok(PARTENZE_SALA.length >= 2);
 });
 
-test('i tipi di zombie compaiono col passare dei round e hanno statistiche diverse', () => {
-  assert.equal(tipoZombie(1, 0), 'normale');
-  assert.ok(['normale', 'base'].includes(tipoZombie(2, 0.99)));
-  assert.equal(pesiZombie(2).cane, 0);
-  assert.ok(pesiZombie(8).cane > 0 && pesiZombie(8).grasso > 0);
-  assert.ok(TIPI_ZOMBIE.grasso.vita > TIPI_ZOMBIE.normale.vita);
-  assert.ok(TIPI_ZOMBIE.cane.velocita > TIPI_ZOMBIE.normale.velocita);
+test('due tipi di zombie: lo scuoiato arriva dal secondo round ed è più veloce ma più fragile', () => {
+  assert.deepEqual(Object.keys(TIPI_ZOMBIE).sort(), ['magro', 'normale']);
+  assert.equal(tipoZombie(1, 0.99), 'normale');
+  assert.equal(pesiZombie(1).magro, 0);
+  assert.ok(pesiZombie(5).magro > 0);
+  assert.ok(TIPI_ZOMBIE.magro.velocita > TIPI_ZOMBIE.normale.velocita);
+  assert.ok(TIPI_ZOMBIE.magro.vita < TIPI_ZOMBIE.normale.vita);
   const visti = new Set();
-  for (let i = 0; i < 400; i++) visti.add(tipoZombie(9, i / 400));
-  for (const tipo of ['normale', 'base', 'scheletro', 'braccio', 'grasso', 'cane']) assert.ok(visti.has(tipo), tipo);
+  for (let i = 0; i < 100; i++) visti.add(tipoZombie(6, i / 100));
+  assert.deepEqual([...visti].sort(), ['magro', 'normale']);
 });
 
-test('uno zombie grosso ha più vita e fa più male', () => {
+test('lo scuoiato fa più male di uno zombie normale', () => {
   const stato = inGioco();
   const g = giocatore(stato, 'a');
   Object.assign(g, { x: 0, z: 0 });
-  const grasso = zombie(stato, { tipo: 'grasso', x: 0, z: 0.8, vita: 500, vitaMax: 500 });
-  grasso.stato = 'attacco';
-  grasso.timer = 0.01;
-  grasso.bersaglio = 'a';
+  const z = zombie(stato, { tipo: 'magro', x: 0, z: 0.8, vita: 500, vitaMax: 500 });
+  z.stato = 'attacco';
+  z.timer = 0.01;
+  z.bersaglio = 'a';
   avanza(stato, R.PASSO * 2);
-  assert.equal(g.vita, R.VITA - R.DANNO_ZOMBIE * TIPI_ZOMBIE.grasso.danno);
+  assert.equal(g.vita, R.VITA - R.DANNO_ZOMBIE * TIPI_ZOMBIE.magro.danno);
 });
 
 test('le uccisioni ogni tanto lasciano un bonus, al massimo quattro per round', () => {
@@ -158,6 +141,7 @@ test('il bonus si raccoglie passandoci sopra; i punti doppi raddoppiano', () => 
   const prima = g.punti;
   avanza(stato, R.PASSO, una('a', 'colpo', { zombie: z.id, danno: 10 }));
   assert.equal(g.punti - prima, R.PUNTI_COLPO * 2);
+  Object.assign(stato, { zombie: [], daGenerare: 0, fase: 'intervallo', timerFase: 999 });
   avanza(stato, BONUS.doppi.durata + 0.1);
   assert.equal(stato.effetti.doppi, 0);
 });
@@ -250,9 +234,7 @@ test("l'istantanea porta sala, bonus, effetti e tipi di zombie e passa la valida
   assert.equal(vista.fase, 'attesa');
   assert.equal(vista.bonus[0].tipo, 'munizioni');
   assert.equal(vista.effetti.infinite, 12);
-  assert.ok(vista.zombie.every(z => z.tipo === 'manichino'));
-  for (const azione of [{ tipo: 'pronto', attivo: true }, { tipo: 'prova', arma: 'laser' }, { tipo: 'frammento', id: 1 }]) {
+  for (const azione of [{ tipo: 'pronto', attivo: true }, { tipo: 'frammento', id: 1 }]) {
     assert.ok(valida({ t: 'az', a: azione }), azione.tipo);
   }
-  assert.equal(valida({ t: 'az', a: { tipo: 'prova', arma: 'bazooka' } }), null);
 });

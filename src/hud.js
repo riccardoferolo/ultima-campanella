@@ -117,7 +117,7 @@ export function creaHud() {
             return riga;
           });
           const nota = document.createElement('p');
-          nota.textContent = io?.pronto ? 'Invio: aspetta, non sono pronto' : 'Prova le armi al muro (F) · INVIO quando sei pronto';
+          nota.textContent = io?.pronto ? 'Invio: aspetta, non sono pronto' : 'Premi INVIO quando sei pronto';
           sala.replaceChildren(titolo, ...righe, nota);
         }
       }

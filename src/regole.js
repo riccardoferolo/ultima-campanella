@@ -35,7 +35,6 @@ export const R = Object.freeze({
   VELOCITA_CAMMINA: 1.1,
   VELOCITA_CORRE: 3.6,
   DISTANZA_ACQUISTO: 2,
-  DISTANZA_PROVA: 1.3,
 
   COSTO_CASSA: 950,
   DURATA_CASSA: 8,
@@ -45,8 +44,6 @@ export const R = Object.freeze({
 
   CONTO_ALLA_ROVESCIA: 5,
   PRIMO_ROUND_TRA: 3,
-  VITA_MANICHINO: 3000,
-  RINASCITA_MANICHINO: 3,
 
   PROBABILITA_BONUS: 0.035,
   BONUS_PER_ROUND: 4,
@@ -169,24 +166,12 @@ export const BEVANDE = Object.freeze({
 
 export const TIPI_ZOMBIE = Object.freeze({
   normale: Object.freeze({ nome: 'Zombie', vita: 1, velocita: 1, danno: 1, portata: 1, punti: 1 }),
-  base: Object.freeze({ nome: 'Zombie verde', vita: 1, velocita: 1, danno: 1, portata: 1, punti: 1 }),
-  scheletro: Object.freeze({ nome: 'Costola', vita: 0.6, velocita: 1.25, danno: 0.8, portata: 1, punti: 1, corre: true }),
-  braccio: Object.freeze({ nome: 'Braccione', vita: 1.5, velocita: 0.95, danno: 1.3, portata: 1.45, punti: 1.5 }),
-  grasso: Object.freeze({ nome: 'Ciccione', vita: 3.2, velocita: 0.65, danno: 1.7, portata: 1.1, punti: 2.5 }),
-  cane: Object.freeze({ nome: 'Cane infetto', vita: 0.45, velocita: 1.55, danno: 0.6, portata: 0.9, punti: 1, corre: true }),
-  manichino: Object.freeze({ nome: 'Manichino', vita: 1, velocita: 0, danno: 0, portata: 0, punti: 0 }),
+  magro: Object.freeze({ nome: 'Scuoiato', vita: 0.7, velocita: 1.15, danno: 1.1, portata: 1.05, punti: 1.2, corre: true }),
 });
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 
 export function pesiZombie(round) {
-  return {
-    normale: 0.55,
-    base: 0.45,
-    scheletro: round >= 3 ? 0.18 : 0,
-    braccio: round >= 4 ? 0.15 : 0,
-    grasso: round >= 5 ? 0.1 + Math.min(0.1, (round - 5) * 0.01) : 0,
-    cane: round >= 6 ? 0.12 : 0,
-  };
+  return { normale: 1, magro: round >= 2 ? 0.25 + Math.min(0.35, (round - 2) * 0.04) : 0 };
 }
 
 export function tipoZombie(round, estratto) {

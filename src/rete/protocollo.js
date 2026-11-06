@@ -52,7 +52,6 @@ function eAzione(a) {
   if (a.tipo === 'compra') return testo(a.acquisto) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'assa') return testo(a.finestra);
   if (a.tipo === 'rianima' || a.tipo === 'pronto') return typeof a.attivo === 'boolean';
-  if (a.tipo === 'prova') return arma(a.arma);
   if (a.tipo === 'frammento') return numero(a.id);
   return false;
 }

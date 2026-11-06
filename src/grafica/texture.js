@@ -11,11 +11,27 @@ function disegna(larghezza, altezza, pittore, ripeti = true) {
   pittore(ctx, larghezza, altezza, creaCaso(larghezza * 31 + altezza));
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
+  texture.anisotropy = 4;
   if (ripeti) texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   return texture;
+}
+
+const REALI = Object.freeze(['muro', 'piastrelle', 'parquet', 'soffitto', 'legno', 'legnoChiaro', 'porta', 'terra', 'linoleum', 'cemento', 'asfalto', 'metallo']);
+
+export async function caricaTextureReali(base = './texture/') {
+  const loader = new THREE.TextureLoader();
+  const carica = async (nome, colore) => {
+    const t = await loader.loadAsync(`${base}${nome}.jpg`);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    if (colore) t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  };
+  const voci = await Promise.all(REALI.map(async chiave => {
+    const [map, normalMap, roughnessMap] = await Promise.all([carica(`${chiave}_diff`, true), carica(`${chiave}_nor`, false), carica(`${chiave}_rough`, false)]);
+    return [chiave, { map, normalMap, roughnessMap }];
+  }));
+  return Object.fromEntries(voci);
 }
 
 function rumore(ctx, l, a, caso, colori, quanti) {

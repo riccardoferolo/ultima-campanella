@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><base href="/"><title>realistici</title></head>
+<body style="margin:0;background:#ddd">
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+
+const PH = '/_lavoro/scaricati/polyhaven/';
+
+async function binario(oggetto, lato, animazioni = []) {
+  const glb = await new GLTFExporter().parseAsync(oggetto, { binary: true, maxTextureSize: lato, animations: animazioni });
+  const byte = new Uint8Array(glb);
+  let s = '';
+  for (let i = 0; i < byte.length; i += 0x8000) s += String.fromCharCode(...byte.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+window.arredi = async nomi => {
+  const radice = new THREE.Scene();
+  const info = {};
+  for (const nome of nomi) {
+    const g = await new GLTFLoader().loadAsync(`${PH}modelli/${nome}/${nome}.gltf`);
+    const gruppo = new THREE.Group();
+    gruppo.name = nome;
+    gruppo.add(g.scene);
+    const s = new THREE.Box3().setFromObject(gruppo);
+    let triangoli = 0;
+    gruppo.traverse(o => { if (o.isMesh) triangoli += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+    info[nome] = { min: s.min.toArray().map(v => +v.toFixed(2)), dim: s.getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)), triangoli: Math.round(triangoli) };
+    radice.add(gruppo);
+  }
+  return { info, base64: await binario(radice, 512) };
+};
+
+window.ricodifica = async (url, lato, qualita) => {
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const c = document.createElement('canvas');
+  c.width = c.height = lato;
+  c.getContext('2d').drawImage(img, 0, 0, lato, lato);
+  return c.toDataURL('image/jpeg', qualita).split(',')[1];
+};
+
+window.soldato = async url => {
+  const g = await new GLTFLoader().loadAsync(url);
+  const s = new THREE.Box3().setFromObject(g.scene);
+  const ossa = [];
+  g.scene.traverse(o => { if (o.isBone && /Hand$|Head$/.test(o.name)) ossa.push(o.name); });
+  return { altezza: +(s.max.y - s.min.y).toFixed(3), animazioni: g.animations.map(a => a.name), ossa };
+};
+window.pronto = true;
+</script>
+</body></html>
