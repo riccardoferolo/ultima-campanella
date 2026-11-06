@@ -3,7 +3,8 @@ import { ELENCO_TIPI_ZOMBIE, ELENCO_BONUS, BONUS_A_TEMPO } from './regole.js';
 
 export const STATI_ZOMBIE = Object.freeze(['arriva', 'assi', 'scavalca', 'dentro', 'attacco', 'morto']);
 export const STATI_GIOCATORE = Object.freeze(['vivo', 'terra', 'morto']);
-export const FASI = Object.freeze(['intervallo', 'gioco', 'fine', 'attesa']);
+export const FASI = Object.freeze(['intervallo', 'gioco', 'fine', 'attesa', 'finale', 'vinta']);
+export const STATI_GENERATORE = Object.freeze(['fermo', 'acceso', 'finito']);
 export const STATI_POTENZIATORE = Object.freeze(['libero', 'lavora', 'pronta']);
 
 const r2 = n => Math.round(n * 100) / 100;
@@ -21,7 +22,7 @@ export function faiIstantanea(stato) {
       id: g.id, n: g.nome, x: r2(g.x), z: r2(g.z), y: r2(g.yaw), p: r2(g.pitch),
       s: STATI_GIOCATORE.indexOf(g.stato), v: Math.round(g.vita), vm: g.vitaMax, pt: g.punti,
       a: g.armaAttiva, ar: [...g.armi], b: [...g.bevande], c: g.colpi, tt: r2(g.timerTerra),
-      pr: r2(g.progressoRianimazione), ri: g.rianimando ? 1 : 0, u: g.uccisioni, tp: g.teletrasporto, ok: g.pronto ? 1 : 0,
+      pr: r2(g.progressoRianimazione), ri: g.rianimando ? 1 : 0, u: g.uccisioni, tp: g.teletrasporto, ok: g.pronto ? 1 : 0, gn: g.granate ?? 0,
     })),
     c: [stato.cassa.stato === 'aperta' ? 1 : 0, stato.cassa.arma ?? '', stato.cassa.per ?? '', r2(stato.cassa.timer)],
     e: stato.corrente ? 1 : 0,
@@ -31,6 +32,11 @@ export function faiIstantanea(stato) {
     fr: [...(stato.frammenti ?? [])],
     cp: stato.campanella ? 1 : 0,
     co: stato.conto === null || stato.conto === undefined ? -1 : r2(stato.conto),
+    gr: (stato.granate ?? []).map(gr => [gr.id, r2(gr.x), r2(gr.y), r2(gr.z)]),
+    m: stato.missione
+      ? [stato.missione.fusibili, stato.missione.messi, Math.max(0, STATI_GENERATORE.indexOf(stato.missione.generatore)), Math.round(stato.missione.progresso * 100), stato.missione.presideFusibile ? 1 : 0]
+      : [0, 0, 0, 0, 1],
+    fo: (stato.missione?.aTerra ?? []).map(f => [f.id, r2(f.x), r2(f.z), r2(f.y)]),
   };
 }
 
@@ -46,7 +52,7 @@ export function espandi(ist) {
     giocatori: ist.g.map(g => ({
       id: g.id, nome: g.n, x: g.x, z: g.z, yaw: g.y, pitch: g.p, stato: STATI_GIOCATORE[g.s], vita: g.v, vitaMax: g.vm,
       punti: g.pt, armaAttiva: g.a, armi: g.ar, bevande: g.b, colpi: g.c, timerTerra: g.tt, progressoRianimazione: g.pr,
-      rianimando: !!g.ri, uccisioni: g.u, teletrasporto: g.tp, pronto: !!g.ok,
+      rianimando: !!g.ri, uccisioni: g.u, teletrasporto: g.tp, pronto: !!g.ok, granate: g.gn ?? 0,
     })),
     cassa: { stato: ist.c[0] ? 'aperta' : 'chiusa', arma: ist.c[1] || null, per: ist.c[2] || null, timer: ist.c[3] },
     corrente: !!ist.e,
@@ -56,6 +62,15 @@ export function espandi(ist) {
     frammenti: ist.fr ?? [],
     campanella: !!ist.cp,
     conto: ist.co === undefined || ist.co < 0 ? null : ist.co,
+    granate: (ist.gr ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
+    missione: {
+      fusibili: ist.m?.[0] ?? 0,
+      messi: ist.m?.[1] ?? 0,
+      generatore: STATI_GENERATORE[ist.m?.[2] ?? 0],
+      progresso: (ist.m?.[3] ?? 0) / 100,
+      presideFusibile: !!(ist.m?.[4] ?? 1),
+      aTerra: (ist.fo ?? []).map(([id, x, z, y]) => ({ id, x, z, y })),
+    },
   };
 }
 
@@ -79,6 +94,14 @@ function interpolaElenco(elencoA, elencoB, f, conPitch) {
   });
 }
 
+function interpolaGranate(prima, dopo, t) {
+  const vecchie = new Map(prima.map(g => [g.id, g]));
+  return dopo.map(g => {
+    const v = vecchie.get(g.id);
+    return v ? { id: g.id, x: lineare(v.x, g.x, t), y: lineare(v.y, g.y, t), z: lineare(v.z, g.z, t) } : g;
+  });
+}
+
 export function interpola(a, b, f) {
   const t = Math.min(1, Math.max(0, f));
   return {
@@ -86,5 +109,6 @@ export function interpola(a, b, f) {
     tempo: lineare(a.tempo, b.tempo, t),
     zombie: interpolaElenco(a.zombie, b.zombie, t, false),
     giocatori: interpolaElenco(a.giocatori, b.giocatori, t, true),
+    granate: interpolaGranate(a.granate ?? [], b.granate ?? [], t),
   };
 }

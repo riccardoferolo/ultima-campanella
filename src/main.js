@@ -223,8 +223,13 @@ function mostraFine(evento) {
   if (s.fase !== 'gioco') return;
   s.fase = 'fine';
   comandi.attiva(false);
-  audio.suona('fine');
-  $('t-dettaglio').textContent = evento.round > 1 ? `Siete sopravvissuti fino al round ${evento.round}.` : 'Non siete andati oltre il primo round.';
+  audio.suona(evento.vinto ? 'vittoria' : 'fine');
+  document.querySelector('.titolo-fine').textContent = evento.vinto ? 'Avete vinto!' : 'Siete morti';
+  const minuti = Math.floor((evento.durata ?? 0) / 60);
+  const secondi = String((evento.durata ?? 0) % 60).padStart(2, '0');
+  $('t-dettaglio').textContent = evento.vinto
+    ? `Avete suonato l'ultima campanella e abbattuto il Custode al round ${evento.round}${evento.durata ? ` dopo ${minuti}:${secondi} di battaglia` : ''}.`
+    : evento.round > 1 ? `Siete sopravvissuti fino al round ${evento.round}.` : 'Non siete andati oltre il primo round.';
   $('t-tabella').replaceChildren(...evento.giocatori.map(g => {
     const riga = document.createElement('div');
     riga.textContent = `${g.nome} — ${g.uccisioni} zombie, ${g.punti} punti`;
@@ -249,7 +254,28 @@ function suEventi(eventi) {
       case 'ucciso':
         mondo.effetti.macchia(e.x, e.z);
         if (e.bomba) mondo.effetti.esplosione({ x: e.x, y: 1, z: e.z }, 'fuoco');
+        else if (e.testa) mondo.decapita(e.zombie);
+        if (e.da === s.mioId) hud.uccisione();
         break;
+      case 'esplosione':
+        mondo.effetti.esplosione({ x: e.x, y: e.y + 0.3, z: e.z }, 'fuoco');
+        mondo.effetti.esplosione({ x: e.x, y: e.y + 0.8, z: e.z }, 'fuoco', 0xffc070);
+        audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z), Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
+        break;
+      case 'boss': audio.suona('boss'); hud.avviso(e.fusibile ? 'Il Preside è arrivato… e ha qualcosa in tasca' : 'Il Preside è tornato!'); break;
+      case 'infuriato': audio.suona('urlo'); hud.avviso('Il Preside si è infuriato!'); break;
+      case 'bossUcciso': audio.suona('bossUcciso'); if (e.tipo === 'preside') hud.avviso('Il Preside è morto!', 'bene'); break;
+      case 'fusibileCaduto': hud.avviso('Il Preside ha perso un fusibile!', 'bene'); break;
+      case 'fusibile': audio.suona('fusibile'); hud.avviso(`Fusibile ${e.trovati}/${e.totale}`, 'bene'); break;
+      case 'fusibiliMessi': audio.suona('fusibile'); hud.avviso(`Quadro del cancello: ${e.messi}/${e.totale}`, 'bene'); break;
+      case 'rifugio': audio.suona('rifugio'); hud.avviso('Il cancello del rifugio si apre…', 'bene'); break;
+      case 'generatore': audio.suona('generatore'); hud.avviso('Generatore acceso: difendetelo!'); break;
+      case 'generatoreFinito': audio.suona('fusibile'); hud.avviso('Il generatore ha sputato un fusibile!', 'bene'); break;
+      case 'finale': audio.suona('finale'); hud.avviso('Il cancello si chiude… il Custode si sveglia'); break;
+      case 'faseBoss': audio.suona('urlo'); hud.avviso(e.fase === 2 ? 'Il Custode si infuria!' : 'Il Custode è fuori di sé!'); break;
+      case 'urlo': audio.suona('urlo'); hud.avviso('Il Custode chiama i suoi!'); break;
+      case 'scatto': audio.suona('scatto'); break;
+      case 'vittoria': mostraFine({ ...e, vinto: true }); break;
       case 'via': azzera(arsenale); audio.suona('round'); hud.avviso('Si comincia! Restate vicini', 'bene'); break;
       case 'conto': audio.suona('conto'); break;
       case 'contoAnnullato': hud.avviso('Partenza annullata: qualcuno non è pronto'); break;
@@ -469,6 +495,7 @@ function sparaColpo(arma, vista) {
   }
   for (const [zombie, { danno, testa }] of colpiti) {
     inviaAzione({ tipo: 'colpo', zombie, danno, testa });
+    mondo.colpito(zombie, testa);
     hud.segno(testa);
     audio.suona(testa ? 'testa' : 'carne');
   }
@@ -482,6 +509,12 @@ function usaArmi(lettura, me, vista, dt) {
       if (vista.fase === 'attesa') inviaAzione({ tipo: 'pronto', attivo: !me.pronto });
     } else if (azione === 'ricarica' && ricarica(arsenale, me.bevande)) audio.suona('ricarica');
     else if (azione === 'cambia') cambia(arsenale);
+    else if (azione === 'granata') {
+      if (me.granate > 0 && vista.fase !== 'attesa') {
+        inviaAzione({ tipo: 'granata', yaw: io.yaw, pitch: io.pitch });
+        audio.suona('lancio');
+      } else if (vista.fase !== 'attesa') hud.avviso('Niente granate');
+    }
     else if (azione?.arma !== undefined) cambia(arsenale, azione.arma);
     else if (azione === 'coltello' && coltellata(arsenale)) {
       audio.suona('coltello');
@@ -489,6 +522,7 @@ function usaArmi(lettura, me, vista, dt) {
       const colpo = colpisciZombie({ x: io.x, y: R.ALTEZZA_OCCHI, z: io.z }, d, mondo.bersagli(vista), scatole(vista.porte, true), COLTELLO.portata);
       if (colpo.id !== null) {
         inviaAzione({ tipo: 'colpo', zombie: colpo.id, danno: COLTELLO.danno, coltello: true });
+        mondo.colpito(colpo.id, false);
         audio.suona('carne');
         hud.segno(false);
       }
@@ -570,7 +604,7 @@ function ciclo(ora) {
     if (vista && me) {
       s.vista = vista;
       if (!io.pronto || me.teletrasporto > io.tp) Object.assign(io, { x: me.x, z: me.z, yaw: me.yaw, tp: me.teletrasporto, pronto: true });
-      if (vista.fase === 'fine' && s.fase === 'gioco') mostraFine({ round: vista.round, giocatori: vista.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });
+      if ((vista.fase === 'fine' || vista.fase === 'vinta') && s.fase === 'gioco') mostraFine({ round: vista.round, vinto: vista.fase === 'vinta', giocatori: vista.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });
       const lettura = comandi.leggi();
       comandi.applicaVista(io);
       muovi(lettura, me, dt);

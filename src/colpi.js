@@ -58,7 +58,7 @@ export function colpisciZombie(o, d, bersagli, scatole, portata = Infinity) {
   const muro = Math.min(portata, primoMuro(o, d, scatole));
   let migliore = null;
   for (const b of bersagli) {
-    const testa = raggioSfera(o, d, b.testa ?? { x: b.x, y: TESTA.altezza, z: b.z }, TESTA.raggio);
+    const testa = raggioSfera(o, d, b.testa ?? { x: b.x, y: TESTA.altezza, z: b.z }, b.raggioTesta ?? TESTA.raggio);
     const corpo = raggioCilindro(o, d, b.x, b.z, b.raggio ?? CORPO.raggio, CORPO.basso, b.alto ?? CORPO.alto);
     const t = Math.min(testa, corpo);
     if (t >= muro || (migliore && t >= migliore.t)) continue;

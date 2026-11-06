@@ -25,7 +25,7 @@ const elencoNumeri = (x, lunghezza) => Array.isArray(x) && x.every(e => Array.is
 
 function eGiocatore(g) {
   return !!g && typeof g === 'object' && testo(g.id) && typeof g.n === 'string'
-    && [g.x, g.z, g.y, g.p, g.s, g.v, g.vm, g.pt, g.c, g.tt, g.pr, g.ri, g.u, g.tp].every(numero)
+    && [g.x, g.z, g.y, g.p, g.s, g.v, g.vm, g.pt, g.c, g.tt, g.pr, g.ri, g.u, g.tp, g.gn].every(numero)
     && arma(g.a) && Array.isArray(g.ar) && g.ar.every(arma)
     && Array.isArray(g.b) && g.b.every(b => Object.hasOwn(BEVANDE, b));
 }
@@ -43,7 +43,10 @@ function eIstantanea(ist) {
     && elencoNumeri(ist.b, 5)
     && Array.isArray(ist.x) && ist.x.every(numero)
     && Array.isArray(ist.fr) && ist.fr.every(numero)
-    && numero(ist.cp) && numero(ist.co);
+    && numero(ist.cp) && numero(ist.co)
+    && elencoNumeri(ist.gr, 4)
+    && Array.isArray(ist.m) && ist.m.length === 5 && ist.m.every(numero)
+    && elencoNumeri(ist.fo, 4);
 }
 
 function eAzione(a) {
@@ -53,6 +56,7 @@ function eAzione(a) {
   if (a.tipo === 'assa') return testo(a.finestra);
   if (a.tipo === 'rianima' || a.tipo === 'pronto') return typeof a.attivo === 'boolean';
   if (a.tipo === 'frammento') return numero(a.id);
+  if (a.tipo === 'granata') return numero(a.yaw) && numero(a.pitch);
   return false;
 }
 

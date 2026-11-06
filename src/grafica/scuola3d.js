@@ -12,10 +12,12 @@ const ALTEZZA_PORTA = 2.4;
 const LUCI = Object.freeze([
   [0, 0, true, 0xffd29a], [0, 14, true, 0xffd29a], [12, 0, false, 0xffd29a], [20, 0, true, 0xffd29a],
   [-9, 17, false, 0xffe3b0], [3, 27, false, 0xd8f0ff], [22, -10.5, true, 0xff6a40],
+  [0, -30, false, 0xffe2b8], [-19, -31, true, 0xffd8a0], [0, -46, true, 0xff3326],
 ]);
 const INTENSITA_LUCE = 16;
 const PORTATA_LUCE = 17;
-const LAMPIONI = Object.freeze([[17, 20, 0xbcd4ff], [10.5, 27.5, 0xc8dcff]]);
+const LAMPIONI = Object.freeze([[17, 20, 0xbcd4ff], [10.5, 27.5, 0xc8dcff], [23, -26, 0xbcd4ff]]);
+const PROFILO_CAMPANA = Object.freeze([[0, 0.02], [0.05, 0.03], [0.07, 0.08], [0.085, 0.16], [0.13, 0.22], [0.14, 0.24], [0, 0.24]]);
 const MATERIALI_OSTACOLI = Object.freeze({ banco: 'legnoChiaro', tavolo: 'legnoChiaro', bancone: 'metallo', cavallina: 'legno' });
 
 function scatolaUV(l, a, p, metri, partenza = 0) {
@@ -73,6 +75,8 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
     palo: new THREE.MeshStandardMaterial({ color: 0x5a6066, metalness: 0.7, roughness: 0.45 }),
     corteccia: new THREE.MeshStandardMaterial({ map: texture.corteccia, roughness: 1 }),
     metallo: pbr('metallo', { metalness: 0.55 }),
+    libri: new THREE.MeshStandardMaterial({ map: texture.libri, roughness: 0.85 }),
+    ottone: new THREE.MeshStandardMaterial({ color: 0xb08a3a, metalness: 0.85, roughness: 0.35, side: THREE.DoubleSide }),
   };
   const caso = creaCaso(77);
 
@@ -121,9 +125,10 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
   const porte = new Map();
   for (const p of PORTE) {
     blocco(scena, mat.muro, p.scatola, ALTEZZA_PORTA, H);
-    const anta = blocco(scena, mat.porta, p.scatola, 0, ALTEZZA_PORTA, ALTEZZA_PORTA);
+    const anta = blocco(scena, p.chiusa ? mat.rete : mat.porta, p.chiusa ? { ...p.scatola, z0: p.scatola.z0 + 0.1, z1: p.scatola.z1 - 0.1 } : p.scatola, 0, ALTEZZA_PORTA, p.chiusa ? 1 : ALTEZZA_PORTA);
     porte.set(p.id, { anta, apertura: 0 });
   }
+  const generatore = { spia: null, corpo: null };
 
   for (const o of OSTACOLI) {
     if (o.tipo === 'tribuna') {
@@ -151,6 +156,44 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
       scena.add(auto);
     } else if (o.tipo === 'banco') {
       continue;
+    } else if (o.tipo === 'scaffale') {
+      const mesh = new THREE.Mesh(scatolaUV(o.x1 - o.x0, o.altezza, o.z1 - o.z0, o.altezza), [mat.legno, mat.legno, mat.legno, mat.legno, mat.libri, mat.libri]);
+      mesh.position.set((o.x0 + o.x1) / 2, o.altezza / 2, (o.z0 + o.z1) / 2);
+      scena.add(mesh);
+    } else if (o.tipo === 'fila') {
+      const sedia = oggetti.get('painted_wooden_chair_01');
+      const cz = (o.z0 + o.z1) / 2;
+      for (let x = o.x0 + 0.5; x < o.x1; x += 1) {
+        if (!sedia) break;
+        const copia = sedia.clone();
+        const rovesciata = caso() < 0.08;
+        copia.position.set(x + (caso() - 0.5) * 0.15, rovesciata ? 0.42 : 0, cz + (caso() - 0.5) * 0.2);
+        copia.rotation.set(rovesciata ? Math.PI / 2 : 0, Math.PI + (caso() - 0.5) * 0.4, 0);
+        scena.add(copia);
+      }
+    } else if (o.tipo === 'pilastro') {
+      blocco(scena, mat.cemento, o, 0, H, 2);
+    } else if (o.tipo === 'generatore') {
+      const gruppo = new THREE.Group();
+      const l = o.x1 - o.x0;
+      const p = o.z1 - o.z0;
+      const corpo = new THREE.Mesh(new THREE.BoxGeometry(l, 0.95, p), new THREE.MeshStandardMaterial({ color: 0x3b4a33, metalness: 0.55, roughness: 0.55 }));
+      corpo.position.y = 0.55;
+      const telaio = new THREE.Mesh(new THREE.BoxGeometry(l + 0.08, 0.1, p + 0.08), mat.metallo);
+      telaio.position.y = 0.05;
+      const serbatoio = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, l * 0.8, 12).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x8a2a1e, metalness: 0.5, roughness: 0.5 }));
+      serbatoio.position.y = 1.2;
+      const scarico = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), mat.metallo);
+      scarico.position.set(l * 0.38, 1.35, -p * 0.3);
+      const targa = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.22), new THREE.MeshBasicMaterial({ map: texturaTesto(['GENERATORE'], { larghezza: 128, altezza: 32, sfondo: '#1d2418', colore: '#d8d2b0', font: 'bold 16px monospace' }) }));
+      targa.position.set(0, 0.75, p / 2 + 0.005);
+      const spia = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xb8241b, emissiveIntensity: 1.5 }));
+      spia.position.set(-l * 0.35, 0.85, p / 2 + 0.02);
+      gruppo.add(corpo, telaio, serbatoio, scarico, targa, spia);
+      gruppo.position.set((o.x0 + o.x1) / 2, 0, (o.z0 + o.z1) / 2);
+      scena.add(gruppo);
+      generatore.spia = spia;
+      generatore.corpo = gruppo;
     } else if (o.tipo === 'lampione') {
       blocco(scena, mat.palo, o, 0, o.altezza + 1.5, 1);
     } else if (o.tipo === 'panchina') {
@@ -170,7 +213,7 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
     }
   }
 
-  for (const [x0, x1, z0, z1] of [[-1.85, -1.7, 6.6, 9.3], [-1.85, -1.7, 10.8, 16.4], [1.7, 1.85, 6.6, 12.4], [1.7, 1.85, 15.6, 21.4]]) {
+  for (const [x0, x1, z0, z1] of [[-1.85, -1.7, 6.6, 9.3], [-1.85, -1.7, 10.8, 16.4], [1.7, 1.85, 6.6, 12.4], [1.7, 1.85, 15.6, 21.4], [1.7, 1.85, -21.4, -13], [1.7, 1.85, -11, -6.6]]) {
     blocco(scena, mat.armadietti, { x0, x1, z0, z1 }, 0, 1.9, 1.9);
   }
   const lavagna = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshStandardMaterial({ map: texture.lavagna, roughness: 0.9 }));
@@ -210,6 +253,51 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
       scena.add(macchina);
     }
   }
+
+  const cartello = (righe, x, y, z, verso, larghezza, altezza, opzioni) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(larghezza, altezza), new THREE.MeshBasicMaterial({ map: texturaTesto(righe, opzioni), transparent: true }));
+    mesh.position.set(x, y, z);
+    orientamento(mesh, verso);
+    scena.add(mesh);
+    return mesh;
+  };
+  cartello(['RIFUGIO ANTIAEREO'], 0, 2.78, -37.83, { x: 0, z: 1 }, 2.4, 0.4, { larghezza: 384, altezza: 64, sfondo: '#202020', colore: '#e7d9a8', font: 'bold 34px sans-serif', bordo: '#7a6a3a' });
+  cartello(['NON SUONARE', 'PER NESSUN MOTIVO'], 0, 1.35, -53.83, { x: 0, z: 1 }, 1.4, 0.5, { larghezza: 256, altezza: 92, sfondo: '#d9d2bd', colore: '#7a0d0d', font: 'bold 26px sans-serif', bordo: '#3a0505' });
+  cartello(['BIBLIOTECA'], -12.16, 2.7, -30, { x: 1, z: 0 }, 1.6, 0.32, { larghezza: 256, altezza: 52, sfondo: '#2a2016', colore: '#e9dfc4', font: 'bold 30px serif' });
+  cartello(['AULA MAGNA'], 0, 2.7, -21.84, { x: 0, z: 1 }, 1.6, 0.32, { larghezza: 256, altezza: 52, sfondo: '#2a2016', colore: '#e9dfc4', font: 'bold 30px serif' });
+
+  const quadroDati = ACQUISTI.find(a => a.tipo === 'quadro');
+  const quadroFusibili = new THREE.Group();
+  const cassettaQuadro = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.65, 0.14), mat.metallo);
+  const targaQuadro = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.13), new THREE.MeshBasicMaterial({ map: texturaTesto(['CANCELLO RIFUGIO'], { larghezza: 192, altezza: 32, sfondo: '#111', colore: '#e6e0c8', font: 'bold 16px monospace' }) }));
+  targaQuadro.position.set(0, 0.23, 0.072);
+  const spiaQuadro = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: 0xb8241b }));
+  spiaQuadro.position.set(0.33, 0.23, 0.08);
+  quadroFusibili.add(cassettaQuadro, targaQuadro, spiaQuadro);
+  const alloggi = [-0.24, 0, 0.24].map(x => {
+    const vuoto = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.26, 0.04), new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.9 }));
+    vuoto.position.set(x, -0.07, 0.075);
+    const pieno = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x3a1a00, emissive: 0xff8a2a, emissiveIntensity: 1.6, roughness: 0.2 }));
+    pieno.position.set(x, -0.07, 0.1);
+    pieno.visible = false;
+    quadroFusibili.add(vuoto, pieno);
+    return pieno;
+  });
+  quadroFusibili.position.set(quadroDati.posizione.x, 1.45, quadroDati.posizione.z);
+  orientamento(quadroFusibili, quadroDati.verso);
+  scena.add(quadroFusibili);
+
+  const allarmeDati = ACQUISTI.find(a => a.tipo === 'allarme');
+  const campanaFinale = new THREE.Group();
+  const corpoCampana = new THREE.Mesh(new THREE.LatheGeometry(PROFILO_CAMPANA.map(([x, y]) => new THREE.Vector2(x * 4.2, -y * 4.2)), 20), mat.ottone);
+  const batacchio = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), mat.ottone);
+  batacchio.position.y = -0.9;
+  campanaFinale.add(corpoCampana, batacchio);
+  const staffaCampana = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.75), mat.metallo);
+  staffaCampana.position.set(allarmeDati.posizione.x, 2.85, allarmeDati.posizione.z + allarmeDati.verso.z * 0.3);
+  campanaFinale.position.set(allarmeDati.posizione.x, 2.8, allarmeDati.posizione.z + allarmeDati.verso.z * 0.62);
+  scena.add(campanaFinale, staffaCampana);
+  let oscillaCampana = 0;
 
   const interruttoreDati = ACQUISTI.find(a => a.tipo === 'interruttore');
   const quadro = new THREE.Group();
@@ -282,6 +370,7 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
       for (const p of PORTE) {
         const porta = porte.get(p.id);
         if (vista.porte.has(p.id)) porta.apertura = Math.min(1, porta.apertura + dt * 1.5);
+        else porta.apertura = Math.max(0, porta.apertura - dt * 2.5);
         porta.anta.position.y = ALTEZZA_PORTA / 2 + porta.apertura * ALTEZZA_PORTA;
         porta.anta.visible = porta.apertura < 1;
       }
@@ -290,6 +379,19 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
         l.luce.intensity = spenta ? 0.6 : l.base;
         l.plafoniera.material.color.setHex(spenta ? 0x2a2620 : 0xfff1cf);
       }
+      const missione = vista.missione;
+      if (missione) {
+        alloggi.forEach((pieno, i) => { pieno.visible = i < missione.messi; });
+        spiaQuadro.material.color.setHex(vista.corrente ? (missione.messi >= 3 ? 0x3cff6a : 0xffb020) : 0xb8241b);
+        const acceso = missione.generatore === 'acceso';
+        if (generatore.spia) {
+          generatore.spia.material.emissive.setHex(acceso ? (Math.sin(tempo * 10) > 0 ? 0xffc020 : 0x3a2a00) : missione.generatore === 'finito' ? 0x3cff6a : 0xb8241b);
+          generatore.corpo.position.y = acceso ? Math.sin(tempo * 60) * 0.006 : 0;
+        }
+      }
+      if (vista.fase === 'finale') oscillaCampana = Math.min(1, oscillaCampana + dt);
+      else oscillaCampana = Math.max(0, oscillaCampana - dt * 0.3);
+      campanaFinale.rotation.x = Math.sin(tempo * 5) * 0.45 * oscillaCampana;
       leva.rotation.x = THREE.MathUtils.lerp(leva.rotation.x, vista.corrente ? -2.4 : 0, Math.min(1, dt * 5));
       spia.material.color.setHex(vista.corrente ? 0x3cff6a : 0xb8241b);
       const lavora = vista.potenziatore.stato === 'lavora';

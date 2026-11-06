@@ -111,6 +111,20 @@ export function creaAudio() {
     frammento: () => { [1568, 2093, 2637].forEach((f, i) => nota(f, { durata: 0.6, tipo: 'sine', volume: 0.12, ritardo: i * 0.15 })); },
     segreto: () => { [262, 330, 392, 523, 392, 523, 659, 784, 1046].forEach((f, i) => nota(f, { durata: 0.5, tipo: 'triangle', volume: 0.16, ritardo: i * 0.18 })); soffio({ durata: 3, da: 200, a: 3000, tipo: 'bandpass', volume: 0.3 }); },
     campanella: () => { for (let i = 0; i < 6; i++) { nota(1175, { durata: 0.5, tipo: 'sine', volume: 0.18, ritardo: i * 0.16 }); nota(1760, { durata: 0.3, tipo: 'sine', volume: 0.08, ritardo: i * 0.16 }); } },
+    lancio: () => { nota(1900, { durata: 0.03, tipo: 'square', volume: 0.08 }); soffio({ durata: 0.28, da: 2600, a: 600, tipo: 'bandpass', volume: 0.35, ritardo: 0.05 }); },
+    boss: () => { nota(62, { durata: 1.8, tipo: 'sawtooth', volume: 0.35, scendi: 38 }); nota(93, { durata: 1.5, tipo: 'sawtooth', volume: 0.2, scendi: 52, ritardo: 0.1 }); soffio({ durata: 1.6, da: 900, a: 180, tipo: 'bandpass', volume: 0.7 }); },
+    urlo: () => { nota(118, { durata: 1.1, tipo: 'sawtooth', volume: 0.3, scendi: 58 }); nota(176, { durata: 0.9, tipo: 'sawtooth', volume: 0.15, scendi: 90 }); soffio({ durata: 1.1, da: 1600, a: 300, tipo: 'bandpass', volume: 0.7 }); },
+    scatto: () => { soffio({ durata: 0.7, da: 450, a: 110, volume: 0.8 }); nota(52, { durata: 0.7, volume: 0.45, scendi: 34 }); },
+    bossUcciso: () => { [196, 247, 294, 392, 494].forEach((f, i) => nota(f, { durata: 0.6, tipo: 'triangle', volume: 0.18, ritardo: 0.4 + i * 0.12 })); nota(48, { durata: 1.6, tipo: 'sawtooth', volume: 0.4, scendi: 26 }); soffio({ durata: 1.6, da: 1200, a: 60, volume: 0.8 }); },
+    fusibile: () => { nota(120, { durata: 0.25, tipo: 'square', volume: 0.07 }); [880, 1320, 1760].forEach((f, i) => nota(f, { durata: 0.35, tipo: 'triangle', volume: 0.16, ritardo: 0.1 + i * 0.1 })); },
+    generatore: () => { nota(42, { durata: 2.8, tipo: 'sawtooth', volume: 0.22, scendi: 58 }); nota(84, { durata: 2.6, tipo: 'square', volume: 0.05, ritardo: 0.4 }); soffio({ durata: 2.2, da: 300, a: 900, tipo: 'bandpass', volume: 0.4 }); },
+    rifugio: () => { soffio({ durata: 2.4, da: 700, a: 140, volume: 0.8 }); nota(68, { durata: 2, tipo: 'square', volume: 0.1, scendi: 48 }); [330, 262, 196].forEach((f, i) => nota(f, { durata: 1.2, tipo: 'sine', volume: 0.14, ritardo: 0.8 + i * 0.5 })); },
+    finale: () => {
+      for (let i = 0; i < 5; i++) { nota(392, { durata: 1.8, tipo: 'sine', volume: 0.26, ritardo: i * 0.9 }); nota(587, { durata: 1.2, tipo: 'sine', volume: 0.1, ritardo: i * 0.9 }); }
+      nota(55, { durata: 2.4, tipo: 'sawtooth', volume: 0.4, scendi: 33, ritardo: 4.6 });
+      soffio({ durata: 2.2, da: 1000, a: 150, tipo: 'bandpass', volume: 0.8, ritardo: 4.6 });
+    },
+    vittoria: () => { [262, 330, 392, 523, 659, 784, 1046].forEach((f, i) => nota(f, { durata: 0.5, tipo: 'triangle', volume: 0.2, ritardo: i * 0.14 })); [523, 659, 784].forEach(f => nota(f, { durata: 2.4, tipo: 'triangle', volume: 0.14, ritardo: 1.1 })); },
     fine: () => { [196, 165, 131, 98].forEach((f, i) => nota(f, { durata: 1.2, tipo: 'sawtooth', volume: 0.18, ritardo: i * 0.6 })); },
   };
 
@@ -131,6 +145,13 @@ export function creaAudio() {
       }
       soffio({ durata: s.durata, da: s.filtro * 2, a: s.filtro * 0.3, volume: s.volume, destinazione });
       nota(s.botto, { durata: s.durata * 0.8, volume: s.volume * 0.6, scendi: s.botto * 0.4, destinazione });
+    },
+    esplosione(distanza, angolo) {
+      if (!pronto() || distanza > 40) return;
+      const destinazione = distanza > 1 ? spazio(distanza * 0.55, angolo) : uscita;
+      nota(52, { durata: 1.3, tipo: 'sawtooth', volume: 0.6, scendi: 24, destinazione });
+      soffio({ durata: 1.5, da: 2400, a: 70, volume: 1.2, destinazione });
+      soffio({ durata: 0.25, da: 7000, a: 1500, tipo: 'highpass', volume: 0.45, destinazione });
     },
     lamento(distanza, angolo) {
       if (!pronto() || distanza > 20) return;

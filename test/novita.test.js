@@ -93,7 +93,7 @@ test('se uno torna non pronto il conto alla rovescia si annulla', () => {
 });
 
 test('due tipi di zombie: lo scuoiato arriva dal secondo round ed è più veloce ma più fragile', () => {
-  assert.deepEqual(Object.keys(TIPI_ZOMBIE).sort(), ['magro', 'normale']);
+  assert.deepEqual(Object.keys(TIPI_ZOMBIE).filter(t => !TIPI_ZOMBIE[t].boss).sort(), ['magro', 'normale']);
   assert.equal(tipoZombie(1, 0.99), 'normale');
   assert.equal(pesiZombie(1).magro, 0);
   assert.ok(pesiZombie(5).magro > 0);

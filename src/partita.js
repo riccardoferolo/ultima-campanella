@@ -1,9 +1,14 @@
 import {
   R, ARMI_CASSA, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
+  dannoGranata, moltiplicatoreBoss, faseCustode,
 } from './regole.js';
 import { passoCaso } from './caso.js';
-import { FINESTRE, PORTE, ACQUISTI, PARTENZE, PARTENZE_SALA, FRAMMENTI, zoneAperte, ostacoliPerGiocatori } from './mappa.js';
+import {
+  FINESTRE, PORTE, ACQUISTI, PARTENZE, PARTENZE_SALA, FRAMMENTI, ZONE, ALTEZZA_SOFFITTO, POSTI_FUSIBILE, FUSIBILE_GENERATORE, GENERATORE, COMPARSA_CUSTODE,
+  SOGLIA_RIFUGIO, FINESTRE_RIFUGIO, zonaDi, zoneAperte, ostacoliPerGiocatori,
+} from './mappa.js';
 import { muoviCerchio, vistaLibera } from './fisica.js';
+import { direzioneDa } from './colpi.js';
 import { griglia, campoVerso, direzione } from './navigazione.js';
 
 const PRIMO_ROUND_TRA = 3;
@@ -13,6 +18,13 @@ const AGGIORNA_CAMPO_OGNI = 0.25;
 const RESTA_A_TERRA_DA_MORTO = 4;
 const CARICA_ATTACCO = 0.55;
 const SEPARAZIONE = 0.75;
+const RAGGIO_GRANATA_FISICO = 0.06;
+const RIMBALZO = 0.35;
+const ATTRITO_SUOLO = 3;
+const URTO_SUOLO = 0.55;
+const MARGINE_GRANATA = 0.05;
+const ALTEZZA_SCHERMO_ESPLOSIONE = 1.5;
+const URLO_PER_FASE = Object.freeze([18, 14, 10]);
 
 const ARMA_SEGRETA = 'disintegratore';
 const REGALO_CAMPANELLA = Object.freeze({ x: -3, z: 4.4 });
@@ -60,6 +72,18 @@ export function creaPartita({ seme, giocatori = [], sala = false }) {
     potenziatore: { stato: 'libero', arma: null, per: null, timer: 0 },
     campo: null,
     attesaCampo: 0,
+    granate: [],
+    prossimaGranata: 1,
+    presideTra: null,
+    missione: {
+      fusibili: 0,
+      messi: 0,
+      aTerra: [{ id: 0, ...POSTI_FUSIBILE[(seme >>> 0) % POSTI_FUSIBILE.length] }],
+      presideFusibile: true,
+      generatore: 'fermo',
+      progresso: 0,
+    },
+    finale: null,
   };
   giocatori.forEach(g => aggiungiGiocatore(stato, g));
   return stato;
@@ -77,7 +101,7 @@ export function aggiungiGiocatore(stato, { id, nome }) {
     id, nome, x: partenza.x, z: partenza.z, yaw: stato.fase === 'attesa' ? Math.PI / 2 : Math.PI, pitch: 0, pronto: false,
     stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, ultimoDanno: -Infinity, timerTerra: 0,
     punti: R.PUNTI_INIZIALI, armi: ['pistola'], armaAttiva: 'pistola', bevande: [],
-    rianimando: false, progressoRianimazione: 0, attesaAssa: 0, colpi: 0, uccisioni: 0, teletrasporto: 0,
+    rianimando: false, progressoRianimazione: 0, attesaAssa: 0, colpi: 0, uccisioni: 0, teletrasporto: 0, granate: R.GRANATE_INIZIALI,
   };
   stato.giocatori.push(giocatore);
   return giocatore;
@@ -115,9 +139,13 @@ function prendiArma(stato, giocatore, arma, eventi, extra = {}) {
 function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   if (giocatore.armi.includes(armaInMano)) giocatore.armaAttiva = armaInMano;
   const aperte = zoneAperte(new Set(stato.porte));
+  if (idAcquisto.startsWith('fusibile:')) {
+    raccogliFusibile(stato, giocatore, Number(idAcquisto.slice('fusibile:'.length)), aperte, eventi);
+    return;
+  }
   if (idAcquisto.startsWith('porta:')) {
     const porta = PORTE.find(p => `porta:${p.id}` === idAcquisto);
-    if (!porta || stato.porte.includes(porta.id) || giocatore.punti < porta.costo) return;
+    if (!porta || porta.chiusa || stato.porte.includes(porta.id) || giocatore.punti < porta.costo) return;
     if (distanza(giocatore, porta.centro) > R.DISTANZA_ACQUISTO + TOLLERANZA_DISTANZA) return;
     giocatore.punti -= porta.costo;
     stato.porte.push(porta.id);
@@ -145,6 +173,20 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   }
   if (acquisto.tipo === 'potenziatore') {
     potenziatore(stato, giocatore, eventi);
+    return;
+  }
+  if (acquisto.tipo === 'quadro') {
+    inserisciFusibili(stato, eventi);
+    return;
+  }
+  if (acquisto.tipo === 'generatore') {
+    avviaGeneratore(stato, giocatore, eventi);
+    return;
+  }
+  if (acquisto.tipo === 'allarme') {
+    if (stato.finale || (stato.fase !== 'gioco' && stato.fase !== 'intervallo')) return;
+    if (!stato.giocatori.filter(g => g.stato !== 'morto').every(g => zonaDi(g.x, g.z) === 'rifugio' && g.z < SOGLIA_RIFUGIO)) return;
+    iniziaFinale(stato, eventi);
     return;
   }
   if (acquisto.tipo === 'campanella') {
@@ -227,27 +269,220 @@ export function sceltaPesata(scelte, estratto) {
 function colpisci(stato, giocatore, azione, eventi) {
   const zombie = stato.zombie.find(z => z.id === azione.zombie && z.stato !== 'morto');
   if (!zombie) return;
-  const danno = stato.effetti.secco > 0 ? zombie.vita : Math.min(DANNO_MASSIMO_COLPO, Math.max(0, Number(azione.danno) || 0));
+  const richiesto = Math.min(DANNO_MASSIMO_COLPO, Math.max(0, Number(azione.danno) || 0));
+  const danno = stato.effetti.secco > 0 && !tipoDi(zombie).boss ? zombie.vita : richiesto;
+  danneggia(stato, giocatore, zombie, danno, { testa: !!azione.testa, coltello: !!azione.coltello }, eventi);
+}
+
+function danneggia(stato, giocatore, zombie, danno, { testa = false, coltello = false }, eventi) {
+  const dati = tipoDi(zombie);
   zombie.vita -= danno;
   if (zombie.vita > 0) {
     aggiungiPunti(stato, giocatore, R.PUNTI_COLPO);
-    eventi.push({ k: 'colpito', zombie: zombie.id, testa: !!azione.testa, da: giocatore.id });
+    if (dati.infuria && !zombie.corre && zombie.vita < zombie.vitaMax * dati.infuria) {
+      zombie.corre = true;
+      eventi.push({ k: 'infuriato', zombie: zombie.id, tipo: zombie.tipo });
+    }
+    if (dati.finale) {
+      const fase = faseCustode(zombie.vita / zombie.vitaMax);
+      if (fase > (zombie.faseBoss ?? 1)) {
+        zombie.faseBoss = fase;
+        zombie.corre = true;
+        eventi.push({ k: 'faseBoss', fase });
+      }
+    }
+    eventi.push({ k: 'colpito', zombie: zombie.id, testa, da: giocatore.id });
     return;
   }
   zombie.stato = 'morto';
   zombie.timer = RESTA_A_TERRA_DA_MORTO;
-  eventi.push({ k: 'ucciso', zombie: zombie.id, testa: !!azione.testa, da: giocatore.id, x: zombie.x, z: zombie.z });
+  eventi.push({ k: 'ucciso', zombie: zombie.id, testa, da: giocatore.id, x: zombie.x, z: zombie.z, tipo: zombie.tipo });
   giocatore.uccisioni += 1;
-  aggiungiPunti(stato, giocatore, (azione.coltello ? R.PUNTI_COLTELLO : azione.testa ? R.PUNTI_TESTA : R.PUNTI_UCCISIONE) * tipoDi(zombie).punti);
-  forseBonus(stato, zombie, eventi);
+  aggiungiPunti(stato, giocatore, (coltello ? R.PUNTI_COLTELLO : testa ? R.PUNTI_TESTA : R.PUNTI_UCCISIONE) * dati.punti);
+  if (dati.boss) bossUcciso(stato, zombie, eventi);
+  else forseBonus(stato, zombie, eventi);
+}
+
+function puntoCaduta(zombie) {
+  const fuori = zombie.stato === 'arriva' || zombie.stato === 'assi' || zombie.stato === 'scavalca';
+  return fuori && zombie.finestra ? finestraDi(zombie.finestra).interno : zombie;
 }
 
 function forseBonus(stato, zombie, eventi) {
   if (stato.bonusRound >= R.BONUS_PER_ROUND || caso(stato) >= R.PROBABILITA_BONUS) return;
-  const fuori = zombie.stato === 'arriva' || zombie.stato === 'assi';
-  const punto = fuori && zombie.finestra ? finestraDi(zombie.finestra).interno : zombie;
+  const punto = puntoCaduta(zombie);
   stato.bonusRound += 1;
   creaBonus(stato, punto.x, punto.z, ELENCO_BONUS[Math.floor(caso(stato) * ELENCO_BONUS.length)], eventi);
+}
+
+function bossUcciso(stato, zombie, eventi) {
+  for (const g of vivi(stato)) aggiungiPunti(stato, g, R.PUNTI_BOSS);
+  eventi.push({ k: 'bossUcciso', tipo: zombie.tipo });
+  if (zombie.tipo !== 'preside') return;
+  const punto = puntoCaduta(zombie);
+  creaBonus(stato, punto.x + 0.9, punto.z, ELENCO_BONUS[Math.floor(caso(stato) * ELENCO_BONUS.length)], eventi);
+  if (!stato.missione.presideFusibile) return;
+  stato.missione.presideFusibile = false;
+  stato.missione.aTerra.push({ id: 1, x: punto.x, z: punto.z, y: 0.3 });
+  eventi.push({ k: 'fusibileCaduto', x: punto.x, z: punto.z });
+}
+
+function raccogliFusibile(stato, giocatore, id, aperte, eventi) {
+  const missione = stato.missione;
+  const fusibile = missione.aTerra.find(f => f.id === id);
+  if (!fusibile || distanza(giocatore, fusibile) > R.DISTANZA_FUSIBILE + TOLLERANZA_DISTANZA) return;
+  const zona = zonaDi(fusibile.x, fusibile.z);
+  if (zona && !aperte.has(zona)) return;
+  missione.aTerra = missione.aTerra.filter(f => f !== fusibile);
+  missione.fusibili += 1;
+  for (const g of vivi(stato)) aggiungiPunti(stato, g, R.PUNTI_FUSIBILE);
+  eventi.push({ k: 'fusibile', da: giocatore.id, trovati: missione.fusibili + missione.messi, totale: R.FUSIBILI });
+}
+
+function inserisciFusibili(stato, eventi) {
+  const missione = stato.missione;
+  if (!stato.corrente || missione.fusibili === 0) return;
+  missione.messi += missione.fusibili;
+  missione.fusibili = 0;
+  eventi.push({ k: 'fusibiliMessi', messi: missione.messi, totale: R.FUSIBILI });
+  if (missione.messi < R.FUSIBILI || stato.porte.includes('rifugio')) return;
+  stato.porte.push('rifugio');
+  eventi.push({ k: 'rifugio' });
+}
+
+function avviaGeneratore(stato, giocatore, eventi) {
+  const missione = stato.missione;
+  if (stato.fase !== 'gioco' || missione.generatore !== 'fermo') return;
+  missione.generatore = 'acceso';
+  missione.progresso = 0;
+  eventi.push({ k: 'generatore', da: giocatore.id });
+}
+
+function aggiornaGeneratore(stato, dt, eventi) {
+  const missione = stato.missione;
+  if (missione.generatore !== 'acceso') return;
+  if (vivi(stato).some(g => distanza(g, GENERATORE) <= R.DISTANZA_GENERATORE)) missione.progresso = Math.min(1, missione.progresso + dt / R.DURATA_GENERATORE);
+  if (missione.progresso < 1) return;
+  missione.generatore = 'finito';
+  missione.aTerra.push({ id: 2, ...FUSIBILE_GENERATORE });
+  eventi.push({ k: 'generatoreFinito' });
+}
+
+function iniziaFinale(stato, eventi) {
+  stato.fase = 'finale';
+  stato.daGenerare = 0;
+  stato.presideTra = null;
+  stato.porte = stato.porte.filter(p => p !== 'rifugio');
+  const vita = Math.round(R.VITA_CUSTODE * moltiplicatoreBoss(stato.giocatori.length));
+  stato.zombie.push({
+    id: stato.prossimoId++, x: COMPARSA_CUSTODE.x, z: COMPARSA_CUSTODE.z, yaw: Math.PI, stato: 'dentro', finestra: FINESTRE_RIFUGIO[0],
+    vita, vitaMax: vita, tipo: 'custode', corre: false, variante: 0, timer: 0, attesa: 2.5, bersaglio: null, scatto: 0, prossimoScatto: 6, faseBoss: 1,
+  });
+  stato.finale = { urlo: URLO_PER_FASE[0], rinforzi: 4, tempo: 0 };
+  eventi.push({ k: 'finale' });
+}
+
+function aggiornaFinale(stato, dt, eventi) {
+  const finale = stato.finale;
+  finale.tempo += dt;
+  const custode = stato.zombie.find(z => z.tipo === 'custode' && z.stato !== 'morto');
+  if (!custode) {
+    vittoria(stato, eventi);
+    return;
+  }
+  const fase = faseCustode(custode.vita / custode.vitaMax);
+  const presenti = stato.zombie.filter(z => z.stato !== 'morto').length;
+  finale.rinforzi -= dt;
+  if (finale.rinforzi <= 0) {
+    if (presenti <= R.RINFORZI_FINALE_MAX) generaZombie(stato, { finestre: FINESTRE_RIFUGIO, corre: fase === 3 ? true : undefined });
+    finale.rinforzi = fase === 3 ? 1.6 : 2.4;
+  }
+  finale.urlo -= dt;
+  if (finale.urlo > 0) return;
+  const quanti = 3 + fase;
+  for (let i = 0; i < quanti && presenti + i < R.ZOMBIE_VIVI_MAX; i++) generaZombie(stato, { finestre: FINESTRE_RIFUGIO, corre: true });
+  finale.urlo = URLO_PER_FASE[fase - 1];
+  eventi.push({ k: 'urlo' });
+}
+
+function vittoria(stato, eventi) {
+  stato.fase = 'vinta';
+  for (const z of stato.zombie) {
+    if (z.stato === 'morto') continue;
+    z.stato = 'morto';
+    z.timer = RESTA_A_TERRA_DA_MORTO;
+    eventi.push({ k: 'ucciso', zombie: z.id, testa: false, da: null, x: z.x, z: z.z, bomba: true });
+  }
+  if (!stato.porte.includes('rifugio')) stato.porte.push('rifugio');
+  for (const g of stato.giocatori) aggiungiPunti(stato, g, R.PUNTI_VITTORIA);
+  eventi.push({
+    k: 'vittoria', round: stato.round, durata: Math.round(stato.finale?.tempo ?? 0),
+    giocatori: stato.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })),
+  });
+}
+
+function lancia(stato, giocatore, azione, eventi) {
+  if (giocatore.granate <= 0) return;
+  giocatore.granate -= 1;
+  const d = direzioneDa(Number(azione.yaw) || 0, Math.max(-1.2, Math.min(1.2, Number(azione.pitch) || 0)));
+  stato.granate.push({
+    id: stato.prossimaGranata++, x: giocatore.x, y: R.ALTEZZA_OCCHI - 0.15, z: giocatore.z,
+    vx: d.x * R.VELOCITA_LANCIO, vy: d.y * R.VELOCITA_LANCIO + R.SPINTA_LANCIO, vz: d.z * R.VELOCITA_LANCIO,
+    timer: R.MICCIA_GRANATA, da: giocatore.id,
+  });
+  eventi.push({ k: 'lancio', a: giocatore.id });
+}
+
+const sottoCielo = (x, z) => ZONE.some(zona => zona.aperto && x >= zona.x0 && x <= zona.x1 && z >= zona.z0 && z <= zona.z1);
+
+function urta(x, z, y, ostacoli) {
+  return ostacoli.some(s => x > s.x0 - MARGINE_GRANATA && x < s.x1 + MARGINE_GRANATA && z > s.z0 - MARGINE_GRANATA && z < s.z1 + MARGINE_GRANATA && y < (s.altezza ?? ALTEZZA_SOFFITTO));
+}
+
+function aggiornaGranate(stato, dt, eventi) {
+  if (stato.granate.length === 0) return;
+  const ostacoli = ostacoliPerGiocatori(new Set(stato.porte));
+  stato.granate = stato.granate.filter(gr => {
+    gr.timer -= dt;
+    gr.vy -= R.GRAVITA * dt;
+    let y = gr.y + gr.vy * dt;
+    const x = gr.x + gr.vx * dt;
+    if (urta(x, gr.z, y, ostacoli)) gr.vx *= -RIMBALZO;
+    else gr.x = x;
+    const z = gr.z + gr.vz * dt;
+    if (urta(gr.x, z, y, ostacoli)) gr.vz *= -RIMBALZO;
+    else gr.z = z;
+    if (y <= RAGGIO_GRANATA_FISICO) {
+      y = RAGGIO_GRANATA_FISICO;
+      const urto = Math.abs(gr.vy) >= 1;
+      gr.vy = urto ? -gr.vy * RIMBALZO : 0;
+      const frena = urto ? URTO_SUOLO : Math.max(0, 1 - ATTRITO_SUOLO * dt);
+      gr.vx *= frena;
+      gr.vz *= frena;
+    }
+    if (y >= ALTEZZA_SOFFITTO - RAGGIO_GRANATA_FISICO && !sottoCielo(gr.x, gr.z)) {
+      y = ALTEZZA_SOFFITTO - RAGGIO_GRANATA_FISICO;
+      gr.vy = -Math.abs(gr.vy) * RIMBALZO;
+    }
+    gr.y = y;
+    if (gr.timer > 0) return true;
+    esplodi(stato, gr, ostacoli, eventi);
+    return false;
+  });
+}
+
+function esplodi(stato, granata, ostacoli, eventi) {
+  eventi.push({ k: 'esplosione', x: granata.x, y: granata.y, z: granata.z });
+  const lanciatore = stato.giocatori.find(g => g.id === granata.da);
+  if (!lanciatore) return;
+  const schermi = ostacoli.filter(s => (s.altezza ?? ALTEZZA_SOFFITTO) >= ALTEZZA_SCHERMO_ESPLOSIONE);
+  const base = dannoGranata(stato.round);
+  for (const z of stato.zombie) {
+    if (z.stato === 'morto') continue;
+    const d = Math.hypot(z.x - granata.x, 0.9 - granata.y, z.z - granata.z);
+    if (d > R.RAGGIO_GRANATA || !vistaLibera(granata, z, schermi)) continue;
+    danneggia(stato, lanciatore, z, Math.round(base * (0.35 + 0.65 * (1 - d / R.RAGGIO_GRANATA))), {}, eventi);
+  }
 }
 
 export function creaBonus(stato, x, z, tipo, eventi = []) {
@@ -262,7 +497,7 @@ function applicaBonus(stato, bonus, giocatore, eventi) {
   if (dati.durata) stato.effetti[bonus.tipo] = dati.durata;
   if (bonus.tipo === 'bomba') {
     for (const z of stato.zombie) {
-      if (z.stato === 'morto') continue;
+      if (z.stato === 'morto' || tipoDi(z).boss) continue;
       z.stato = 'morto';
       z.timer = RESTA_A_TERRA_DA_MORTO;
       eventi.push({ k: 'ucciso', zombie: z.id, testa: false, da: null, x: z.x, z: z.z, bomba: true });
@@ -313,7 +548,7 @@ function avvia(stato, eventi) {
     const partenza = PARTENZE[i % PARTENZE.length];
     Object.assign(g, {
       x: partenza.x, z: partenza.z, yaw: Math.PI, stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, punti: R.PUNTI_INIZIALI,
-      armi: ['pistola'], armaAttiva: 'pistola', bevande: [], pronto: false, uccisioni: 0, teletrasporto: g.teletrasporto + 1,
+      armi: ['pistola'], armaAttiva: 'pistola', bevande: [], pronto: false, uccisioni: 0, teletrasporto: g.teletrasporto + 1, granate: R.GRANATE_INIZIALI,
     });
   });
   eventi.push({ k: 'via' });
@@ -355,24 +590,25 @@ function eseguiAzioni(stato, azioni, eventi) {
       giocatore.rianimando = !!azione.attivo;
       continue;
     }
-    if (giocatore.stato !== 'vivo' || stato.fase === 'fine') continue;
+    if (giocatore.stato !== 'vivo' || stato.fase === 'fine' || stato.fase === 'vinta') continue;
     if (azione.tipo === 'colpo') colpisci(stato, giocatore, azione, eventi);
     else if (azione.tipo === 'pronto') giocatore.pronto = stato.fase === 'attesa' && !!azione.attivo;
     else if (stato.fase === 'attesa') continue;
     else if (azione.tipo === 'compra') compra(stato, giocatore, String(azione.acquisto), azione.arma, eventi);
     else if (azione.tipo === 'assa') ricostruisci(stato, giocatore, azione.finestra, eventi);
     else if (azione.tipo === 'frammento') frammento(stato, giocatore, Number(azione.id), eventi);
+    else if (azione.tipo === 'granata') lancia(stato, giocatore, azione, eventi);
   }
 }
 
-function generaZombie(stato) {
+function generaZombie(stato, { tipo: tipoVoluto = null, finestre: soloFinestre = null, corre: correVoluto } = {}) {
   const aperte = zoneAperte(new Set(stato.porte));
-  const finestre = FINESTRE.filter(f => aperte.has(f.zona));
+  const finestre = soloFinestre ? FINESTRE.filter(f => soloFinestre.includes(f.id)) : FINESTRE.filter(f => aperte.has(f.zona));
   const finestra = finestre[Math.floor(caso(stato) * finestre.length)];
-  const tipo = tipoZombie(stato.round, caso(stato));
+  const tipo = tipoVoluto ?? tipoZombie(stato.round, caso(stato));
   const dati = TIPI_ZOMBIE[tipo];
-  const corre = !!dati.corre || caso(stato) < quotaCorridori(stato.round);
-  const vita = Math.round(vitaZombie(stato.round) * dati.vita);
+  const corre = dati.boss ? false : correVoluto ?? (!!dati.corre || caso(stato) < quotaCorridori(stato.round));
+  const vita = Math.round(vitaZombie(Math.max(1, stato.round)) * dati.vita * (dati.boss ? moltiplicatoreBoss(stato.giocatori.length) : 1));
   stato.zombie.push({
     id: stato.prossimoId++, x: finestra.comparsa.x + (caso(stato) - 0.5) * 2, z: finestra.comparsa.z + (caso(stato) - 0.5) * 2,
     yaw: Math.atan2(-finestra.fuori.x, -finestra.fuori.z), stato: 'arriva', finestra: finestra.id, vita, vitaMax: vita, tipo,
@@ -385,6 +621,10 @@ function avanzaFase(stato, dt, eventi) {
     aggiornaSala(stato, dt, eventi);
     return;
   }
+  if (stato.fase === 'finale') {
+    aggiornaFinale(stato, dt, eventi);
+    return;
+  }
   if (stato.fase === 'intervallo') {
     stato.timerFase -= dt;
     if (stato.timerFase > 0) return;
@@ -393,25 +633,37 @@ function avanzaFase(stato, dt, eventi) {
     stato.fase = 'gioco';
     stato.daGenerare = zombieDelRound(stato.round);
     stato.attesaComparsa = 1;
+    stato.presideTra = stato.round % R.OGNI_PRESIDE === 0 ? R.PRESIDE_DOPO : null;
     for (const g of stato.giocatori) {
+      if (g.stato === 'vivo' && stato.round > 1) g.granate = Math.min(R.GRANATE_MASSIME, g.granate + R.GRANATE_PER_ROUND);
       if (g.stato !== 'morto') continue;
       const partenza = PARTENZE[0];
-      Object.assign(g, { stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, x: partenza.x, z: partenza.z, armi: ['pistola'], armaAttiva: 'pistola', bevande: [], rianimando: false, teletrasporto: g.teletrasporto + 1 });
+      Object.assign(g, { stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, x: partenza.x, z: partenza.z, armi: ['pistola'], armaAttiva: 'pistola', bevande: [], rianimando: false, teletrasporto: g.teletrasporto + 1, granate: R.GRANATE_INIZIALI });
       eventi.push({ k: 'rinato', a: g.id });
     }
     eventi.push({ k: 'round', round: stato.round });
     return;
   }
   if (stato.fase !== 'gioco') return;
+  if (stato.presideTra !== null) {
+    stato.presideTra -= dt;
+    if (stato.presideTra <= 0) {
+      stato.presideTra = null;
+      generaZombie(stato, { tipo: 'preside' });
+      eventi.push({ k: 'boss', tipo: 'preside', fusibile: stato.missione.presideFusibile });
+    }
+  }
+  const generatore = stato.missione.generatore === 'acceso';
+  if (generatore && stato.daGenerare < 2) stato.daGenerare = 2;
   stato.attesaComparsa -= dt;
   const presenti = stato.zombie.filter(z => z.stato !== 'morto').length;
   if (stato.attesaComparsa <= 0 && stato.daGenerare > 0 && presenti < R.ZOMBIE_VIVI_MAX) {
     generaZombie(stato);
     stato.daGenerare -= 1;
-    stato.attesaComparsa = attesaComparsa(stato.round);
+    stato.attesaComparsa = attesaComparsa(stato.round) * (generatore ? 0.6 : 1);
     return;
   }
-  if (stato.daGenerare === 0 && presenti === 0) {
+  if (stato.daGenerare === 0 && presenti === 0 && stato.presideTra === null) {
     stato.fase = 'intervallo';
     stato.timerFase = R.INTERVALLO;
     eventi.push({ k: 'fineRound', round: stato.round });
@@ -439,7 +691,8 @@ function muoviZombie(stato, dt, eventi) {
   for (const z of stato.zombie) {
     z.attesa = Math.max(0, z.attesa - dt);
     const dati = tipoDi(z);
-    const velocita = (z.corre ? R.VELOCITA_CORRE : R.VELOCITA_CAMMINA) * dati.velocita;
+    const furia = dati.finale && (z.faseBoss ?? 1) >= 3;
+    const velocita = z.scatto > 0 ? R.VELOCITA_SCATTO : (z.corre ? R.VELOCITA_CORRE : R.VELOCITA_CAMMINA) * dati.velocita * (furia ? 1.25 : 1);
     const portata = R.PORTATA_ZOMBIE * dati.portata;
     const finestra = finestraDi(z.finestra);
     if (z.stato === 'morto') {
@@ -452,7 +705,7 @@ function muoviZombie(stato, dt, eventi) {
       const d = Math.hypot(dx, dz);
       if (d < 0.3) {
         z.stato = 'assi';
-        z.timer = R.ROMPI_ASSE_OGNI;
+        z.timer = R.ROMPI_ASSE_OGNI / (dati.rompe ?? 1);
       } else {
         const passo = Math.min(d, velocita * dt);
         z.x += (dx / d) * passo;
@@ -468,7 +721,7 @@ function muoviZombie(stato, dt, eventi) {
         z.timer -= dt;
         if (z.timer <= 0) {
           stato.finestre[z.finestra] -= 1;
-          z.timer = R.ROMPI_ASSE_OGNI;
+          z.timer = R.ROMPI_ASSE_OGNI / (dati.rompe ?? 1);
           eventi.push({ k: 'assaRotta', finestra: z.finestra });
         }
       } else if (!occupata) {
@@ -493,18 +746,22 @@ function muoviZombie(stato, dt, eventi) {
       const bersaglio = stato.giocatori.find(g => g.id === z.bersaglio && g.stato === 'vivo');
       if (bersaglio && distanza(bersaglio, z) <= portata + 0.4) ferisci(stato, bersaglio, eventi, R.DANNO_ZOMBIE * dati.danno);
       z.stato = 'dentro';
-      z.attesa = R.ATTESA_ATTACCO;
+      z.attesa = R.ATTESA_ATTACCO * (dati.attesa ?? 1) * (furia ? 0.7 : 1);
       continue;
     }
     if (vicino && vicino.d <= portata && z.attesa === 0) {
       z.stato = 'attacco';
-      z.timer = CARICA_ATTACCO;
+      z.timer = CARICA_ATTACCO * (dati.carica ?? 1);
       z.bersaglio = vicino.g.id;
+      z.scatto = 0;
       eventi.push({ k: 'attacco', zombie: z.id });
       continue;
     }
     if (vicino && vicino.d <= portata * 0.8) continue;
-    const verso = vicino && vicino.d < 1.5 ? { x: (vicino.g.x - z.x) / vicino.d, z: (vicino.g.z - z.z) / vicino.d } : direzione(stato.campo, z.x, z.z);
+    const preda = dati.finale ? scatto(stato, z, dt, ostacoli, eventi) : null;
+    const verso = preda
+      ? { x: (preda.x - z.x) / (distanza(preda, z) || 1), z: (preda.z - z.z) / (distanza(preda, z) || 1) }
+      : vicino && vicino.d < 1.5 ? { x: (vicino.g.x - z.x) / vicino.d, z: (vicino.g.z - z.z) / vicino.d } : direzione(stato.campo, z.x, z.z);
     if (!verso) continue;
     const nuova = muoviCerchio(z, verso.x * velocita * dt, verso.z * velocita * dt, R.RAGGIO_ZOMBIE, ostacoli);
     z.x = nuova.x;
@@ -513,6 +770,23 @@ function muoviZombie(stato, dt, eventi) {
   }
   separa(stato.zombie.filter(z => z.stato === 'dentro' || z.stato === 'arriva' || z.stato === 'assi'));
   stato.zombie = stato.zombie.filter(z => z.stato !== 'morto' || z.timer > 0);
+}
+
+function scatto(stato, z, dt, ostacoli, eventi) {
+  z.prossimoScatto = Math.max(0, (z.prossimoScatto ?? 0) - dt);
+  z.scatto = Math.max(0, (z.scatto ?? 0) - dt);
+  if (z.scatto > 0) return vivi(stato).find(g => g.id === z.bersaglioScatto) ?? null;
+  if (z.prossimoScatto > 0 || (z.faseBoss ?? 1) < 2) return null;
+  const prede = vivi(stato)
+    .map(g => ({ g, d: distanza(g, z) }))
+    .filter(p => p.d > 4 && p.d < 14 && vistaLibera(z, p.g, ostacoli))
+    .sort((a, b) => a.d - b.d);
+  if (prede.length === 0) return null;
+  z.scatto = R.DURATA_SCATTO;
+  z.prossimoScatto = z.faseBoss >= 3 ? 5 : 8;
+  z.bersaglioScatto = prede[0].g.id;
+  eventi.push({ k: 'scatto', zombie: z.id });
+  return prede[0].g;
 }
 
 function separa(zombie) {
@@ -580,7 +854,7 @@ function aggiornaCassa(stato, dt, eventi) {
 
 export function passo(stato, dt, { posizioni = {}, azioni = [] } = {}) {
   const eventi = [];
-  if (stato.fase === 'fine') return eventi;
+  if (stato.fase === 'fine' || stato.fase === 'vinta') return eventi;
   stato.tempo += dt;
   aggiornaPosizioni(stato, posizioni);
   eseguiAzioni(stato, azioni, eventi);
@@ -590,6 +864,9 @@ export function passo(stato, dt, { posizioni = {}, azioni = [] } = {}) {
   aggiornaCassa(stato, dt, eventi);
   aggiornaPotenziatore(stato, dt, eventi);
   aggiornaBonus(stato, dt, eventi);
+  aggiornaGranate(stato, dt, eventi);
+  aggiornaGeneratore(stato, dt, eventi);
+  if (stato.fase === 'vinta') return eventi;
   if (stato.giocatori.length > 0 && vivi(stato).length === 0) {
     stato.fase = 'fine';
     eventi.push({ k: 'fine', round: stato.round, giocatori: stato.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });

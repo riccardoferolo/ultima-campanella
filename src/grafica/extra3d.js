@@ -112,6 +112,19 @@ export function creaBonus3d(scena) {
   };
 }
 
+function texturaAlone() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const sfumatura = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  sfumatura.addColorStop(0, 'rgba(255,255,255,0.9)');
+  sfumatura.addColorStop(0.35, 'rgba(255,255,255,0.25)');
+  sfumatura.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sfumatura;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+
 export function creaSegreti(scena) {
   const materiale = new THREE.MeshStandardMaterial({ color: 0x2c3b2a, emissive: 0x39ff6a, emissiveIntensity: 0.9, roughness: 0.4, metalness: 0.3, flatShading: true });
   const pezzi = FRAMMENTI.map(f => {
@@ -134,6 +147,25 @@ export function creaSegreti(scena) {
   campana.add(corpo, staffa, batacchio);
   campana.position.set(datiCampana.posizione.x, 2.35, datiCampana.posizione.z + datiCampana.verso.z * 0.12);
   scena.add(campana);
+  const vetro = new THREE.MeshStandardMaterial({ color: 0x3a1a00, emissive: 0xff8a2a, emissiveIntensity: 1.4, roughness: 0.15, metalness: 0.1 });
+  const cappuccio = new THREE.MeshStandardMaterial({ color: 0xb9b4a6, metalness: 0.9, roughness: 0.3 });
+  const alone = new THREE.SpriteMaterial({ map: texturaAlone(), color: 0xff9a3a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const fusibili = [0, 1, 2].map(() => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.13, 10), vetro));
+    for (const y of [-0.075, 0.075]) {
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.03, 10), cappuccio);
+      c.position.y = y;
+      g.add(c);
+    }
+    const s = new THREE.Sprite(alone);
+    s.scale.setScalar(0.45);
+    g.add(s);
+    g.rotation.z = Math.PI / 2;
+    g.visible = false;
+    scena.add(g);
+    return g;
+  });
   let oscillazione = 0;
   let tempo = 0;
   return {
@@ -149,6 +181,14 @@ export function creaSegreti(scena) {
         mesh.position.y = FRAMMENTI[i].y + Math.sin(tempo * 2 + i) * 0.03;
       });
       materiale.emissiveIntensity = 0.6 + Math.sin(tempo * 4) * 0.35;
+      const aTerra = new Map((vista.missione?.aTerra ?? []).map(f => [f.id, f]));
+      fusibili.forEach((g, id) => {
+        const f = aTerra.get(id);
+        g.visible = !!f && vista.fase !== 'attesa';
+        if (!f) return;
+        g.position.set(f.x, f.y + Math.sin(tempo * 2.2 + id) * 0.03, f.z);
+        g.rotation.y += dt * 1.2;
+      });
       oscillazione = Math.max(0, oscillazione - dt * 0.6);
       campana.rotation.x = Math.sin(tempo * 14) * 0.5 * oscillazione;
     },

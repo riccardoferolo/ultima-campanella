@@ -126,6 +126,7 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 .segno { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); font-size: 30px; color: #fff; opacity: 0; }
 .segno.visibile { opacity: 1; }
 .segno.testa { color: var(--sangue-chiaro); }
+.segno.uccisione { color: var(--sangue-chiaro); font-size: 42px; }
 
 .round {
   position: absolute;
@@ -153,6 +154,16 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 .arma b { font-size: 40px; font-weight: 400; }
 .arma b.poche { color: var(--sangue-chiaro); }
 .bibite { display: flex; gap: 6px; }
+.granate { display: flex; gap: 5px; min-height: 14px; }
+.granate i { width: 10px; height: 13px; border-radius: 50% 50% 45% 45%; background: #5f6d40; border: 1px solid #000; display: block; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.35); }
+.boss { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); width: min(520px, 70vw); text-align: center; }
+.boss[hidden] { display: none; }
+.boss b { display: block; font-family: 'Creepster', cursive; font-weight: 400; font-size: 30px; color: var(--sangue-chiaro); letter-spacing: 0.04em; }
+.boss div { height: 12px; border: 1px solid rgba(255, 255, 255, 0.7); background: rgba(0, 0, 0, 0.55); margin-top: 4px; }
+.boss i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #5e0907, #c8231b); }
+.obiettivo { position: absolute; top: 12px; left: 16px; font-size: 18px; color: #e9e2cc; max-width: 46vw; }
+.obiettivo::before { content: '\25B8  '; color: var(--oro); }
+.obiettivo:empty { display: none; }
 .bibite i { width: 22px; height: 22px; border-radius: 3px; border: 1px solid #000; display: block; }
 
 .avviso {

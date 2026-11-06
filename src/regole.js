@@ -54,6 +54,31 @@ export const R = Object.freeze({
   COSTO_CASSA_SALDI: 10,
   DISTANZA_FRAMMENTO: 1.6,
   PUNTI_SEGRETO: 1000,
+
+  GRANATE_INIZIALI: 2,
+  GRANATE_PER_ROUND: 2,
+  GRANATE_MASSIME: 4,
+  MICCIA_GRANATA: 2.2,
+  RAGGIO_GRANATA: 4.5,
+  VELOCITA_LANCIO: 13,
+  SPINTA_LANCIO: 3,
+  GRAVITA: 14,
+
+  OGNI_PRESIDE: 5,
+  PRESIDE_DOPO: 6,
+  PUNTI_BOSS: 500,
+
+  DISTANZA_FUSIBILE: 1.6,
+  FUSIBILI: 3,
+  DURATA_GENERATORE: 75,
+  DISTANZA_GENERATORE: 7,
+  PUNTI_FUSIBILE: 250,
+
+  VITA_CUSTODE: 30000,
+  VELOCITA_SCATTO: 7,
+  DURATA_SCATTO: 1.4,
+  RINFORZI_FINALE_MAX: 10,
+  PUNTI_VITTORIA: 5000,
 });
 
 const arma = dati => Object.freeze({ pallini: 1, dispersione: 0.02, automatica: false, ...dati });
@@ -167,6 +192,8 @@ export const BEVANDE = Object.freeze({
 export const TIPI_ZOMBIE = Object.freeze({
   normale: Object.freeze({ nome: 'Zombie', vita: 1, velocita: 1, danno: 1, portata: 1, punti: 1 }),
   magro: Object.freeze({ nome: 'Scuoiato', vita: 0.7, velocita: 1.15, danno: 1.1, portata: 1.05, punti: 1.2, corre: true }),
+  preside: Object.freeze({ nome: 'Il Preside', vita: 12, velocita: 0.85, danno: 1.6, portata: 1.3, punti: 8, boss: true, carica: 1.4, rompe: 3, infuria: 0.5 }),
+  custode: Object.freeze({ nome: 'Il Custode', vita: 1, velocita: 0.9, danno: 1.9, portata: 1.6, punti: 20, boss: true, finale: true, carica: 1.6, attesa: 0.9 }),
 });
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 
@@ -211,6 +238,20 @@ export function quotaCorridori(round) {
   if (round === 4) return 0.5;
   if (round < 8) return 0.8;
   return 1;
+}
+
+export function dannoGranata(round) {
+  return Math.round(vitaZombie(Math.max(1, round)) * 1.25);
+}
+
+export function moltiplicatoreBoss(giocatori) {
+  return giocatori >= 2 ? 1.7 : 1;
+}
+
+export function faseCustode(vitaRelativa) {
+  if (vitaRelativa > 2 / 3) return 1;
+  if (vitaRelativa > 1 / 3) return 2;
+  return 3;
 }
 
 export function attesaComparsa(round) {

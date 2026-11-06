@@ -1,8 +1,21 @@
-import { ARMI, BEVANDE, BONUS } from './regole.js';
+import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseCustode } from './regole.js';
 
 const $ = id => document.getElementById(id);
 const DURATA_AVVISO_MS = 2200;
 const DURATA_SEGNO_MS = 140;
+const DURATA_UCCISIONE_MS = 240;
+
+function obiettivo(vista) {
+  const m = vista.missione;
+  if (!m || vista.fase === 'attesa' || vista.fase === 'vinta' || vista.round === 0) return '';
+  if (vista.fase === 'finale') return 'Uccidete il Custode';
+  if (m.messi >= R.FUSIBILI) return "Scendete nel rifugio e suonate l'ultima campanella";
+  if (!vista.porte.has('aula')) return 'Trovate il vecchio rifugio sotto la scuola';
+  const parti = [`Fusibili del cancello ${m.fusibili + m.messi}/${R.FUSIBILI}`];
+  if (m.fusibili > 0) parti.push(vista.corrente ? 'portateli al quadro in aula magna' : 'accendete la corrente e portateli al quadro');
+  if (m.generatore === 'acceso') parti.push(`generatore ${Math.round(m.progresso * 100)}%`);
+  return parti.join(' · ');
+}
 
 export function creaHud() {
   const n = {
@@ -15,7 +28,20 @@ export function creaHud() {
   sala.hidden = true;
   const effetti = document.createElement('div');
   effetti.id = 'effetti';
-  n.radice.append(sala, effetti);
+  const boss = document.createElement('div');
+  boss.className = 'boss';
+  boss.hidden = true;
+  const nomeBoss = document.createElement('b');
+  const barraBoss = document.createElement('div');
+  const vitaBoss = document.createElement('i');
+  barraBoss.append(vitaBoss);
+  boss.append(nomeBoss, barraBoss);
+  const missione = document.createElement('div');
+  missione.className = 'obiettivo';
+  const granate = document.createElement('div');
+  granate.className = 'granate';
+  n.munizioni.after(granate);
+  n.radice.append(sala, effetti, boss, missione);
   let chiaveSala = '';
   let chiaveEffetti = '';
   let scadenzaAvviso = 0;
@@ -60,15 +86,35 @@ export function creaHud() {
     },
     avviso,
     segno(testa) {
+      if (n.segno.classList.contains('uccisione') && performance.now() < scadenzaSegno) return;
       n.segno.classList.add('visibile');
       n.segno.classList.toggle('testa', testa);
       scadenzaSegno = performance.now() + DURATA_SEGNO_MS;
+    },
+    uccisione() {
+      n.segno.classList.add('visibile', 'uccisione');
+      scadenzaSegno = performance.now() + DURATA_UCCISIONE_MS;
     },
     aggiorna({ vista, mioId, arma, suggerimento, rianimazione, inMira, cannocchiale, bloccato, rete, apertura }) {
       const io = vista.giocatori.find(g => g.id === mioId);
       const ora = performance.now();
       if (ora > scadenzaAvviso) n.avviso.classList.remove('visibile');
-      if (ora > scadenzaSegno) n.segno.classList.remove('visibile');
+      if (ora > scadenzaSegno) n.segno.classList.remove('visibile', 'uccisione');
+      const numero = String(io?.granate ?? 0);
+      if (granate.dataset.n !== numero) {
+        granate.dataset.n = numero;
+        granate.replaceChildren(...Array.from({ length: Number(numero) }, () => document.createElement('i')));
+      }
+      const capo = vista.zombie.find(z => z.tipo === 'custode' && z.stato !== 'morto') ?? vista.zombie.find(z => z.tipo === 'preside' && z.stato !== 'morto');
+      boss.hidden = !capo;
+      if (capo) {
+        const fase = capo.tipo === 'custode' ? faseCustode(capo.vita / 100) : 0;
+        const titolo = fase ? `${TIPI_ZOMBIE.custode.nome} — fase ${fase}` : TIPI_ZOMBIE[capo.tipo].nome;
+        if (nomeBoss.textContent !== titolo) nomeBoss.textContent = titolo;
+        vitaBoss.style.width = `${Math.max(0, Math.min(100, capo.vita))}%`;
+      }
+      const testoMissione = obiettivo(vista);
+      if (missione.textContent !== testoMissione) missione.textContent = testoMissione;
       n.round.textContent = vista.round > 0 ? String(vista.round) : '';
       n.round.classList.toggle('lampeggia', vista.fase === 'intervallo' && vista.round > 0);
       disegnaPunti(vista, mioId);

@@ -5,16 +5,15 @@ const MACCHIE_MASSIME = 50;
 
 function texturaPunto() {
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 16;
+  canvas.width = canvas.height = 32;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(4, 4, 8, 8);
-  ctx.fillRect(2, 6, 12, 4);
-  ctx.fillRect(6, 2, 4, 12);
-  const t = new THREE.CanvasTexture(canvas);
-  t.magFilter = THREE.NearestFilter;
-  t.minFilter = THREE.NearestFilter;
-  return t;
+  const sfumatura = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  sfumatura.addColorStop(0, 'rgba(255,255,255,1)');
+  sfumatura.addColorStop(0.45, 'rgba(255,255,255,0.85)');
+  sfumatura.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sfumatura;
+  ctx.fillRect(0, 0, 32, 32);
+  return new THREE.CanvasTexture(canvas);
 }
 
 const TIPI = {

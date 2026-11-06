@@ -1,6 +1,6 @@
 const SENSIBILITA = 0.0022;
 const PITCH_MASSIMO = 1.45;
-const TASTI_GIOCO = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyR', 'KeyF', 'KeyV', 'KeyQ', 'Digit1', 'Digit2', 'Enter', 'NumpadEnter']);
+const TASTI_GIOCO = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyR', 'KeyF', 'KeyV', 'KeyQ', 'Digit1', 'Digit2', 'Enter', 'NumpadEnter', 'KeyG']);
 
 export function creaComandi(superficie) {
   const premuti = new Set();
@@ -25,6 +25,7 @@ export function creaComandi(superficie) {
     else if (e.code === 'Digit1') stato.azioni.push({ arma: 0 });
     else if (e.code === 'Digit2') stato.azioni.push({ arma: 1 });
     else if (e.code === 'KeyF') stato.fPremuto = true;
+    else if (e.code === 'KeyG') stato.azioni.push('granata');
     else if (e.code === 'Enter' || e.code === 'NumpadEnter') stato.azioni.push('pronto');
   }
   function suTastoSu(e) {

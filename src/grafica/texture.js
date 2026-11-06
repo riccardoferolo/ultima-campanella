@@ -139,6 +139,43 @@ export function creaTexture() {
     }
     rumore(ctx, l, a, caso, ['#6b5a3a', '#3a4d5a'], 300);
   }, true);
+  const libri = disegna(256, 256, (ctx, l, a, caso) => {
+    const COLORI = ['#5a1f1b', '#1f3a5a', '#2f4a2a', '#6b5233', '#3d2b4a', '#7a6a4a', '#2a2a2a', '#4a3020', '#8a7a5a', '#244040'];
+    ctx.fillStyle = '#2a1b10';
+    ctx.fillRect(0, 0, l, a);
+    const ripiano = a / 4;
+    for (let r = 0; r < 4; r++) {
+      const base = (r + 1) * ripiano - 6;
+      let x = 2;
+      while (x < l - 4) {
+        const larghezza = 5 + Math.floor(caso() * 9);
+        const alto = ripiano * (0.55 + caso() * 0.32);
+        const vuoto = caso() < 0.06;
+        if (!vuoto) {
+          const inclinato = caso() < 0.05;
+          ctx.save();
+          ctx.translate(x, base);
+          if (inclinato) ctx.rotate(-0.18);
+          ctx.fillStyle = COLORI[Math.floor(caso() * COLORI.length)];
+          ctx.fillRect(0, -alto, larghezza, alto);
+          ctx.fillStyle = 'rgba(0,0,0,0.35)';
+          ctx.fillRect(larghezza - 1, -alto, 1, alto);
+          ctx.fillStyle = 'rgba(210,180,110,0.55)';
+          if (larghezza > 7) {
+            ctx.fillRect(1, -alto + 6, larghezza - 2, 1);
+            ctx.fillRect(1, -10, larghezza - 2, 1);
+          }
+          ctx.restore();
+        }
+        x += larghezza + (vuoto ? 6 : 0);
+      }
+      ctx.fillStyle = '#4a3220';
+      ctx.fillRect(0, base, l, 6);
+      ctx.fillStyle = '#1a1009';
+      ctx.fillRect(0, base + 5, l, 1);
+    }
+    rumore(ctx, l, a, caso, ['rgba(120,110,90,0.25)', 'rgba(0,0,0,0.25)'], 1200);
+  });
   const terra = disegna(LATO, LATO, (ctx, l, a, caso) => {
     ctx.fillStyle = '#2b2a1e';
     ctx.fillRect(0, 0, l, a);
@@ -250,7 +287,7 @@ export function creaTexture() {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     for (let x = 4; x < l; x += 8) for (let y = 4; y < a; y += 8) ctx.fillRect(x, y, 2, 2);
   });
-  return { muro, piastrelle, parquet, soffitto, legno, porta, armadietti, terra, lavagna, metallo, legnoChiaro, linoleum, cemento, asfalto, rete, pulmino, corteccia, fogliame, mimetica, pannello };
+  return { muro, piastrelle, parquet, soffitto, legno, porta, armadietti, terra, lavagna, metallo, legnoChiaro, linoleum, cemento, asfalto, rete, pulmino, corteccia, fogliame, mimetica, pannello, libri };
 }
 
 export function texturaTesto(righe, { larghezza = 128, altezza = 64, sfondo = null, colore = '#f2efe6', font = 'bold 14px monospace', bordo = null } = {}) {

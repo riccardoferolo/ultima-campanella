@@ -18,6 +18,13 @@ npm test
 - Due zombie realistici: quello di città e lo Scuoiato (più veloce, più fragile, fa più male).
 - Bonus lasciati dagli zombie: Bomba, Munizioni al massimo, Punti doppi, Colpo secco, Saldi, Carpentiere, Caricatore infinito.
 - Easter egg: tre frammenti di meteorite nascosti nella mappa e la vecchia campanella dell'atrio.
+- Granate (tasto G): due all'inizio, due in più a ogni round, massimo quattro.
+- Zombie che barcollano quando li colpisci e perdono la testa col colpo in testa.
+- Il Preside, un boss che arriva ogni cinque round.
+- Ala nuova: androne, aula magna, biblioteca, campo sportivo e il rifugio antiaereo.
+- Missione finale: tre fusibili (biblioteca, tasca del Preside, generatore da difendere nel campo) nel quadro
+  del cancello con la corrente accesa, poi nel rifugio si suona l'ultima campanella e arriva il Custode,
+  boss in tre fasi: il cancello si chiude finché non muore, e la sua morte vince la partita.
 
 ## Strumenti
 

@@ -5,6 +5,11 @@ import { TESTA } from '../colpi.js';
 
 const DISSOLVENZA = 0.25;
 const AFFONDA_DOPO = 2.6;
+const SUSSULTO_MASSIMO = 1;
+const SMORZA_SUSSULTO = 5;
+const PIEGA_BUSTO = 0.42;
+const PIEGA_TESTA = 0.35;
+const ARRETRA = 0.09;
 const VARIANTI = Object.freeze([
   { tinta: 0xffffff, scala: 1 },
   { tinta: 0xc7d1bf, scala: 0.95 },
@@ -14,6 +19,16 @@ const VARIANTI = Object.freeze([
 const MODELLI = Object.freeze({
   normale: { url: './modelli/zombie.glb', scala: 0.01, varianti: true, clip: { cammina: 'cammina', cammina2: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' }, velocita: { cammina: 1, cammina2: 0.9, corre: 1.05, attacco: 1.6, attacco2: 1.7, muore: 1.2, fermo: 1 } },
   magro: { url: './modelli/zombi_magro.glb', scala: 0.25, clip: { cammina: 'walk', cammina2: 'walk2', corre: 'run', attacco: 'attack2', attacco2: 'attack1_r', muore: 'dead1', fermo: 'idle' }, velocita: {}, riserva: { tinta: 0x9c7266, scala: 0.94 } },
+  preside: {
+    url: './modelli/zombie.glb', scala: 0.0135, tinta: 0x8f8a86, alto: 1.95, raggio: 0.5, raggioTesta: 0.23, reazione: 0.45,
+    clip: { cammina: 'cammina', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.8, corre: 0.85, attacco: 1.2, attacco2: 1.15, muore: 0.9, fermo: 0.8 },
+  },
+  custode: {
+    url: './modelli/zombie.glb', scala: 0.0158, tinta: 0x6f5a52, alto: 2.3, raggio: 0.62, raggioTesta: 0.27, reazione: 0.25,
+    clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.75, corre: 0.8, attacco: 1, attacco2: 0.95, muore: 0.7, fermo: 0.7 },
+  },
 });
 
 function sistemaTexture(radice) {
@@ -108,7 +123,12 @@ export function creaGestoreZombi(scena, risorse) {
     radice.add(corpo);
     scena.add(radice);
     let testa = null;
-    corpo.traverse(o => { if (!testa && o.isBone && /head$/i.test(o.name)) testa = o; });
+    let busto = null;
+    corpo.traverse(o => {
+      if (!o.isBone) return;
+      if (!testa && /head$/i.test(o.name)) testa = o;
+      if (/spine2?$/i.test(o.name)) busto = o;
+    });
     const mixer = new THREE.AnimationMixer(corpo);
     const azioni = new Map();
     for (const [logico, nome] of Object.entries(dati.clip)) {
@@ -122,7 +142,10 @@ export function creaGestoreZombi(scena, risorse) {
       }
       azioni.set(logico, azione);
     }
-    const voce = { radice, corpo, testa, mixer, azioni, dati, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3 };
+    const voce = {
+      radice, corpo, testa, busto, mixer, azioni, dati, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3,
+      vitaPrima: z.vita, sussulto: 0, senzaTesta: false,
+    };
     zombi.set(z.id, voce);
     return voce;
   }
@@ -138,6 +161,20 @@ export function creaGestoreZombi(scena, risorse) {
     nuova.play();
     if (vecchia) vecchia.crossFadeTo(nuova, DISSOLVENZA, false);
     voce.attuale = scelto;
+  }
+
+  function scuoti(voce, forza) {
+    voce.sussulto = Math.min(SUSSULTO_MASSIMO, voce.sussulto + forza * (voce.dati.reazione ?? 1));
+  }
+
+  function postura(voce, dt) {
+    voce.sussulto = Math.max(0, voce.sussulto - dt * SMORZA_SUSSULTO);
+    if (voce.sussulto > 0) {
+      voce.busto?.rotateX(-voce.sussulto * PIEGA_BUSTO);
+      if (!voce.senzaTesta) voce.testa?.rotateX(-voce.sussulto * PIEGA_TESTA);
+      voce.corpo.position.z = -voce.sussulto * ARRETRA;
+    } else voce.corpo.position.z = 0;
+    if (voce.senzaTesta && voce.testa) voce.testa.scale.setScalar(0.001);
   }
 
   function rimuovi(id) {
@@ -165,7 +202,10 @@ export function creaGestoreZombi(scena, risorse) {
           voce.tempoMorto += dt;
           if (voce.tempoMorto > AFFONDA_DOPO) voce.radice.position.y = -(voce.tempoMorto - AFFONDA_DOPO) * 0.6;
         } else voce.tempoMorto = 0;
+        if (z.vita < voce.vitaPrima && z.stato !== 'morto') scuoti(voce, 0.45 + (voce.vitaPrima - z.vita) / 40);
+        voce.vitaPrima = z.vita;
         voce.mixer.update(dt);
+        postura(voce, dt);
       }
       for (const id of [...zombi.keys()]) if (!vivi.has(id)) rimuovi(id);
     },
@@ -174,13 +214,23 @@ export function creaGestoreZombi(scena, risorse) {
       return vista.zombie.filter(z => z.stato !== 'morto').map(z => {
         const voce = zombi.get(z.id);
         const dati = MODELLI[z.tipo] ?? MODELLI.normale;
-        const forma = { id: z.id, x: z.x, z: z.z, alto: dati.alto, raggio: dati.raggio };
+        const forma = { id: z.id, x: z.x, z: z.z, alto: dati.alto, raggio: dati.raggio, raggioTesta: dati.raggioTesta };
         if (voce?.testa) {
           voce.testa.getWorldPosition(punto);
           return { ...forma, testa: { x: punto.x, y: punto.y + 0.06, z: punto.z } };
         }
         return { ...forma, testa: { x: z.x, y: dati.testa ?? TESTA.altezza, z: z.z } };
       });
+    },
+    colpito(id, testa) {
+      const voce = zombi.get(id);
+      if (voce) scuoti(voce, testa ? 0.9 : 0.6);
+    },
+    decapita(id) {
+      const voce = zombi.get(id);
+      if (!voce?.testa || voce.dati.alto) return null;
+      voce.senzaTesta = true;
+      return voce.testa.getWorldPosition(new THREE.Vector3());
     },
     posizioneTesta(id) {
       const voce = zombi.get(id);

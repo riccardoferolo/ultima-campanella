@@ -25,6 +25,55 @@ const CIELO_APERTO = 0x0b1322;
 const NEBBIA_DENTRO = 24;
 const NEBBIA_FUORI = 40;
 const ONDEGGIO = 0.01;
+const RAGGIO_BOMBA = 0.034;
+const SU = new THREE.Vector3(0, 1, 0);
+
+function creaGranate3d(scena) {
+  const corpo = new THREE.SphereGeometry(RAGGIO_BOMBA, 12, 10).scale(1, 1.25, 1);
+  const tappo = new THREE.CylinderGeometry(0.011, 0.014, 0.03, 8);
+  const leva = new THREE.BoxGeometry(0.009, 0.06, 0.014);
+  const verde = new THREE.MeshStandardMaterial({ color: 0x3f4a2c, roughness: 0.55, metalness: 0.25 });
+  const metallo = new THREE.MeshStandardMaterial({ color: 0x9a9a92, roughness: 0.35, metalness: 0.85 });
+  const visibili = new Map();
+  function crea() {
+    const g = new THREE.Group();
+    const c = new THREE.Mesh(corpo, verde);
+    const t = new THREE.Mesh(tappo, metallo);
+    t.position.y = RAGGIO_BOMBA * 1.25 + 0.012;
+    const l = new THREE.Mesh(leva, metallo);
+    l.position.set(RAGGIO_BOMBA * 0.9, RAGGIO_BOMBA * 0.6, 0);
+    l.rotation.z = -0.25;
+    g.add(c, t, l);
+    scena.add(g);
+    return g;
+  }
+  return {
+    aggiorna(granate, dt) {
+      const presenti = new Set();
+      for (const gr of granate ?? []) {
+        presenti.add(gr.id);
+        const g = visibili.get(gr.id) ?? crea();
+        visibili.set(gr.id, g);
+        const prima = g.position.clone();
+        g.position.set(gr.x, gr.y, gr.z);
+        const passo = g.position.distanceTo(prima);
+        if (passo < 1) {
+          g.rotation.x += passo * 9;
+          g.rotation.z += passo * 4;
+        }
+      }
+      for (const [id, g] of visibili) {
+        if (presenti.has(id)) continue;
+        scena.remove(g);
+        visibili.delete(id);
+      }
+    },
+    svuota() {
+      for (const g of visibili.values()) scena.remove(g);
+      visibili.clear();
+    },
+  };
+}
 
 function precompila(renderer, scena, camera, extra) {
   const gruppo = new THREE.Group();
@@ -85,6 +134,7 @@ export async function creaMondo(contenitore) {
   const segreti = creaSegreti(scena);
   const zombi = creaGestoreZombi(scena, risorseZombi);
   const effetti = creaEffetti(scena);
+  const granate3d = creaGranate3d(scena);
   const vista1p = creaVista1p(materialiArmi);
   vista1p.scena.environment = ambiente;
   vista1p.scena.environmentIntensity = 0.5;
@@ -165,6 +215,7 @@ export async function creaMondo(contenitore) {
     scena.background.copy(scena.fog.color);
     scuola.aggiorna(vista, dt, tempo);
     zombi.aggiorna(vista, dt);
+    granate3d.aggiorna(vista.granate, dt);
     bonus3d.aggiorna(vista, dt);
     segreti.aggiorna(vista, dt);
     aggiornaCompagni(vista, mioId, dt);
@@ -192,9 +243,17 @@ export async function creaMondo(contenitore) {
     },
     campanella: () => segreti.suona(),
     bersagli: vista => zombi.bersagli(vista),
+    colpito: (id, testa) => zombi.colpito(id, testa),
+    decapita(id) {
+      const punto = zombi.decapita(id);
+      if (!punto) return;
+      effetti.sangue(punto, SU);
+      effetti.sangue(punto, SU);
+    },
     effetti,
     svuota() {
       zombi.svuota();
+      granate3d.svuota();
       effetti.svuota();
       bonus3d.svuota();
       for (const c of compagni.values()) c.chiudi();
