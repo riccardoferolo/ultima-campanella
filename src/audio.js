@@ -214,7 +214,16 @@ export function creaAudio() {
     assaMessa: () => { nota(180, { durata: 0.08, tipo: 'square', volume: 0.25 }); nota(160, { durata: 0.08, tipo: 'square', volume: 0.25, ritardo: 0.16 }); },
     porta: () => { soffio({ durata: 1.2, da: 400, a: 120, volume: 0.6 }); nota(55, { durata: 1, tipo: 'sawtooth', volume: 0.12 }); },
     acquisto: () => { nota(988, { durata: 0.12, tipo: 'triangle', volume: 0.25 }); nota(1319, { durata: 0.3, tipo: 'triangle', volume: 0.25, ritardo: 0.1 }); },
-    bevanda: () => { [523, 659, 784].forEach((f, i) => nota(f, { durata: 0.25, tipo: 'triangle', volume: 0.2, ritardo: i * 0.12 })); },
+    sorsi: () => {
+      nota(2500, { durata: 0.06, tipo: 'triangle', volume: 0.1 });
+      soffio({ durata: 0.22, da: 5000, a: 1500, tipo: 'bandpass', volume: 0.3, ritardo: 0.04 });
+      for (let i = 0; i < 3; i++) {
+        nota(175 - i * 10, { durata: 0.13, volume: 0.35, scendi: 85, ritardo: 0.5 + i * 0.27 });
+        soffio({ durata: 0.1, da: 700, a: 200, volume: 0.25, ritardo: 0.51 + i * 0.27 });
+      }
+      nota(240, { durata: 0.4, tipo: 'sawtooth', volume: 0.04, scendi: 170, ritardo: 1.4 });
+      [523, 659, 784, 1046].forEach((f, i) => nota(f, { durata: 0.3, tipo: 'triangle', volume: 0.18, ritardo: 1.55 + i * 0.1 }));
+    },
     cassa: () => { [880, 740, 988, 659, 1175].forEach((f, i) => nota(f, { durata: 0.4, tipo: 'sine', volume: 0.18, ritardo: i * 0.22 })); },
     round: () => { [98, 92.5, 87.3, 73.4].forEach((f, i) => nota(f, { durata: 1.1, tipo: 'sawtooth', volume: 0.16, ritardo: i * 0.55 })); soffio({ durata: 2.5, da: 300, a: 60, volume: 0.3 }); },
     fineRound: () => { [73.4, 87.3, 110].forEach((f, i) => nota(f, { durata: 0.9, tipo: 'triangle', volume: 0.18, ritardo: i * 0.4 })); },

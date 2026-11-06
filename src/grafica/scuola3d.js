@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { R, ARMI, BEVANDE } from '../regole.js';
+import { R, ARMI } from '../regole.js';
 import { ALTEZZA_SOFFITTO, ZONE, MURI, RECINZIONI, ALTEZZA_RECINZIONE, OSTACOLI, FINESTRE, PORTE, ACQUISTI } from '../mappa.js';
 import { texturaTesto } from './texture.js';
 import { modelloArma } from './armi3d.js';
 import { creaCaso } from './caso-grafica.js';
+import { creaDistributore } from './bibite3d.js';
 
 const H = ALTEZZA_SOFFITTO;
 const DAVANZALE = 0.9;
@@ -239,15 +240,7 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
       supporto.add(cornice, gruppo, gesso);
       scena.add(supporto);
     } else if (a.tipo === 'bevanda') {
-      const bevanda = BEVANDE[a.bevanda];
-      const macchina = new THREE.Group();
-      const corpo = new THREE.Mesh(new THREE.BoxGeometry(0.95, 2, 0.65), new THREE.MeshStandardMaterial({ color: new THREE.Color(bevanda.colore).multiplyScalar(0.55), metalness: 0.5, roughness: 0.35 }));
-      corpo.position.y = 1;
-      const pannello = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.2), new THREE.MeshBasicMaterial({
-        map: texturaTesto([bevanda.nome.split(' ')[0].toUpperCase(), bevanda.nome.split(' ')[1].toUpperCase(), `${bevanda.costo}`], { larghezza: 64, altezza: 96, sfondo: `#${bevanda.colore.toString(16).padStart(6, '0')}`, font: 'bold 12px monospace', bordo: '#111' }),
-      }));
-      pannello.position.set(0, 1.2, 0.33);
-      macchina.add(corpo, pannello);
+      const macchina = creaDistributore(a.bevanda);
       macchina.position.set(x, 0, z);
       orientamento(macchina, a.verso);
       scena.add(macchina);

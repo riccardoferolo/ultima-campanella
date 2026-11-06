@@ -1,11 +1,19 @@
 import * as THREE from 'three';
 import { modelloArma, creaBraccio, creaManoSinistra } from './armi3d.js';
+import { creaBottiglia } from './bibite3d.js';
 
 const RIPOSO = new THREE.Vector3(0.11, -0.095, -0.29);
 const MIRA = new THREE.Vector3(0, -0.068, -0.24);
 const DURATA_LAMPO = 0.05;
 const SOSTEGNO_PISTOLA = new THREE.Vector3(-0.018, -0.05, 0.04);
 const COLORE_LAMPO = 0xfff3c4;
+export const DURATA_BEVUTA = 1.7;
+const BEVUTA_SALE = new THREE.Vector3(0.08, -0.4, -0.28);
+const BEVUTA_PRONTA = new THREE.Vector3(0.05, -0.07, -0.24);
+const BEVUTA_BOCCA = new THREE.Vector3(0.01, 0.03, -0.17);
+const BEVUTA_VIA = new THREE.Vector3(0.16, -0.5, -0.3);
+const INCLINAZIONE = 1.7;
+const liscio = t => t * t * (3 - 2 * t);
 
 function texturaLampo() {
   const canvas = document.createElement('canvas');
@@ -45,6 +53,12 @@ export function creaVista1p(materialiArmi) {
   const coltello = modelloArma('coltello', materialiArmi);
   coltello.gruppo.visible = false;
   scena.add(coltello.gruppo);
+  const presaBottiglia = new THREE.Group();
+  presaBottiglia.add(creaBraccio(materialiArmi));
+  presaBottiglia.visible = false;
+  scena.add(presaBottiglia);
+  const bottiglie = new Map();
+  const bevuta = { tipo: null, t: 0 };
   let attuale = null;
   let rinculo = 0;
   let tempoLampo = 0;
@@ -79,6 +93,19 @@ export function creaVista1p(materialiArmi) {
       tempoLampo = DURATA_LAMPO;
       lampo.material.rotation = Math.random() * Math.PI;
     },
+    bevi(tipo) {
+      if (!bottiglie.has(tipo)) {
+        const b = creaBottiglia(tipo);
+        b.gruppo.position.set(0.004, -0.115, 0.012);
+        b.gruppo.scale.setScalar(0.9);
+        b.gruppo.visible = false;
+        presaBottiglia.add(b.gruppo);
+        bottiglie.set(tipo, b);
+      }
+      bottiglie.forEach(b => { b.gruppo.visible = false; });
+      bottiglie.get(tipo).gruppo.visible = true;
+      Object.assign(bevuta, { tipo, t: 0 });
+    },
     get lampoAcceso() { return tempoLampo > 0; },
     get coloreLampo() { return lampo.material.color.getHex(); },
     aggiorna({ dt, movimento, mira, ricarica, cambio, coltellata, corsa }) {
@@ -97,6 +124,26 @@ export function creaVista1p(materialiArmi) {
         posizione.z + rinculo * 0.05,
       );
       supporto.rotation.set(rinculo * 0.12 + ricarica * 0.8, (corsa ? 0.5 : 0) + (mira ? 0 : 0.06), ricarica * 0.4);
+      presaBottiglia.visible = bevuta.tipo !== null;
+      if (bevuta.tipo) {
+        bevuta.t += dt;
+        const f = bevuta.t / DURATA_BEVUTA;
+        const liquido = bottiglie.get(bevuta.tipo).liquido;
+        if (f < 0.2) {
+          presaBottiglia.position.lerpVectors(BEVUTA_SALE, BEVUTA_PRONTA, liscio(f / 0.2));
+          presaBottiglia.rotation.set(-0.15, 0.2, -0.1);
+          liquido.scale.y = 1;
+        } else if (f < 0.78) {
+          const g = liscio((f - 0.2) / 0.58);
+          presaBottiglia.position.lerpVectors(BEVUTA_PRONTA, BEVUTA_BOCCA, Math.min(1, g * 1.6));
+          presaBottiglia.rotation.set(-0.15 + g * INCLINAZIONE, 0.2 - g * 0.2, -0.1 + g * 0.1);
+          liquido.scale.y = Math.max(0.06, 1 - g);
+        } else if (f < 1) {
+          const g = liscio((f - 0.78) / 0.22);
+          presaBottiglia.position.lerpVectors(BEVUTA_BOCCA, BEVUTA_VIA, g);
+          presaBottiglia.rotation.set(INCLINAZIONE - 0.15 - g * 1.2, 0, 0.3 * g);
+        } else bevuta.tipo = null;
+      }
       coltello.gruppo.visible = coltellata > 0;
       if (coltellata > 0) {
         const f = 1 - coltellata;

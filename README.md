@@ -22,6 +22,7 @@ npm test
   (congela gli zombie in statue che si frantumano con un colpo), Arco Voltaico (fulmine che salta fino a 6 zombie, 12 potenziato).
 - Fino a 4 giocatori nella stessa stanza (chi la crea più tre amici); in tre e in quattro più zombie e boss più resistenti.
 - Musica che cresce coi round, con temi per il Preside e per il Custode (tasto M per spegnerla o riaccenderla).
+- Distributori col proprio marchio (insegna, vetrina con le bottiglie, logo e slogan) e bevuta animata in prima persona.
 - Sei bibite: Ferro, Lampo, Ritorno e, nell'ala nuova, Raffica (spari più veloce, aula magna), Scatto (corri di più, campo sportivo), Tasca (terza arma, biblioteca; a terra la perdi).
 - Granate (tasto G): due all'inizio, due in più a ogni round, massimo quattro.
 - Zombie che barcollano quando li colpisci e perdono la testa col colpo in testa.

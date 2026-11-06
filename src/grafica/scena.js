@@ -342,6 +342,7 @@ export async function creaMondo(contenitore) {
       effetti.raggio(bocca, new THREE.Vector3(punto.x, punto.y, punto.z), colore);
     },
     campanella: () => segreti.suona(),
+    bevi: tipo => vista1p.bevi(tipo),
     bersagli: vista => zombi.bersagli(vista),
     colpito: (id, testa) => zombi.colpito(id, testa),
     frantuma(id, x, z) {

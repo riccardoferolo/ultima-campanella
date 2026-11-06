@@ -4,7 +4,8 @@ import { semeCasuale } from './caso.js';
 import { MURI, OSTACOLI, PORTE, ACQUISTI, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
 import { muoviCerchio } from './fisica.js';
 import { colpisciZombie, direzioneDa, disperdi, esplosione } from './colpi.js';
-import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera } from './arsenale.js';
+import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi } from './arsenale.js';
+import { DURATA_BEVUTA } from './grafica/vista1p.js';
 import { interazioneVicina } from './interazioni.js';
 import { creaPartita, passo, aggiungiGiocatore, rimuoviGiocatore } from './partita.js';
 import { faiIstantanea, espandi, interpola } from './istantanea.js';
@@ -326,7 +327,16 @@ function suEventi(eventi) {
       case 'potenzia': if (perMe) { audio.suona('potenzia'); hud.avviso('Potenziamento in corso…', 'bene'); } break;
       case 'potenziataPronta': if (perMe) hud.avviso("Ritira l'arma potenziata!", 'bene'); break;
       case 'munizioni': if (perMe) { riempi(arsenale, e.arma); audio.suona('acquisto'); } break;
-      case 'bevanda': if (perMe) { audio.suona('bevanda'); hud.avviso(BEVANDE[e.bevanda].nome, 'bene'); } break;
+      case 'bevanda':
+        if (!perMe) break;
+        bevi(arsenale, DURATA_BEVUTA);
+        mondo.bevi(e.bevanda);
+        audio.suona('sorsi');
+        setTimeout(() => {
+          hud.sorso(BEVANDE[e.bevanda].colore);
+          hud.avviso(`${BEVANDE[e.bevanda].nome}: ${BEVANDE[e.bevanda].descrizione}`, 'bene');
+        }, DURATA_BEVUTA * 850);
+        break;
       case 'cassa': if (perMe) { audio.suona('cassa'); hud.avviso(`Prendi: ${ARMI[e.arma].nome}`, 'bene'); } break;
       case 'ferito': if (perMe) audio.suona('ferito'); break;
       case 'aTerra': audio.suona('aTerra'); hud.avviso(perMe ? 'Sei a terra!' : `${nomeDi(e.a)} è a terra!`); break;

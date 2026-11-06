@@ -38,6 +38,9 @@ export function creaHud() {
   boss.append(nomeBoss, barraBoss);
   const missione = document.createElement('div');
   missione.className = 'obiettivo';
+  const sorso = document.createElement('div');
+  sorso.className = 'sorso';
+  n.radice.prepend(sorso);
   const granate = document.createElement('div');
   granate.className = 'granate';
   n.munizioni.after(granate);
@@ -90,6 +93,15 @@ export function creaHud() {
       n.segno.classList.add('visibile');
       n.segno.classList.toggle('testa', testa);
       scadenzaSegno = performance.now() + DURATA_SEGNO_MS;
+    },
+    sorso(colore) {
+      sorso.style.transition = 'none';
+      sorso.style.setProperty('--colore', `#${colore.toString(16).padStart(6, '0')}`);
+      sorso.style.opacity = '0.75';
+      requestAnimationFrame(() => {
+        sorso.style.transition = 'opacity 1.4s ease-out';
+        sorso.style.opacity = '0';
+      });
     },
     uccisione() {
       n.segno.classList.add('visibile', 'uccisione');

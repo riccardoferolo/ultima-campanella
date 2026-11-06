@@ -154,6 +154,7 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 .arma b { font-size: 40px; font-weight: 400; }
 .arma b.poche { color: var(--sangue-chiaro); }
 .bibite { display: flex; gap: 6px; }
+.sorso { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 35%, var(--colore, #fff) 120%); mix-blend-mode: screen; }
 .granate { display: flex; gap: 5px; min-height: 14px; }
 .granate i { width: 10px; height: 13px; border-radius: 50% 50% 45% 45%; background: #5f6d40; border: 1px solid #000; display: block; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.35); }
 .boss { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); width: min(520px, 70vw); text-align: center; }

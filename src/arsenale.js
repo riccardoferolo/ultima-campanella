@@ -68,6 +68,11 @@ export function allinea(a, armiHost, armaNuova = null) {
   a.ricarica = 0;
 }
 
+export function bevi(a, durata) {
+  a.ricarica = 0;
+  a.cambio = Math.max(a.cambio, durata);
+}
+
 export function riempi(a, tipo) {
   const arma = a.armi.find(x => x.tipo === tipo);
   if (arma) Object.assign(arma, nuovaArma(tipo));
