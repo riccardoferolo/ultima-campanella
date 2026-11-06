@@ -31,7 +31,7 @@ const FERITA_BUCO = 0.12;
 const IMPLOSIONE_PER_VITA = 2.5;
 const SALTI_MASSIMI = 13;
 
-const ARMA_SEGRETA = 'disintegratore';
+const ARMA_SEGRETA = 'singolarita+';
 const REGALO_CAMPANELLA = Object.freeze({ x: -3, z: 4.4 });
 
 const distanza = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);

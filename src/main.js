@@ -1,5 +1,5 @@
 import './stile.css';
-import { R, ARMI, BEVANDE, BONUS, COLTELLO, saltiArco, fattoreBevande } from './regole.js';
+import { R, ARMI, BEVANDE, BONUS, COLTELLO, saltiArco, fattoreBevande, modoRicarica } from './regole.js';
 import { semeCasuale } from './caso.js';
 import { MURI, OSTACOLI, PORTE, ACQUISTI, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
 import { muoviCerchio } from './fisica.js';
@@ -308,7 +308,7 @@ function suEventi(eventi) {
         if (e.tipo === 'munizioni') arsenale.armi.forEach(a => riempi(arsenale, a.tipo));
         break;
       case 'frammento': audio.suona('frammento'); hud.avviso(`Frammento di meteorite ${e.trovati}/${e.totale}`, 'bene'); break;
-      case 'segreto': audio.suona('segreto'); hud.avviso('La meteorite si risveglia: avete il Disintegratore!', 'bene'); break;
+      case 'segreto': audio.suona('segreto'); hud.avviso("La meteorite si risveglia: avete l'Orizzonte degli Eventi!", 'bene'); break;
       case 'campanella':
         audio.suona('campanella');
         mondo.campanella();
@@ -612,14 +612,25 @@ function statoMusica(vista) {
   return vista.zombie.some(z => z.tipo === 'preside' && z.stato !== 'morto') ? 'preside' : 'round';
 }
 
+function avviaRicarica(me) {
+  if (!ricarica(arsenale, me.bevande)) return false;
+  locale.suonoRicarica?.ferma();
+  locale.suonoRicarica = audio.ricarica(modoRicarica(armaAttiva(arsenale).tipo), arsenale.ricaricaTotale, arsenale.daCaricare);
+  return true;
+}
+
 function usaArmi(lettura, me, vista, dt) {
   if (lettura.azioni.includes('musica')) hud.avviso(audio.alternaMusica() ? 'Musica accesa' : 'Musica spenta', 'bene');
-  if (aggiornaArsenale(arsenale, dt)) audio.suona('ricarica');
+  aggiornaArsenale(arsenale, dt);
+  if (arsenale.ricarica === 0 && locale.suonoRicarica) {
+    locale.suonoRicarica.ferma();
+    locale.suonoRicarica = null;
+  }
   if (me.stato !== 'vivo' || s.fase !== 'gioco') return;
   for (const azione of lettura.azioni) {
     if (azione === 'pronto') {
       if (vista.fase === 'attesa') inviaAzione({ tipo: 'pronto', attivo: !me.pronto });
-    } else if (azione === 'ricarica' && ricarica(arsenale, me.bevande)) audio.suona('ricarica');
+    } else if (azione === 'ricarica') avviaRicarica(me);
     else if (azione === 'cambia') cambia(arsenale);
     else if (azione === 'granata') {
       if (me.granate > 0 && vista.fase !== 'attesa') {
@@ -645,7 +656,7 @@ function usaArmi(lettura, me, vista, dt) {
   locale.sparoForzato = false;
   if (!vuole || io.corsa) return;
   if (armaAttiva(arsenale).caricatore === 0) {
-    if (!ricarica(arsenale, me.bevande) && performance.now() / 1000 - locale.ultimoVuoto > VUOTO_OGNI_S) {
+    if (!avviaRicarica(me) && performance.now() / 1000 - locale.ultimoVuoto > VUOTO_OGNI_S) {
       audio.suona('vuoto');
       locale.ultimoVuoto = performance.now() / 1000;
     }
@@ -655,7 +666,7 @@ function usaArmi(lettura, me, vista, dt) {
   if (!colpo) return;
   if (vista.effetti?.infinite > 0) armaAttiva(arsenale).caricatore += 1;
   sparaColpo(colpo, vista);
-  if (armaAttiva(arsenale).caricatore === 0) ricarica(arsenale, me.bevande);
+  if (armaAttiva(arsenale).caricatore === 0) avviaRicarica(me);
 }
 
 function interagisci(lettura, me, vista) {
@@ -729,7 +740,8 @@ function ciclo(ora) {
       const cannocchiale = io.inMira && ARMI[tipo].mirino === true;
       mondo.disegna(vista, {
         io, mioId: s.mioId, dt, arma: tipo, movimento: io.movimento, corsa: io.corsa, inMira: io.inMira, cannocchiale,
-        ricarica: arsenale.ricarica > 0 ? Math.sin(Math.min(1, arsenale.ricarica) * Math.PI) : 0,
+        ricarica: arsenale.ricarica > 0 ? Math.min(0.999, Math.max(0.001, 1 - arsenale.ricarica / arsenale.ricaricaTotale)) : 0,
+        colpiRicarica: arsenale.daCaricare,
         cambio: arsenale.cambio > 0 ? 1 : 0, coltellata: arsenale.coltello / COLTELLO.attesa, aTerra: me.stato === 'terra', morto: me.stato === 'morto',
       });
       hud.aggiorna({

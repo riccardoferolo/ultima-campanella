@@ -263,8 +263,61 @@ export function creaAudio() {
     fine: () => { [196, 165, 131, 98].forEach((f, i) => nota(f, { durata: 1.2, tipo: 'sawtooth', volume: 0.18, ritardo: i * 0.6 })); },
   };
 
+  function ricaricaSuoni(modo, durata, colpi) {
+    const g = ctx.createGain();
+    g.connect(uscita);
+    const clic = (t, f = 1200) => nota(f, { durata: 0.035, tipo: 'square', volume: 0.12, ritardo: t * durata, destinazione: g });
+    const metallo = (t, da = 3200, a = 900, volume = 0.3) => soffio({ durata: 0.09, da, a, tipo: 'bandpass', volume, ritardo: t * durata, destinazione: g });
+    const tonfo = (t, f = 280) => nota(f, { durata: 0.06, tipo: 'square', volume: 0.22, scendi: f * 0.6, ritardo: t * durata, destinazione: g });
+    if (modo === 'caricatore' || modo === 'otturatore') {
+      clic(0.24);
+      metallo(0.25);
+      metallo(0.5, 6000, 2500, 0.18);
+      tonfo(0.62);
+      metallo(0.62, 2000, 600, 0.4);
+      if (modo === 'otturatore') {
+        [0.76, 0.8, 0.84, 0.88].forEach((t, i) => { clic(t, 700 + i * 120); metallo(t, 2600, 900, 0.2); });
+      } else {
+        clic(0.82, 900);
+        metallo(0.82, 2500, 700, 0.3);
+        tonfo(0.87, 420);
+      }
+    } else if (modo === 'tamburo') {
+      clic(0.18, 1500);
+      for (let i = 0; i < 6; i++) nota(3000 + Math.random() * 2500, { durata: 0.05, tipo: 'triangle', volume: 0.05, ritardo: (0.3 + i * 0.012) * durata, destinazione: g });
+      tonfo(0.66, 360);
+      metallo(0.66);
+      clic(0.78, 800);
+      metallo(0.78, 3000, 800, 0.35);
+    } else if (modo === 'cartucce') {
+      const giri = Math.max(1, Math.min(6, colpi));
+      for (let i = 0; i < giri; i++) {
+        const t = 0.12 + ((i + 0.55) / giri) * 0.68;
+        tonfo(t, 340);
+        metallo(t, 2200, 700, 0.22);
+      }
+      soffio({ durata: 0.16, da: 1400, a: 300, volume: 0.45, ritardo: 0.87 * durata, destinazione: g });
+      tonfo(0.88, 240);
+      tonfo(0.93, 380);
+    } else {
+      soffio({ durata: 0.3, da: 500, a: 90, volume: 0.5, ritardo: 0.55 * durata, destinazione: g });
+      nota(190, { durata: 0.3, volume: 0.25, scendi: 70, ritardo: 0.55 * durata, destinazione: g });
+      nota(110, { durata: 0.4, tipo: 'sawtooth', volume: 0.05, ritardo: 0.62 * durata, destinazione: g });
+    }
+    return {
+      ferma() {
+        g.gain.setValueAtTime(0, ctx.currentTime);
+        setTimeout(() => g.disconnect(), 100);
+      },
+    };
+  }
+
   return {
     prepara,
+    ricarica(modo, durata, colpi) {
+      if (!pronto()) return null;
+      return ricaricaSuoni(modo, durata, colpi);
+    },
     musica(stato, intensita) {
       if (!pronto()) return;
       avviaMusica();

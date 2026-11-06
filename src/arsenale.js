@@ -6,7 +6,7 @@ const CAMBIO_ARMA = 0.35;
 const nuovaArma = tipo => ({ tipo, caricatore: ARMI[tipo].caricatore, riserva: ARMI[tipo].riserva });
 
 export function creaArsenale() {
-  return { armi: [nuovaArma('pistola')], attiva: 0, attesa: 0, ricarica: 0, cambio: 0, coltello: 0 };
+  return { armi: [nuovaArma('pistola')], attiva: 0, attesa: 0, ricarica: 0, ricaricaTotale: 0, daCaricare: 0, cambio: 0, coltello: 0 };
 }
 
 export const armaAttiva = a => a.armi[a.attiva];
@@ -40,6 +40,8 @@ export function ricarica(a, bevande = []) {
   const arma = armaAttiva(a);
   if (occupato(a) || arma.riserva <= 0 || arma.caricatore >= ARMI[arma.tipo].caricatore) return false;
   a.ricarica = ARMI[arma.tipo].ricarica * (bevande.includes('lampo') ? FATTORE_LAMPO : 1);
+  a.ricaricaTotale = a.ricarica;
+  a.daCaricare = Math.min(ARMI[arma.tipo].caricatore - arma.caricatore, arma.riserva);
   return true;
 }
 

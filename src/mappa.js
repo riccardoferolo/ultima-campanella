@@ -181,7 +181,7 @@ export const ACQUISTI = Object.freeze([
   Object.freeze({ id: 'muro-carabina', tipo: 'arma', arma: 'carabina', costo: 1600, munizioni: 800, zona: 'cortile', posizione: Object.freeze({ x: 18, z: 8.16 }), verso: Object.freeze({ x: 0, z: 1 }) }),
   Object.freeze({ id: 'muro-doppietta', tipo: 'arma', arma: 'doppietta', costo: 1000, munizioni: 500, zona: 'caldaia', posizione: Object.freeze({ x: 18.16, z: -9.6 }), verso: Object.freeze({ x: 1, z: 0 }) }),
   Object.freeze({ id: 'campanella', tipo: 'campanella', zona: 'atrio', posizione: Object.freeze({ x: -3, z: 5.84 }), verso: Object.freeze({ x: 0, z: -1 }) }),
-  Object.freeze({ id: 'muro-commando', tipo: 'arma', arma: 'commando', costo: 1400, munizioni: 700, zona: 'androne', posizione: Object.freeze({ x: -1.84, z: -10 }), verso: Object.freeze({ x: 1, z: 0 }) }),
+  Object.freeze({ id: 'muro-vettore', tipo: 'arma', arma: 'vettore', costo: 1300, munizioni: 650, zona: 'androne', posizione: Object.freeze({ x: -1.84, z: -10 }), verso: Object.freeze({ x: 1, z: 0 }) }),
   Object.freeze({ id: 'muro-bullpup', tipo: 'arma', arma: 'bullpup', costo: 1500, munizioni: 750, zona: 'aula', posizione: Object.freeze({ x: 11.84, z: -25 }), verso: Object.freeze({ x: -1, z: 0 }) }),
   Object.freeze({ id: 'muro-dsv', tipo: 'arma', arma: 'dsv', costo: 1800, munizioni: 900, zona: 'biblioteca', posizione: Object.freeze({ x: -15, z: -24.16 }), verso: Object.freeze({ x: 0, z: -1 }) }),
   Object.freeze({ id: 'muro-caccia', tipo: 'arma', arma: 'caccia', costo: 1000, munizioni: 500, zona: 'campo', posizione: Object.freeze({ x: 12.16, z: -35 }), verso: Object.freeze({ x: 1, z: 0 }) }),

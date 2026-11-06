@@ -1,19 +1,7 @@
 import * as THREE from 'three';
 
 const FORME = Object.freeze({
-  raggi: { corpo: 'osso', bocca: 'denti', extra: ['vene'] },
-  plasma: { corpo: 'osso', bocca: 'gabbia', extra: ['vene'] },
-  gravitonica: { corpo: 'osso', bocca: 'denti', extra: ['orbita'] },
-  ioni: { corpo: 'osso', bocca: 'denti', extra: ['cuore'] },
-  fulmine: { corpo: 'osso', bocca: 'gabbia', extra: ['cuore', 'vene'] },
-  impulsi: { corpo: 'osso', bocca: 'tentacoli', extra: ['vene'] },
   arco: { corpo: 'osso', bocca: 'corna', extra: ['vene', 'cuore'] },
-  fucilePlasma: { corpo: 'spina', bocca: 'denti', extra: ['vene'] },
-  lanciafiamme: { corpo: 'spina', bocca: 'tentacoli', extra: ['vene'] },
-  lanciagranate: { corpo: 'spina', bocca: 'denti', extra: ['sacca'] },
-  lanciarazzi: { corpo: 'spina', bocca: 'corno', extra: [] },
-  laser: { corpo: 'spina', bocca: 'pungiglione', extra: ['vene'] },
-  disintegratore: { corpo: 'spina', bocca: 'gabbia', extra: ['vene', 'gemma'] },
   singolarita: { corpo: 'spina', bocca: 'gabbia', extra: ['nucleo'] },
   criogeno: { corpo: 'carapace', bocca: 'cristalli', extra: ['cristalli', 'vene'] },
 });

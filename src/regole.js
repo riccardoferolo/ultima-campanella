@@ -102,60 +102,29 @@ const aliena = dati => arma({ famiglia: 'aliena', aliena: true, ...dati });
 
 const ARMI_BASE = Object.freeze({
   pistola: arma({ nome: 'Pistola P9', famiglia: 'pistola', modello: 'Pistol_1', danno: 40, cadenza: 0.22, caricatore: 8, riserva: 48, ricarica: 1.4, dispersione: 0.004 }),
-  pistolaAuto: arma({ nome: 'Pistola automatica R-18', famiglia: 'pistola', modello: 'Pistol_2', danno: 34, cadenza: 0.06, automatica: true, caricatore: 20, riserva: 120, ricarica: 1.8, dispersione: 0.03 }),
-  tattica: arma({ nome: 'Pistola tattica T-40', famiglia: 'pistola', modello: 'Pistol_3', danno: 55, cadenza: 0.18, caricatore: 12, riserva: 72, ricarica: 1.5, dispersione: 0.005 }),
   raffica: arma({ nome: 'Pistola a raffica R-93', famiglia: 'pistola', modello: 'Pistol_4', danno: 38, cadenza: 0.05, automatica: true, caricatore: 30, riserva: 150, ricarica: 2, dispersione: 0.035 }),
-  pesante: arma({ nome: 'Pistola pesante .45', famiglia: 'pistola', modello: 'Pistol_5', danno: 80, cadenza: 0.25, caricatore: 8, riserva: 56, ricarica: 1.6, dispersione: 0.006 }),
   aquila: arma({ nome: 'Pistola Aquila .50', famiglia: 'pistola', modello: 'Pistol_6', danno: 140, cadenza: 0.35, caricatore: 7, riserva: 42, ricarica: 2.2, dispersione: 0.008 }),
   magnum: arma({ nome: 'Revolver .357', famiglia: 'revolver', modello: 'Revolver_1', danno: 160, cadenza: 0.45, caricatore: 6, riserva: 36, ricarica: 3, dispersione: 0.006 }),
-  ufficiale: arma({ nome: "Revolver d'ordinanza", famiglia: 'revolver', modello: 'Revolver_2', danno: 130, cadenza: 0.4, caricatore: 6, riserva: 42, ricarica: 2.8, dispersione: 0.007 }),
-  cannaLunga: arma({ nome: 'Revolver canna lunga', famiglia: 'revolver', modello: 'Revolver_3', danno: 210, cadenza: 0.55, caricatore: 6, riserva: 36, ricarica: 3.1, dispersione: 0.004 }),
   toro: arma({ nome: 'Revolver Toro .500', famiglia: 'revolver', modello: 'Revolver_4', danno: 260, cadenza: 0.6, caricatore: 5, riserva: 30, ricarica: 3.2, dispersione: 0.008 }),
-  sceriffo: arma({ nome: 'Revolver dello sceriffo', famiglia: 'revolver', modello: 'Revolver_5', danno: 120, cadenza: 0.3, caricatore: 6, riserva: 48, ricarica: 2.6, dispersione: 0.009 }),
   mitra: arma({ nome: 'Mitra MK-5', famiglia: 'mitra', modello: 'SubmachineGun_1', danno: 32, cadenza: 0.075, automatica: true, caricatore: 30, riserva: 150, ricarica: 2.2, dispersione: 0.03 }),
-  scorpione: arma({ nome: 'Mitra Scorpione', famiglia: 'mitra', modello: 'SubmachineGun_2', danno: 26, cadenza: 0.05, automatica: true, caricatore: 20, riserva: 140, ricarica: 1.7, dispersione: 0.045 }),
   vettore: arma({ nome: 'Mitra Vettore', famiglia: 'mitra', modello: 'SubmachineGun_3', danno: 30, cadenza: 0.05, automatica: true, caricatore: 25, riserva: 150, ricarica: 2.1, dispersione: 0.025 }),
-  mitraglietta: arma({ nome: 'Mitraglietta U-9', famiglia: 'mitra', modello: 'SubmachineGun_4', danno: 28, cadenza: 0.055, automatica: true, caricatore: 32, riserva: 160, ricarica: 2, dispersione: 0.04 }),
   p50: arma({ nome: 'Mitra P-50', famiglia: 'mitra', modello: 'SubmachineGun_5', danno: 34, cadenza: 0.065, automatica: true, caricatore: 50, riserva: 200, ricarica: 3, dispersione: 0.028 }),
   assalto: arma({ nome: "Fucile d'assalto KV-47", famiglia: 'assalto', modello: 'AssaultRifle_2', danno: 60, cadenza: 0.1, automatica: true, caricatore: 30, riserva: 150, ricarica: 2.4, dispersione: 0.018 }),
-  kvCorto: arma({ nome: 'KV-47 corto', famiglia: 'assalto', modello: 'AssaultRifle_1', danno: 52, cadenza: 0.085, automatica: true, caricatore: 30, riserva: 150, ricarica: 2.1, dispersione: 0.026 }),
-  galil: arma({ nome: 'Fucile G-35', famiglia: 'assalto', modello: 'AssaultRifle_3', danno: 58, cadenza: 0.09, automatica: true, caricatore: 35, riserva: 175, ricarica: 2.6, dispersione: 0.02 }),
   battaglia: arma({ nome: 'Fucile da battaglia S-17', famiglia: 'battaglia', modello: 'AssaultRifle_4', danno: 85, cadenza: 0.12, automatica: true, caricatore: 20, riserva: 120, ricarica: 2.5, dispersione: 0.016 }),
-  kv74: arma({ nome: 'Fucile KV-74', famiglia: 'assalto', modello: 'AssaultRifle_5', danno: 55, cadenza: 0.08, automatica: true, caricatore: 30, riserva: 180, ricarica: 2.3, dispersione: 0.015 }),
   carabina: arma({ nome: 'Carabina M-4', famiglia: 'assalto', modello: 'AssaultRifle2_1', danno: 50, cadenza: 0.08, automatica: true, caricatore: 30, riserva: 180, ricarica: 2.2, dispersione: 0.014 }),
   tiratore: arma({ nome: 'Fucile da tiratore MR-16', famiglia: 'battaglia', modello: 'AssaultRifle2_2', danno: 120, cadenza: 0.18, caricatore: 20, riserva: 120, ricarica: 2.4, dispersione: 0.006 }),
-  commando: arma({ nome: 'Carabina Commando', famiglia: 'assalto', modello: 'AssaultRifle2_3', danno: 46, cadenza: 0.07, automatica: true, caricatore: 30, riserva: 180, ricarica: 2, dispersione: 0.022 }),
-  m4corta: arma({ nome: 'Carabina corta M-4C', famiglia: 'assalto', modello: 'AssaultRifle2_4', danno: 48, cadenza: 0.075, automatica: true, caricatore: 30, riserva: 180, ricarica: 2.1, dispersione: 0.018 }),
   bullpup: arma({ nome: 'Fucile bullpup F-2000', famiglia: 'assalto', modello: 'Bullpup_1', danno: 48, cadenza: 0.07, automatica: true, caricatore: 30, riserva: 180, ricarica: 2.5, dispersione: 0.016 }),
-  fam3: arma({ nome: 'Fucile Fam-3', famiglia: 'assalto', modello: 'Bullpup_2', danno: 45, cadenza: 0.06, automatica: true, caricatore: 25, riserva: 175, ricarica: 2.4, dispersione: 0.02 }),
   mitragliatrice: arma({ nome: 'Mitragliatrice HM-6', famiglia: 'mitragliatrice', modello: 'Bullpup_3', danno: 55, cadenza: 0.07, automatica: true, caricatore: 100, riserva: 300, ricarica: 4, dispersione: 0.035 }),
   pompa: arma({ nome: 'Fucile a pompa 870', famiglia: 'pompa', modello: 'Shotgun_1', danno: 35, cadenza: 0.85, caricatore: 6, riserva: 36, ricarica: 3, pallini: 8, dispersione: 0.07 }),
-  sp12: arma({ nome: 'Fucile SP-12', famiglia: 'pompa', modello: 'Shotgun_2', danno: 32, cadenza: 0.3, caricatore: 8, riserva: 48, ricarica: 3.2, pallini: 8, dispersione: 0.075 }),
   aa12: arma({ nome: 'Fucile automatico AA-12', famiglia: 'pompa', modello: 'Shotgun_3', danno: 28, cadenza: 0.2, automatica: true, caricatore: 20, riserva: 80, ricarica: 3.5, pallini: 6, dispersione: 0.08 }),
   caccia: arma({ nome: 'Fucile da caccia', famiglia: 'pompa', modello: 'Shotgun_4', danno: 38, cadenza: 0.6, caricatore: 7, riserva: 42, ricarica: 2.8, pallini: 7, dispersione: 0.06 }),
   doppietta: arma({ nome: 'Doppietta a canne mozze', famiglia: 'pompa', modello: 'Shotgun_SawedOff', danno: 40, cadenza: 0.25, caricatore: 2, riserva: 40, ricarica: 2.2, pallini: 10, dispersione: 0.1 }),
-  sfondamento: arma({ nome: 'Pompa da sfondamento', famiglia: 'pompa', modello: 'Shotgun_ShortStock', danno: 42, cadenza: 0.7, caricatore: 5, riserva: 35, ricarica: 2.6, pallini: 8, dispersione: 0.09 }),
   precisione: arma({ nome: 'Precisione L-96', famiglia: 'precisione', modello: 'SniperRifle_1', danno: 500, cadenza: 1.2, caricatore: 5, riserva: 30, ricarica: 3, dispersione: 0, mirino: true }),
   dsv: arma({ nome: 'Precisione semiauto D-SV', famiglia: 'precisione', modello: 'SniperRifle_2', danno: 300, cadenza: 0.4, caricatore: 10, riserva: 50, ricarica: 2.8, dispersione: 0, mirino: true }),
   anticarro: arma({ nome: 'Anticarro .50 B-82', famiglia: 'precisione', modello: 'SniperRifle_3', danno: 900, cadenza: 1, caricatore: 10, riserva: 40, ricarica: 3.6, dispersione: 0, mirino: true }),
-  notturno: arma({ nome: 'Precisione notturna N-7', famiglia: 'precisione', modello: 'SniperRifle_4', danno: 420, cadenza: 0.9, caricatore: 6, riserva: 36, ricarica: 2.9, dispersione: 0, mirino: true }),
-  bipiede: arma({ nome: 'Precisione col bipiede M-24', famiglia: 'precisione', modello: 'SniperRifle_5', danno: 650, cadenza: 1.3, caricatore: 5, riserva: 30, ricarica: 3.2, dispersione: 0, mirino: true }),
-  cacciatore: arma({ nome: 'Carabina del cacciatore', famiglia: 'precisione', modello: 'SniperRifle_6', danno: 360, cadenza: 0.8, caricatore: 5, riserva: 40, ricarica: 2.6, dispersione: 0, mirino: true }),
-  raggi: aliena({ nome: 'Pistola a raggi', modello: 'Gun_Pistol', colore: 0x48e5ff, danno: 600, cadenza: 0.35, caricatore: 20, riserva: 160, ricarica: 2.6, dispersione: 0.006, esplosione: esplode(1.8, 400, 'energia') }),
-  plasma: aliena({ nome: 'Pistola al plasma', modello: 'Gun_Pistol', colore: 0x5dff6a, danno: 140, cadenza: 0.09, automatica: true, caricatore: 40, riserva: 240, ricarica: 2.2, dispersione: 0.02, esplosione: esplode(0.9, 80, 'energia') }),
-  gravitonica: aliena({ nome: 'Pistola gravitonica', modello: 'Gun_Pistol', colore: 0xb066ff, danno: 900, cadenza: 0.7, caricatore: 8, riserva: 64, ricarica: 2.8, dispersione: 0.004, esplosione: esplode(2.6, 700, 'energia') }),
-  ioni: aliena({ nome: 'Revolver a ioni', modello: 'Gun_Revolver', colore: 0xffd84a, danno: 1100, cadenza: 0.5, caricatore: 6, riserva: 48, ricarica: 2.6, dispersione: 0.004, esplosione: esplode(1.2, 300, 'energia') }),
-  fulmine: aliena({ nome: 'Spara-fulmini', modello: 'Gun_Revolver', colore: 0xbfe8ff, danno: 800, cadenza: 0.8, caricatore: 8, riserva: 40, ricarica: 3, dispersione: 0.004, esplosione: esplode(5, 600, 'fulmine') }),
-  impulsi: aliena({ nome: 'Revolver a impulsi', modello: 'Gun_Revolver', colore: 0xff4fd8, danno: 450, cadenza: 0.25, caricatore: 12, riserva: 96, ricarica: 2.4, dispersione: 0.01, esplosione: esplode(1.5, 250, 'energia') }),
-  fucilePlasma: aliena({ nome: 'Fucile al plasma', modello: 'Gun_Rifle', colore: 0x3dff8b, danno: 180, cadenza: 0.08, automatica: true, caricatore: 50, riserva: 300, ricarica: 2.8, dispersione: 0.018, esplosione: esplode(1, 110, 'energia') }),
-  lanciafiamme: aliena({ nome: 'Fiammatore stellare', modello: 'Gun_Rifle', colore: 0xff7a1a, danno: 30, cadenza: 0.05, automatica: true, caricatore: 100, riserva: 300, ricarica: 3.5, pallini: 5, dispersione: 0.15, portata: 7, fiamma: true }),
-  lanciagranate: aliena({ nome: 'Lancia-sfere', modello: 'Gun_Rifle', colore: 0xff3fa8, danno: 300, cadenza: 0.9, caricatore: 4, riserva: 32, ricarica: 2.5, dispersione: 0.01, esplosione: esplode(3, 900, 'fuoco', 0xff3fa8) }),
-  lanciarazzi: aliena({ nome: 'Cannone a particelle', modello: 'Gun_Sniper', colore: 0xff3030, danno: 500, cadenza: 1.2, caricatore: 3, riserva: 18, ricarica: 3, dispersione: 0.006, esplosione: esplode(3.5, 1400, 'fuoco') }),
   singolarita: aliena({ nome: 'Singolarità', modello: 'Gun_Sniper', colore: 0x8a3dff, danno: 0, cadenza: 1.3, caricatore: 2, riserva: 14, ricarica: 3.2, dispersione: 0, proiettile: 'buco', suono: 'buco' }),
   criogeno: aliena({ nome: 'Criogeno', modello: 'Gun_Rifle', colore: 0x7fd8ff, danno: 22, cadenza: 0.09, automatica: true, caricatore: 60, riserva: 300, ricarica: 3, pallini: 3, dispersione: 0.07, portata: 11, gelo: 0.11, suono: 'gelo' }),
   arco: aliena({ nome: 'Arco Voltaico', modello: 'Gun_Revolver', colore: 0x66e6ff, danno: 900, cadenza: 0.55, caricatore: 10, riserva: 70, ricarica: 2.6, dispersione: 0.004, catena: 6, suono: 'arco' }),
-  laser: aliena({ nome: 'Precisione al laser', modello: 'Gun_Sniper', colore: 0x4fd8ff, danno: 1600, cadenza: 0.6, caricatore: 8, riserva: 48, ricarica: 2.8, dispersione: 0, mirino: true, esplosione: esplode(0.8, 300, 'energia') }),
-  disintegratore: aliena({ nome: 'Disintegratore', modello: 'Gun_Sniper', colore: 0xe0b0ff, danno: 700, cadenza: 0.1, automatica: true, caricatore: 60, riserva: 360, ricarica: 3, dispersione: 0.01, esplosione: esplode(2, 500, 'energia'), segreta: true }),
 });
 
 const NOMI_POTENZIATI = Object.freeze({
@@ -165,8 +134,6 @@ const NOMI_POTENZIATI = Object.freeze({
   assalto: 'Assalto Lupo',
   mitragliatrice: 'Mitragliatrice Tuono',
   precisione: 'Precisione Falco',
-  raggi: 'Raggi Supernova',
-  disintegratore: 'Fine del Mondo',
   singolarita: 'Orizzonte degli Eventi',
   criogeno: 'Zero Assoluto',
   arco: 'Tempesta di Giove',
@@ -195,6 +162,12 @@ export const ARMI = Object.freeze({
 export const ARMI_DI_BASE = Object.freeze(Object.keys(ARMI_BASE));
 export const versionePotenziata = a => (a.endsWith('+') ? null : `${a}+`);
 export const armaBase = a => (a.endsWith('+') ? a.slice(0, -1) : a);
+
+export const MODI_RICARICA = Object.freeze({
+  pistola: 'caricatore', mitra: 'caricatore', assalto: 'caricatore', battaglia: 'caricatore', mitragliatrice: 'caricatore',
+  precisione: 'otturatore', revolver: 'tamburo', pompa: 'cartucce', aliena: 'capsula',
+});
+export const modoRicarica = tipo => MODI_RICARICA[ARMI[tipo]?.famiglia] ?? 'caricatore';
 
 export const COLTELLO = Object.freeze({ danno: 150, attesa: 0.6, portata: 1.6 });
 

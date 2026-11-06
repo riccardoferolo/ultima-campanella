@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core';
 import { writeFileSync } from 'node:fs';
 
-const armi = process.argv.slice(2).length ? process.argv.slice(2) : ['pistola', 'carabina', 'pompa', 'raggi', 'fucilePlasma', 'vettore'];
+const armi = process.argv.slice(2).length ? process.argv.slice(2) : ['pistola', 'carabina', 'pompa', 'singolarita', 'criogeno', 'vettore'];
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
   const p = await browser.newPage();

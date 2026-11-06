@@ -32,14 +32,14 @@ function zombie(stato, extra = {}) {
 }
 
 test('ogni arma ha un modello, un nome e la sua versione potenziata', () => {
-  assert.ok(ARMI_DI_BASE.length >= 50, `solo ${ARMI_DI_BASE.length} armi`);
+  assert.ok(ARMI_DI_BASE.length >= 20, `solo ${ARMI_DI_BASE.length} armi`);
+  assert.deepEqual(ARMI_DI_BASE.filter(a => ARMI[a].aliena).sort(), ['arco', 'criogeno', 'singolarita']);
   for (const chiave of ARMI_DI_BASE) {
     assert.ok(ARMI[chiave].modello, chiave);
     assert.ok(ARMI[`${chiave}+`], `${chiave}+`);
     assert.notEqual(ARMI[`${chiave}+`].nome, ARMI[chiave].nome);
   }
-  assert.ok(ARMI_DI_BASE.filter(a => ARMI[a].aliena).length >= 10, 'poche armi aliene');
-  assert.ok(!ARMI_CASSA.includes('disintegratore'), "l'arma segreta non esce dalla cassa");
+  assert.ok(!ARMI_CASSA.includes('singolarita+'), "l'arma segreta non esce dalla cassa");
 });
 
 test('la partita con la sala parte in attesa, coi giocatori nella sala e senza zombie', () => {
@@ -53,17 +53,17 @@ test('la partita con la sala parte in attesa, coi giocatori nella sala e senza z
 test("in sala non si possono provare armi né comprare niente", () => {
   const stato = nellaSala();
   const io = giocatore(stato, 'a');
-  for (const azione of [{ tipo: 'prova', arma: 'laser' }, { tipo: 'compra', acquisto: 'cassa' }, { tipo: 'compra', acquisto: 'muro-pompa' }]) {
+  for (const azione of [{ tipo: 'prova', arma: 'arco' }, { tipo: 'compra', acquisto: 'cassa' }, { tipo: 'compra', acquisto: 'muro-pompa' }]) {
     avanza(stato, R.PASSO, una('a', azione.tipo, azione));
   }
   assert.deepEqual(io.armi, ['pistola']);
   assert.equal(io.punti, R.PUNTI_INIZIALI);
-  assert.equal(valida({ t: 'az', a: { tipo: 'prova', arma: 'laser' } }), null, 'il messaggio di prova è rifiutato');
+  assert.equal(valida({ t: 'az', a: { tipo: 'prova', arma: 'arco' } }), null, 'il messaggio di prova è rifiutato');
 });
 
 test('quando tutti sono pronti parte il conto alla rovescia, poi la partita vera', () => {
   const stato = nellaSala();
-  giocatore(stato, 'a').armi = ['pistola', 'laser'];
+  giocatore(stato, 'a').armi = ['pistola', 'arco'];
   avanza(stato, R.PASSO, una('a', 'pronto', { attivo: true }));
   assert.equal(stato.conto, null, 'uno solo pronto non basta');
   const eventi = avanza(stato, R.PASSO, una('b', 'pronto', { attivo: true }));
@@ -189,7 +189,7 @@ test('il carpentiere ripara tutte le finestre', () => {
   assert.ok(FINESTRE.every(f => stato.finestre[f.id] === R.ASSE_PER_FINESTRA));
 });
 
-test('i tre frammenti di meteorite danno a tutti il Disintegratore', () => {
+test("i tre frammenti di meteorite danno a tutti l'Orizzonte degli Eventi", () => {
   const stato = inGioco();
   const g = giocatore(stato, 'a');
   let eventi = [];
@@ -199,7 +199,7 @@ test('i tre frammenti di meteorite danno a tutti il Disintegratore', () => {
   }
   assert.deepEqual([...stato.frammenti].sort(), FRAMMENTI.map(f => f.id).sort());
   assert.ok(eventi.some(e => e.k === 'segreto'));
-  assert.ok(g.armi.includes('disintegratore'));
+  assert.ok(g.armi.includes('singolarita+'));
   avanza(stato, R.PASSO, una('a', 'frammento', { id: FRAMMENTI[0].id }));
   assert.equal(stato.frammenti.length, FRAMMENTI.length, 'un frammento non si conta due volte');
 });

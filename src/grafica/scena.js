@@ -291,7 +291,7 @@ export async function creaMondo(contenitore) {
     dimensiona();
   }
 
-  function disegna(vista, { io, mioId, dt, arma, movimento, corsa, inMira, cannocchiale, ricarica, cambio, coltellata, aTerra, morto }) {
+  function disegna(vista, { io, mioId, dt, arma, movimento, corsa, inMira, cannocchiale, ricarica, colpiRicarica, cambio, coltellata, aTerra, morto }) {
     tempo += dt;
     adattaRisoluzione(dt);
     passo += dt * movimento * (corsa ? 13 : 9);
@@ -322,7 +322,7 @@ export async function creaMondo(contenitore) {
     effetti.aggiorna(dt);
     vista1p.mostra(arma);
     vista1p.nascondi(aTerra || morto || cannocchiale);
-    vista1p.aggiorna({ dt, movimento, mira: inMira, ricarica, cambio, coltellata, corsa });
+    vista1p.aggiorna({ dt, movimento, mira: inMira, ricarica, colpiRicarica, cambio, coltellata, corsa });
 
     renderer.clear();
     renderer.render(scena, camera);

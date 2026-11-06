@@ -113,7 +113,7 @@ test('la cassa non dà un\'arma che hai già, nemmeno potenziata', () => {
     vai(stato, 'cassa', 0);
     io(stato).z -= 1.2;
     const offerta = compra(stato, 'cassa').find(e => e.k === 'cassa');
-    assert.ok(offerta && !['raggi', 'mitra'].includes(offerta.arma), offerta?.arma);
+    assert.ok(offerta && !['arco', 'mitra'].includes(offerta.arma), offerta?.arma);
   }
 });
 

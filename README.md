@@ -14,10 +14,11 @@ npm test
 ## Cosa c'è
 
 - Sala d'attesa prima della partita: Invio quando sei pronto, conto alla rovescia di 5 secondi.
-- 52 armi (40 vere + 12 aliene), ognuna con la sua versione potenziata.
+- 24 armi (21 vere, una per ruolo, + 3 aliene: Singolarità, Criogeno, Arco Voltaico), ognuna con la sua versione potenziata.
+- Ricarica animata per tipo d'arma (caricatore, tamburo del revolver, cartucce della pompa, otturatore, capsula aliena) con suoni sincronizzati.
 - Due zombie realistici: quello di città e lo Scuoiato (più veloce, più fragile, fa più male).
 - Bonus lasciati dagli zombie: Bomba, Munizioni al massimo, Punti doppi, Colpo secco, Saldi, Carpentiere, Caricatore infinito.
-- Easter egg: tre frammenti di meteorite nascosti nella mappa e la vecchia campanella dell'atrio.
+- Easter egg: tre frammenti di meteorite nascosti nella mappa (premio: l'Orizzonte degli Eventi) e la vecchia campanella dell'atrio.
 - Armi aliene con un effetto loro: Singolarità (sfera che apre un buco nero, risucchia e implode), Criogeno
   (congela gli zombie in statue che si frantumano con un colpo), Arco Voltaico (fulmine che salta fino a 6 zombie, 12 potenziato).
 - Fino a 4 giocatori nella stessa stanza (chi la crea più tre amici); in tre e in quattro più zombie e boss più resistenti.

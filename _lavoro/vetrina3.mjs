@@ -50,7 +50,7 @@ try {
     if (mira) await pagina.mouse.up({ button: 'right' });
   };
   void prova;
-  for (const [n, a] of [['53-arma-carabina', 'carabina'], ['54-arma-pompa', 'pompa'], ['55-arma-aquila', 'aquila'], ['56-arma-raggi', 'raggi'], ['57-arma-fucileplasma', 'fucilePlasma'], ['58-arma-cannone', 'lanciarazzi'], ['59-arma-mitra', 'vettore'], ['60-arma-precisione', 'bipiede']]) await tieni(n, a);
+  for (const [n, a] of [['53-arma-carabina', 'carabina'], ['54-arma-pompa', 'pompa'], ['55-arma-aquila', 'aquila'], ['56-arma-singolarita', 'singolarita'], ['57-arma-criogeno', 'criogeno'], ['58-arma-arco', 'arco'], ['59-arma-mitra', 'vettore'], ['60-arma-precisione', 'anticarro']]) await tieni(n, a);
   await pagina.evaluate(() => { window.__gioco.puntaA(-30.5, 1.3, 0); window.__gioco.spara(); });
   await pagina.waitForTimeout(80);
   if (vuoi('61-sparo')) await pagina.screenshot({ path: `${FOTO}61-sparo.png` });

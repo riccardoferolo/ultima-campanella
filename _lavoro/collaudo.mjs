@@ -64,7 +64,7 @@ try {
   const idOspite = (await stato(ospite)).mioId;
 
   verifica("si comincia nella sala d'attesa", (await partita(host, 'return p.fase')) === 'attesa');
-  await ospite.evaluate(() => window.__gioco.azione({ tipo: 'prova', arma: 'laser' }));
+  await ospite.evaluate(() => window.__gioco.azione({ tipo: 'prova', arma: 'arco' }));
   await aspettaGioco(host, 0.5);
   const armiProva = await partita(host, 'return p.giocatori.find(g => g.id === a).armi', idOspite);
   const armiClient = (await stato(ospite)).armi;
@@ -123,12 +123,12 @@ try {
   await partita(host, `
     p.porte.push('palestra');
     p.giocatori.find(g => g.id === a).punti = 3000;
-    p.cassa = { stato: 'aperta', arma: 'raggi', per: a, timer: 99 };
+    p.cassa = { stato: 'aperta', arma: 'arco', per: a, timer: 99 };
   `, idOspite);
   await ospite.evaluate(() => window.__gioco.vaiA(16, 6));
   await aspettaGioco(host, 0.5);
   await ospite.keyboard.press('KeyF');
-  const raggi = await attendi(ospite, () => window.__gioco.stato().armi.includes('raggi'), 5000);
+  const raggi = await attendi(ospite, () => window.__gioco.stato().armi.includes('arco'), 5000);
   verifica("dalla cassa l'amico prende la pistola a raggi", raggi, (await stato(ospite)).armi.join(','));
   await partita(host, `
     p.zombie = [
