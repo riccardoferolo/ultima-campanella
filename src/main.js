@@ -1,5 +1,5 @@
 import './stile.css';
-import { R, ARMI, BEVANDE, BONUS, COLTELLO } from './regole.js';
+import { R, ARMI, BEVANDE, BONUS, COLTELLO, saltiArco } from './regole.js';
 import { semeCasuale } from './caso.js';
 import { MURI, OSTACOLI, PORTE, ACQUISTI, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
 import { muoviCerchio } from './fisica.js';
@@ -36,6 +36,8 @@ const BUFFER_MASSIMO = 40;
 const PORTATA_RAGGI = 60;
 const AZIONI_REMOTE_MASSIME = 64;
 const RIPETI_ACQUISTO_DOPO_S = 1;
+const SALTO_ARCO = 6;
+const ALTEZZA_SCARICA = 1.25;
 
 const $ = id => document.getElementById(id);
 const schermate = ['schermata-inizio', 'schermata-stanza', 'schermata-fine'].map($);
@@ -254,7 +256,10 @@ function suEventi(eventi) {
       case 'ucciso':
         mondo.effetti.macchia(e.x, e.z);
         if (e.bomba) mondo.effetti.esplosione({ x: e.x, y: 1, z: e.z }, 'fuoco');
-        else if (e.testa) mondo.decapita(e.zombie);
+        else if (e.frantumato) {
+          mondo.frantuma(e.zombie, e.x, e.z);
+          audio.suona('frantumato');
+        } else if (e.testa) mondo.decapita(e.zombie);
         if (e.da === s.mioId) hud.uccisione();
         break;
       case 'esplosione':
@@ -275,6 +280,15 @@ function suEventi(eventi) {
       case 'faseBoss': audio.suona('urlo'); hud.avviso(e.fase === 2 ? 'Il Custode si infuria!' : 'Il Custode è fuori di sé!'); break;
       case 'urlo': audio.suona('urlo'); hud.avviso('Il Custode chiama i suoi!'); break;
       case 'scatto': audio.suona('scatto'); break;
+      case 'sfera': if (!perMe) audio.suona('sfera'); break;
+      case 'buco': audio.suona('buco'); break;
+      case 'implosione':
+        mondo.effetti.esplosione({ x: e.x, y: e.y, z: e.z }, 'energia', 0xb06cff);
+        mondo.effetti.esplosione({ x: e.x, y: e.y, z: e.z }, 'fuoco', 0xffb070);
+        audio.suona('implosione');
+        break;
+      case 'congelato': audio.suona('congelato'); break;
+      case 'arco': disegnaArco(e); break;
       case 'vittoria': mostraFine({ ...e, vinto: true }); break;
       case 'via': azzera(arsenale); audio.suona('round'); hud.avviso('Si comincia! Restate vicini', 'bene'); break;
       case 'conto': audio.suona('conto'); break;
@@ -464,13 +478,23 @@ function sparaColpo(arma, vista) {
   audio.sparo(armaAttiva(arsenale).tipo);
   const origine = { x: io.x, y: R.ALTEZZA_OCCHI, z: io.z };
   const centro = direzioneDa(io.yaw, io.pitch);
+  const tipo = armaAttiva(arsenale).tipo;
+  if (arma.proiettile) {
+    inviaAzione({ tipo: 'sparo', yaw: io.yaw, pitch: io.pitch, arma: tipo });
+    return;
+  }
   const bersagli = mondo.bersagli(vista);
   const ostacoli = scatole(vista.porte, true);
+  if (arma.catena) {
+    scarica(arma, tipo, origine, centro, bersagli, ostacoli);
+    return;
+  }
   const colpiti = new Map();
   for (let i = 0; i < arma.pallini; i++) {
     const d = disperdi(centro, arma.dispersione * (io.inMira ? 0.4 : 1) * (io.movimento ? 1.6 : 1), Math.random);
     const colpo = colpisciZombie(origine, d, bersagli, ostacoli, arma.portata ?? (arma.esplosione ? PORTATA_RAGGI : Infinity));
     if (arma.fiamma) mondo.effetti.fiamma(mondo.bocca(), d, arma.colore);
+    if (arma.gelo) mondo.effetti.brina(mondo.bocca(), d);
     if (!Number.isFinite(colpo.t)) continue;
     const punto = { x: origine.x + d.x * colpo.t, y: origine.y + d.y * colpo.t, z: origine.z + d.z * colpo.t };
     if (arma.esplosione) {
@@ -488,18 +512,56 @@ function sparaColpo(arma, vista) {
       continue;
     }
     mondo.effetti.sangue(punto, d);
-    const somma = colpiti.get(colpo.id) ?? { danno: 0, testa: false };
+    const somma = colpiti.get(colpo.id) ?? { danno: 0, testa: false, gelo: 0 };
     somma.danno += colpo.testa ? arma.danno * 2 : arma.danno;
     somma.testa ||= colpo.testa;
+    somma.gelo += arma.gelo ?? 0;
     colpiti.set(colpo.id, somma);
   }
-  for (const [zombie, { danno, testa }] of colpiti) {
-    inviaAzione({ tipo: 'colpo', zombie, danno, testa });
+  for (const [zombie, { danno, testa, gelo }] of colpiti) {
+    inviaAzione({ tipo: 'colpo', zombie, danno, testa, ...(gelo > 0 ? { gelo, arma: tipo } : {}) });
     mondo.colpito(zombie, testa);
     hud.segno(testa);
     audio.suona(testa ? 'testa' : 'carne');
   }
 }
+
+function scarica(arma, tipo, origine, centro, bersagli, ostacoli) {
+  const colpo = colpisciZombie(origine, centro, bersagli, ostacoli, PORTATA_RAGGI);
+  if (colpo.id === null) {
+    if (!Number.isFinite(colpo.t)) return;
+    const punto = { x: origine.x + centro.x * colpo.t, y: origine.y + centro.y * colpo.t, z: origine.z + centro.z * colpo.t };
+    mondo.fulmine([mondo.bocca(), punto]);
+    mondo.effetti.impatto(punto);
+    return;
+  }
+  const catena = [bersagli.find(b => b.id === colpo.id)];
+  while (catena.length < saltiArco(arma)) {
+    const ultimo = catena[catena.length - 1];
+    const prossimo = bersagli
+      .filter(b => !catena.includes(b))
+      .map(b => ({ b, d: Math.hypot(b.x - ultimo.x, b.z - ultimo.z) }))
+      .filter(c => c.d <= SALTO_ARCO)
+      .sort((a, c) => a.d - c.d)[0];
+    if (!prossimo) break;
+    catena.push(prossimo.b);
+  }
+  inviaAzione({ tipo: 'catena', zombie: catena.map(b => b.id), arma: tipo });
+  catena.forEach(b => mondo.colpito(b.id, false));
+  hud.segno(false);
+}
+
+function disegnaArco(e) {
+  const tiratore = vistaGiocatore(e.da);
+  const partenza = e.da === s.mioId ? mondo.bocca() : tiratore ? { x: tiratore.x, y: ALTEZZA_SCARICA + 0.2, z: tiratore.z } : null;
+  const punti = [];
+  for (let i = 0; i + 1 < e.punti.length; i += 2) punti.push({ x: e.punti[i], y: ALTEZZA_SCARICA, z: e.punti[i + 1] });
+  if (partenza) punti.unshift(partenza);
+  if (punti.length >= 2) mondo.fulmine(punti);
+  if (e.da !== s.mioId) audio.suona('scarica');
+}
+
+const vistaGiocatore = id => s.vista?.giocatori.find(g => g.id === id) ?? null;
 
 function usaArmi(lettura, me, vista, dt) {
   if (aggiornaArsenale(arsenale, dt)) audio.suona('ricarica');

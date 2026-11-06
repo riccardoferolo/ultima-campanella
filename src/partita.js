@@ -1,6 +1,6 @@
 import {
-  R, ARMI_CASSA, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
-  dannoGranata, moltiplicatoreBoss, faseCustode,
+  R, ARMI, ARMI_CASSA, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
+  dannoGranata, moltiplicatoreBoss, faseCustode, saltiArco,
 } from './regole.js';
 import { passoCaso } from './caso.js';
 import {
@@ -25,6 +25,11 @@ const URTO_SUOLO = 0.55;
 const MARGINE_GRANATA = 0.05;
 const ALTEZZA_SCHERMO_ESPLOSIONE = 1.5;
 const URLO_PER_FASE = Object.freeze([18, 14, 10]);
+const RAGGIO_PROIETTILE = 0.7;
+const COLPI_BUCO_OGNI = 0.25;
+const FERITA_BUCO = 0.12;
+const IMPLOSIONE_PER_VITA = 2.5;
+const SALTI_MASSIMI = 13;
 
 const ARMA_SEGRETA = 'disintegratore';
 const REGALO_CAMPANELLA = Object.freeze({ x: -3, z: 4.4 });
@@ -74,6 +79,9 @@ export function creaPartita({ seme, giocatori = [], sala = false }) {
     attesaCampo: 0,
     granate: [],
     prossimaGranata: 1,
+    proiettili: [],
+    buchi: [],
+    prossimoProiettile: 1,
     presideTra: null,
     missione: {
       fusibili: 0,
@@ -266,15 +274,132 @@ export function sceltaPesata(scelte, estratto) {
   return scelte[scelte.length - 1];
 }
 
+const armaUsata = (giocatore, azione) => ARMI[giocatore.armi.includes(azione.arma) ? azione.arma : giocatore.armaAttiva];
+
 function colpisci(stato, giocatore, azione, eventi) {
   const zombie = stato.zombie.find(z => z.id === azione.zombie && z.stato !== 'morto');
   if (!zombie) return;
+  const arma = armaUsata(giocatore, azione);
+  const gelo = azione.gelo && arma?.gelo ? Math.min(Number(azione.gelo) || 0, arma.gelo * arma.pallini) * (arma.potenziata ? 1.7 : 1) : 0;
+  if (gelo > 0 && zombie.gelato > 0) return;
   const richiesto = Math.min(DANNO_MASSIMO_COLPO, Math.max(0, Number(azione.danno) || 0));
-  const danno = stato.effetti.secco > 0 && !tipoDi(zombie).boss ? zombie.vita : richiesto;
-  danneggia(stato, giocatore, zombie, danno, { testa: !!azione.testa, coltello: !!azione.coltello }, eventi);
+  ferisciZombie(stato, giocatore, zombie, richiesto, { testa: !!azione.testa, coltello: !!azione.coltello }, eventi);
+  if (gelo > 0 && zombie.stato !== 'morto') congela(zombie, giocatore, gelo, eventi);
 }
 
-function danneggia(stato, giocatore, zombie, danno, { testa = false, coltello = false }, eventi) {
+function ferisciZombie(stato, giocatore, zombie, danno, opzioni, eventi) {
+  if (zombie.gelato > 0) {
+    zombie.gelato = 0;
+    danneggia(stato, giocatore, zombie, zombie.vita, { ...opzioni, frantumato: true }, eventi);
+    return;
+  }
+  danneggia(stato, giocatore, zombie, stato.effetti.secco > 0 && !tipoDi(zombie).boss ? zombie.vita : danno, opzioni, eventi);
+}
+
+function congela(zombie, giocatore, quanto, eventi) {
+  const boss = tipoDi(zombie).boss;
+  zombie.gelo = Math.min(boss ? R.GELO_BOSS_MAX : 1, (zombie.gelo ?? 0) + quanto);
+  zombie.geloDa = giocatore.id;
+  if (boss || zombie.gelo < 1) return;
+  zombie.gelato = R.GELO_DURATA;
+  if (zombie.stato === 'attacco') zombie.stato = 'dentro';
+  eventi.push({ k: 'congelato', zombie: zombie.id, x: zombie.x, z: zombie.z });
+}
+
+function frantuma(stato, zombie, eventi) {
+  const giocatore = stato.giocatori.find(g => g.id === zombie.geloDa) ?? stato.giocatori[0];
+  zombie.gelato = 0;
+  if (giocatore) danneggia(stato, giocatore, zombie, zombie.vita, { frantumato: true }, eventi);
+}
+
+function catena(stato, giocatore, azione, eventi) {
+  const arma = armaUsata(giocatore, azione);
+  if (!arma?.catena || !Array.isArray(azione.zombie)) return;
+  const punti = [];
+  let prima = null;
+  let danno = arma.danno;
+  for (const id of azione.zombie.slice(0, Math.min(SALTI_MASSIMI, saltiArco(arma)))) {
+    const zombie = stato.zombie.find(z => z.id === id && z.stato !== 'morto');
+    if (!zombie || (prima && distanza(prima, zombie) > R.ARCO_SALTO + TOLLERANZA_DISTANZA)) break;
+    punti.push(Math.round(zombie.x * 100) / 100, Math.round(zombie.z * 100) / 100);
+    if (!tipoDi(zombie).boss) zombie.scossa = R.ARCO_SCOSSA;
+    ferisciZombie(stato, giocatore, zombie, Math.round(danno), {}, eventi);
+    prima = zombie;
+    danno *= R.ARCO_CALO;
+  }
+  if (punti.length) eventi.push({ k: 'arco', da: giocatore.id, punti });
+}
+
+function sparaProiettile(stato, giocatore, azione, eventi) {
+  const arma = armaUsata(giocatore, azione);
+  if (!arma?.proiettile) return;
+  const d = direzioneDa(Number(azione.yaw) || 0, Math.max(-1.4, Math.min(1.4, Number(azione.pitch) || 0)));
+  stato.proiettili.push({
+    id: stato.prossimoProiettile++, x: giocatore.x, y: R.ALTEZZA_OCCHI - 0.1, z: giocatore.z,
+    vx: d.x * R.BUCO_VELOCITA, vy: d.y * R.BUCO_VELOCITA, vz: d.z * R.BUCO_VELOCITA, volo: R.BUCO_VOLO, da: giocatore.id, potente: !!arma.potenziata,
+  });
+  eventi.push({ k: 'sfera', a: giocatore.id });
+}
+
+function aggiornaProiettili(stato, dt, eventi) {
+  if (stato.proiettili.length === 0) return;
+  const ostacoli = ostacoliPerGiocatori(new Set(stato.porte));
+  stato.proiettili = stato.proiettili.filter(p => {
+    p.volo -= dt;
+    const x = p.x + p.vx * dt;
+    const y = p.y + p.vy * dt;
+    const z = p.z + p.vz * dt;
+    const zombie = stato.zombie.some(v => v.stato !== 'morto' && Math.hypot(v.x - x, v.z - z) < RAGGIO_PROIETTILE && y < 2.4);
+    if (p.volo > 0 && !zombie && !urta(x, z, y, ostacoli) && y > 0.15 && y < ALTEZZA_SOFFITTO - 0.1) {
+      Object.assign(p, { x, y, z });
+      return true;
+    }
+    const buco = {
+      id: p.id, x: p.x, y: Math.max(0.9, Math.min(1.6, p.y)), z: p.z, da: p.da, colpi: COLPI_BUCO_OGNI,
+      timer: R.BUCO_DURATA * (p.potente ? 1.5 : 1), raggio: R.BUCO_RAGGIO * (p.potente ? 1.35 : 1), implosione: R.BUCO_IMPLOSIONE * (p.potente ? 1.3 : 1), potente: p.potente,
+    };
+    stato.buchi.push(buco);
+    eventi.push({ k: 'buco', x: buco.x, y: buco.y, z: buco.z });
+    return false;
+  });
+}
+
+function aggiornaBuchi(stato, dt, eventi) {
+  if (stato.buchi.length === 0) return;
+  const schermi = ostacoliPerGiocatori(new Set(stato.porte)).filter(s => (s.altezza ?? ALTEZZA_SOFFITTO) >= ALTEZZA_SCHERMO_ESPLOSIONE);
+  stato.buchi = stato.buchi.filter(buco => {
+    const giocatore = stato.giocatori.find(g => g.id === buco.da);
+    buco.timer -= dt;
+    buco.colpi -= dt;
+    const ferisci = buco.colpi <= 0;
+    if (ferisci) buco.colpi += COLPI_BUCO_OGNI;
+    for (const z of stato.zombie) {
+      if (z.stato !== 'dentro' && z.stato !== 'attacco') continue;
+      if (tipoDi(z).boss) continue;
+      const d = distanza(z, buco);
+      if (d > buco.raggio || !vistaLibera(buco, z, schermi)) continue;
+      z.stato = 'dentro';
+      z.trattenuto = 0.15;
+      if (d > 0.3) {
+        const passo = Math.min(d - 0.3, R.BUCO_ATTRAZIONE * dt);
+        z.x += ((buco.x - z.x) / d) * passo;
+        z.z += ((buco.z - z.z) / d) * passo;
+      }
+      if (ferisci && giocatore && d < R.BUCO_CUORE) ferisciZombie(stato, giocatore, z, Math.round(vitaZombie(Math.max(1, stato.round)) * FERITA_BUCO), {}, eventi);
+    }
+    if (buco.timer > 0) return true;
+    eventi.push({ k: 'implosione', x: buco.x, y: buco.y, z: buco.z });
+    if (!giocatore) return false;
+    for (const z of stato.zombie) {
+      if (z.stato === 'morto' || distanza(z, buco) > buco.implosione || !vistaLibera(buco, z, schermi)) continue;
+      const forza = buco.potente ? 2 : 1;
+      ferisciZombie(stato, giocatore, z, tipoDi(z).boss ? R.BUCO_DANNO_BOSS * forza : Math.round(vitaZombie(Math.max(1, stato.round)) * IMPLOSIONE_PER_VITA * forza), {}, eventi);
+    }
+    return false;
+  });
+}
+
+function danneggia(stato, giocatore, zombie, danno, { testa = false, coltello = false, frantumato = false }, eventi) {
   const dati = tipoDi(zombie);
   zombie.vita -= danno;
   if (zombie.vita > 0) {
@@ -296,7 +421,7 @@ function danneggia(stato, giocatore, zombie, danno, { testa = false, coltello = 
   }
   zombie.stato = 'morto';
   zombie.timer = RESTA_A_TERRA_DA_MORTO;
-  eventi.push({ k: 'ucciso', zombie: zombie.id, testa, da: giocatore.id, x: zombie.x, z: zombie.z, tipo: zombie.tipo });
+  eventi.push({ k: 'ucciso', zombie: zombie.id, testa, da: giocatore.id, x: zombie.x, z: zombie.z, tipo: zombie.tipo, ...(frantumato ? { frantumato: true } : {}) });
   giocatore.uccisioni += 1;
   aggiungiPunti(stato, giocatore, (coltello ? R.PUNTI_COLTELLO : testa ? R.PUNTI_TESTA : R.PUNTI_UCCISIONE) * dati.punti);
   if (dati.boss) bossUcciso(stato, zombie, eventi);
@@ -481,7 +606,7 @@ function esplodi(stato, granata, ostacoli, eventi) {
     if (z.stato === 'morto') continue;
     const d = Math.hypot(z.x - granata.x, 0.9 - granata.y, z.z - granata.z);
     if (d > R.RAGGIO_GRANATA || !vistaLibera(granata, z, schermi)) continue;
-    danneggia(stato, lanciatore, z, Math.round(base * (0.35 + 0.65 * (1 - d / R.RAGGIO_GRANATA))), {}, eventi);
+    ferisciZombie(stato, lanciatore, z, Math.round(base * (0.35 + 0.65 * (1 - d / R.RAGGIO_GRANATA))), {}, eventi);
   }
 }
 
@@ -598,6 +723,8 @@ function eseguiAzioni(stato, azioni, eventi) {
     else if (azione.tipo === 'assa') ricostruisci(stato, giocatore, azione.finestra, eventi);
     else if (azione.tipo === 'frammento') frammento(stato, giocatore, Number(azione.id), eventi);
     else if (azione.tipo === 'granata') lancia(stato, giocatore, azione, eventi);
+    else if (azione.tipo === 'sparo') sparaProiettile(stato, giocatore, azione, eventi);
+    else if (azione.tipo === 'catena') catena(stato, giocatore, azione, eventi);
   }
 }
 
@@ -692,7 +819,22 @@ function muoviZombie(stato, dt, eventi) {
     z.attesa = Math.max(0, z.attesa - dt);
     const dati = tipoDi(z);
     const furia = dati.finale && (z.faseBoss ?? 1) >= 3;
-    const velocita = z.scatto > 0 ? R.VELOCITA_SCATTO : (z.corre ? R.VELOCITA_CORRE : R.VELOCITA_CAMMINA) * dati.velocita * (furia ? 1.25 : 1);
+    if (z.stato !== 'morto' && z.gelato > 0) {
+      z.gelato -= dt;
+      if (z.gelato <= 0) frantuma(stato, z, eventi);
+      continue;
+    }
+    if (z.gelo > 0) z.gelo = Math.max(0, z.gelo - R.GELO_CALO * dt);
+    if (z.stato === 'dentro' && z.trattenuto > 0) {
+      z.trattenuto -= dt;
+      continue;
+    }
+    if (z.scossa > 0 && z.stato !== 'morto') {
+      z.scossa -= dt;
+      continue;
+    }
+    const lentezza = 1 - Math.min(0.85, z.gelo ?? 0);
+    const velocita = z.scatto > 0 ? R.VELOCITA_SCATTO * lentezza : (z.corre ? R.VELOCITA_CORRE : R.VELOCITA_CAMMINA) * dati.velocita * (furia ? 1.25 : 1) * lentezza;
     const portata = R.PORTATA_ZOMBIE * dati.portata;
     const finestra = finestraDi(z.finestra);
     if (z.stato === 'morto') {
@@ -865,6 +1007,8 @@ export function passo(stato, dt, { posizioni = {}, azioni = [] } = {}) {
   aggiornaPotenziatore(stato, dt, eventi);
   aggiornaBonus(stato, dt, eventi);
   aggiornaGranate(stato, dt, eventi);
+  aggiornaProiettili(stato, dt, eventi);
+  aggiornaBuchi(stato, dt, eventi);
   aggiornaGeneratore(stato, dt, eventi);
   if (stato.fase === 'vinta') return eventi;
   if (stato.giocatori.length > 0 && vivi(stato).length === 0) {

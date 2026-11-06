@@ -18,6 +18,8 @@ npm test
 - Due zombie realistici: quello di città e lo Scuoiato (più veloce, più fragile, fa più male).
 - Bonus lasciati dagli zombie: Bomba, Munizioni al massimo, Punti doppi, Colpo secco, Saldi, Carpentiere, Caricatore infinito.
 - Easter egg: tre frammenti di meteorite nascosti nella mappa e la vecchia campanella dell'atrio.
+- Armi aliene con un effetto loro: Singolarità (sfera che apre un buco nero, risucchia e implode), Criogeno
+  (congela gli zombie in statue che si frantumano con un colpo), Arco Voltaico (fulmine che salta fino a 6 zombie, 12 potenziato).
 - Granate (tasto G): due all'inizio, due in più a ogni round, massimo quattro.
 - Zombie che barcollano quando li colpisci e perdono la testa col colpo in testa.
 - Il Preside, un boss che arriva ogni cinque round.

@@ -94,6 +94,91 @@ function vestiArma(gruppo, dati, materiali) {
   });
 }
 
+function texturaBagliore() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const s = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  s.addColorStop(0, 'rgba(255,255,255,1)');
+  s.addColorStop(0.3, 'rgba(255,255,255,0.45)');
+  s.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = s;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+let bagliore = null;
+const alone = (colore, scala) => {
+  bagliore ??= texturaBagliore();
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: bagliore, color: colore, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  sprite.scale.setScalar(scala);
+  return sprite;
+};
+
+const ASPETTI = {
+  nucleo(gruppo, bocca, colore, potenziata) {
+    const parte = new THREE.Group();
+    const cuore = new THREE.Mesh(new THREE.SphereGeometry(0.04, 18, 14), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+    const anello = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.005, 8, 40), new THREE.MeshBasicMaterial({ color: colore, transparent: true, blending: THREE.AdditiveBlending }));
+    const anello2 = anello.clone();
+    anello2.rotation.x = Math.PI / 2;
+    const luce = alone(colore, potenziata ? 0.3 : 0.22);
+    parte.add(luce, cuore, anello, anello2);
+    const base = bocca.clone().add(new THREE.Vector3(0, 0.07, 0.16));
+    parte.position.copy(base);
+    gruppo.add(parte);
+    return t => {
+      anello.rotation.y = t * 3.2;
+      anello2.rotation.z = t * 2.3;
+      anello.rotation.x = Math.sin(t) * 0.6;
+      luce.material.opacity = 0.65 + Math.sin(t * 6) * 0.25;
+      parte.position.y = base.y + Math.sin(t * 2) * 0.004;
+    };
+  },
+  bombole(gruppo, bocca, colore) {
+    const vetro = new THREE.MeshStandardMaterial({ color: 0xcff2ff, emissive: colore, emissiveIntensity: 0.7, transparent: true, opacity: 0.82, roughness: 0.08, metalness: 0.1 });
+    const metallo = new THREE.MeshStandardMaterial({ color: 0xc9ccd0, metalness: 0.9, roughness: 0.25 });
+    for (const lato of [-1, 1]) {
+      const bombola = new THREE.Group();
+      bombola.add(new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.15, 14), vetro));
+      for (const y of [-0.08, 0.08]) {
+        const tappo = new THREE.Mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.018, 14), metallo);
+        tappo.position.y = y;
+        bombola.add(tappo);
+      }
+      bombola.rotation.x = Math.PI / 2;
+      bombola.position.copy(bocca).add(new THREE.Vector3(lato * 0.038, 0.0, 0.24));
+      gruppo.add(bombola);
+    }
+    const brina = alone(colore, 0.12);
+    brina.position.copy(bocca);
+    gruppo.add(brina);
+    return t => {
+      vetro.emissiveIntensity = 0.55 + Math.sin(t * 3) * 0.2;
+      brina.material.opacity = 0.35 + Math.sin(t * 7) * 0.15;
+    };
+  },
+  bobine(gruppo, bocca, colore, potenziata) {
+    const rame = new THREE.MeshStandardMaterial({ color: 0xb8733a, metalness: 0.95, roughness: 0.28 });
+    const scintille = [];
+    for (let i = 0; i < 3; i++) {
+      const bobina = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.007, 8, 24), rame);
+      bobina.position.copy(bocca).add(new THREE.Vector3(0, 0, 0.035 + i * 0.032));
+      gruppo.add(bobina);
+      const s = alone(colore, potenziata ? 0.09 : 0.07);
+      s.position.copy(bobina.position).add(new THREE.Vector3(0, 0.026, 0));
+      gruppo.add(s);
+      scintille.push(s);
+    }
+    return t => {
+      scintille.forEach((s, i) => {
+        const acceso = Math.sin(t * (23 + i * 7) + i * 2) > 0.2;
+        s.visible = acceso;
+        s.position.x = bocca.x + Math.sin(t * 31 + i) * 0.02;
+      });
+    };
+  },
+};
+
 export function modelloArma(tipo, materiali) {
   const dati = tipo === 'coltello' ? { modello: MODELLO_COLTELLO } : ARMI[tipo] ?? ARMI[armaBase(tipo)];
   const modello = materiali.libreria.get(dati.modello);
@@ -103,6 +188,7 @@ export function modelloArma(tipo, materiali) {
   if (tipo !== 'coltello') vestiArma(gruppo, dati, materiali);
   const extra = modello.userData;
   const bocca = new THREE.Vector3().fromArray(extra.bocca ?? [0, 0.03, -0.3]);
+  gruppo.userData.anima = dati.aspetto ? ASPETTI[dati.aspetto](gruppo, bocca, new THREE.Color(dati.colore), !!dati.potenziata) : null;
   const presa = extra.presa ? new THREE.Vector3().fromArray(extra.presa) : null;
   return { gruppo, bocca, presa, lunghezza: extra.lunghezza ?? 0.5, colore: dati.colore ?? null };
 }

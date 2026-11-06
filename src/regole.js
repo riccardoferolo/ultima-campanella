@@ -79,6 +79,21 @@ export const R = Object.freeze({
   DURATA_SCATTO: 1.4,
   RINFORZI_FINALE_MAX: 10,
   PUNTI_VITTORIA: 5000,
+
+  BUCO_VELOCITA: 11,
+  BUCO_VOLO: 3,
+  BUCO_DURATA: 3,
+  BUCO_RAGGIO: 6,
+  BUCO_ATTRAZIONE: 5,
+  BUCO_CUORE: 1.8,
+  BUCO_IMPLOSIONE: 3.5,
+  BUCO_DANNO_BOSS: 3000,
+  GELO_CALO: 0.3,
+  GELO_DURATA: 5,
+  GELO_BOSS_MAX: 0.5,
+  ARCO_SALTO: 6.5,
+  ARCO_CALO: 0.88,
+  ARCO_SCOSSA: 0.8,
 });
 
 const arma = dati => Object.freeze({ pallini: 1, dispersione: 0.02, automatica: false, ...dati });
@@ -136,6 +151,9 @@ const ARMI_BASE = Object.freeze({
   lanciafiamme: aliena({ nome: 'Fiammatore stellare', modello: 'Gun_Rifle', colore: 0xff7a1a, danno: 30, cadenza: 0.05, automatica: true, caricatore: 100, riserva: 300, ricarica: 3.5, pallini: 5, dispersione: 0.15, portata: 7, fiamma: true }),
   lanciagranate: aliena({ nome: 'Lancia-sfere', modello: 'Gun_Rifle', colore: 0xff3fa8, danno: 300, cadenza: 0.9, caricatore: 4, riserva: 32, ricarica: 2.5, dispersione: 0.01, esplosione: esplode(3, 900, 'fuoco', 0xff3fa8) }),
   lanciarazzi: aliena({ nome: 'Cannone a particelle', modello: 'Gun_Sniper', colore: 0xff3030, danno: 500, cadenza: 1.2, caricatore: 3, riserva: 18, ricarica: 3, dispersione: 0.006, esplosione: esplode(3.5, 1400, 'fuoco') }),
+  singolarita: aliena({ nome: 'Singolarità', modello: 'Gun_Sniper', colore: 0x8a3dff, danno: 0, cadenza: 1.3, caricatore: 2, riserva: 14, ricarica: 3.2, dispersione: 0, proiettile: 'buco', aspetto: 'nucleo', suono: 'buco' }),
+  criogeno: aliena({ nome: 'Criogeno', modello: 'Gun_Rifle', colore: 0x7fd8ff, danno: 22, cadenza: 0.09, automatica: true, caricatore: 60, riserva: 300, ricarica: 3, pallini: 3, dispersione: 0.07, portata: 11, gelo: 0.11, aspetto: 'bombole', suono: 'gelo' }),
+  arco: aliena({ nome: 'Arco Voltaico', modello: 'Gun_Revolver', colore: 0x66e6ff, danno: 900, cadenza: 0.55, caricatore: 10, riserva: 70, ricarica: 2.6, dispersione: 0.004, catena: 6, aspetto: 'bobine', suono: 'arco' }),
   laser: aliena({ nome: 'Precisione al laser', modello: 'Gun_Sniper', colore: 0x4fd8ff, danno: 1600, cadenza: 0.6, caricatore: 8, riserva: 48, ricarica: 2.8, dispersione: 0, mirino: true, esplosione: esplode(0.8, 300, 'energia') }),
   disintegratore: aliena({ nome: 'Disintegratore', modello: 'Gun_Sniper', colore: 0xe0b0ff, danno: 700, cadenza: 0.1, automatica: true, caricatore: 60, riserva: 360, ricarica: 3, dispersione: 0.01, esplosione: esplode(2, 500, 'energia'), segreta: true }),
 });
@@ -149,6 +167,9 @@ const NOMI_POTENZIATI = Object.freeze({
   precisione: 'Precisione Falco',
   raggi: 'Raggi Supernova',
   disintegratore: 'Fine del Mondo',
+  singolarita: 'Orizzonte degli Eventi',
+  criogeno: 'Zero Assoluto',
+  arco: 'Tempesta di Giove',
 });
 const EPITETI = Object.freeze(['Furia', 'Spettro', 'Cobra', 'Drago', 'Valanga', 'Inferno', 'Tempesta', 'Lupo', 'Falco', 'Vespa', 'Uragano', 'Tuono', 'Vipera']);
 
@@ -242,6 +263,10 @@ export function quotaCorridori(round) {
 
 export function dannoGranata(round) {
   return Math.round(vitaZombie(Math.max(1, round)) * 1.25);
+}
+
+export function saltiArco(arma) {
+  return (arma.catena ?? 0) * (arma.potenziata ? 2 : 1);
 }
 
 export function moltiplicatoreBoss(giocatori) {

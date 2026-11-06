@@ -24,7 +24,14 @@ const TIPI = {
   energia: { colore: 0x5fe9ff, vita: 0.45, gravita: 0.5, dimensione: 0.28, sparsa: 4, additivo: true },
   fuoco: { colore: 0xff8a2a, vita: 0.55, gravita: 1.2, dimensione: 0.34, sparsa: 3.5, additivo: true },
   fiamma: { colore: 0xff7a1a, vita: 0.35, gravita: 1.5, dimensione: 0.22, sparsa: 0.6, additivo: true },
+  brina: { colore: 0xbfeaff, vita: 0.6, gravita: 0.2, dimensione: 0.32, sparsa: 0.45, additivo: true },
+  ghiaccio: { colore: 0xe4f6ff, vita: 1, gravita: -9, dimensione: 0.11, sparsa: 3.2, additivo: false },
+  scarica: { colore: 0x9cf0ff, vita: 0.3, gravita: -1, dimensione: 0.08, sparsa: 2.6, additivo: true },
+  vuoto: { colore: 0xb06cff, vita: 0.55, gravita: 0, dimensione: 0.14, sparsa: 0, additivo: true },
 };
+const DURATA_FULMINE = 0.2;
+const PEZZI_FULMINE = 10;
+const SCARTO_FULMINE = 0.09;
 const COLORI_ESPLOSIONE = Object.freeze({ energia: 0x5fe9ff, fuoco: 0xff8a2a, fulmine: 0xd8f0ff });
 const DURATA_RAGGIO = 0.14;
 const DURATA_LAMPO = 0.18;
@@ -93,6 +100,66 @@ export function creaEffetti(scena) {
     },
     fiamma(da, verso, colore) {
       emetti('fiamma', da, 4, verso, colore, 6);
+    },
+    brina(da, verso) {
+      emetti('brina', da, 3, verso, null, 9);
+    },
+    ghiaccio(punto) {
+      emetti('ghiaccio', punto, 36);
+      emetti('brina', punto, 10);
+    },
+    scarica(punto) {
+      emetti('scarica', punto, 8);
+    },
+    scia(punto, colore) {
+      emetti('vuoto', punto, 2, null, colore);
+    },
+    risucchio(centro, raggio, quante = 5) {
+      for (let i = 0; i < quante && libere.length; i++) {
+        const p = libere.pop();
+        const angolo = Math.random() * Math.PI * 2;
+        const r = raggio * (0.5 + Math.random() * 0.5);
+        p.tipo = TIPI.vuoto;
+        p.vita = 0;
+        p.durata = 0.6;
+        p.sprite.position.set(centro.x + Math.cos(angolo) * r, centro.y + (Math.random() - 0.5) * 1.6, centro.z + Math.sin(angolo) * r);
+        p.velocita.set(centro.x - p.sprite.position.x, centro.y - p.sprite.position.y, centro.z - p.sprite.position.z).multiplyScalar(1 / p.durata);
+        p.sprite.material.color.setHex(Math.random() < 0.3 ? 0xffb070 : TIPI.vuoto.colore);
+        p.sprite.material.blending = THREE.AdditiveBlending;
+        p.sprite.scale.setScalar(TIPI.vuoto.dimensione);
+        p.sprite.visible = true;
+        attive.push(p);
+      }
+    },
+    fulmine(punti, colore = 0x9cf0ff) {
+      for (const spessore of [0, 1]) {
+        const tracciato = [];
+        for (let i = 0; i < punti.length - 1; i++) {
+          const a = punti[i];
+          const b = punti[i + 1];
+          const lungo = a.distanceTo(b);
+          for (let k = 0; k < PEZZI_FULMINE; k++) {
+            const f = k / PEZZI_FULMINE;
+            const scarto = k === 0 ? 0 : SCARTO_FULMINE * Math.min(4, lungo) * (spessore ? 0.5 : 1);
+            tracciato.push(new THREE.Vector3(
+              a.x + (b.x - a.x) * f + (Math.random() - 0.5) * scarto * 2,
+              a.y + (b.y - a.y) * f + (Math.random() - 0.5) * scarto * 2,
+              a.z + (b.z - a.z) * f + (Math.random() - 0.5) * scarto * 2,
+            ));
+          }
+        }
+        tracciato.push(punti[punti.length - 1].clone());
+        const percorso = new THREE.CurvePath();
+        for (let i = 0; i < tracciato.length - 1; i++) percorso.add(new THREE.LineCurve3(tracciato[i], tracciato[i + 1]));
+        const tubo = new THREE.TubeGeometry(percorso, tracciato.length * 2, spessore ? 0.008 : 0.026, 5, false);
+        const linea = new THREE.Mesh(tubo, new THREE.MeshBasicMaterial({ color: spessore ? 0xe8fbff : colore, transparent: true, opacity: spessore ? 1 : 0.45, depthWrite: false, blending: THREE.AdditiveBlending }));
+        scena.add(linea);
+        raggi.push({ linea, vita: DURATA_FULMINE });
+      }
+      for (const p of punti.slice(1)) emetti('scarica', p, 6);
+      lampoEsplosione.color.setHex(colore);
+      lampoEsplosione.position.copy(punti[punti.length - 1]);
+      tempoLampo = DURATA_LAMPO * 0.6;
     },
     macchia(x, z) {
       const mesh = macchie.length >= MACCHIE_MASSIME ? macchie.shift() : new THREE.Mesh(geometriaMacchia, materialeMacchia);

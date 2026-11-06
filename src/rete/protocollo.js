@@ -33,7 +33,7 @@ function eGiocatore(g) {
 function eIstantanea(ist) {
   return !!ist && typeof ist === 'object'
     && [ist.t, ist.f, ist.r, ist.tf].every(numero)
-    && elencoNumeri(ist.z, 9)
+    && elencoNumeri(ist.z, 10)
     && Array.isArray(ist.w) && ist.w.every(numero)
     && Array.isArray(ist.p) && ist.p.every(p => testo(p))
     && Array.isArray(ist.g) && ist.g.every(eGiocatore)
@@ -46,12 +46,16 @@ function eIstantanea(ist) {
     && numero(ist.cp) && numero(ist.co)
     && elencoNumeri(ist.gr, 4)
     && Array.isArray(ist.m) && ist.m.length === 5 && ist.m.every(numero)
-    && elencoNumeri(ist.fo, 4);
+    && elencoNumeri(ist.fo, 4)
+    && elencoNumeri(ist.pj, 4)
+    && elencoNumeri(ist.bh, 6);
 }
 
 function eAzione(a) {
   if (!a || typeof a !== 'object') return false;
-  if (a.tipo === 'colpo') return numero(a.zombie) && numero(a.danno);
+  if (a.tipo === 'colpo') return numero(a.zombie) && numero(a.danno) && (a.gelo === undefined || numero(a.gelo)) && (a.arma === undefined || arma(a.arma));
+  if (a.tipo === 'sparo') return numero(a.yaw) && numero(a.pitch) && (a.arma === undefined || arma(a.arma));
+  if (a.tipo === 'catena') return Array.isArray(a.zombie) && a.zombie.length > 0 && a.zombie.length <= 13 && a.zombie.every(numero) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'compra') return testo(a.acquisto) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'assa') return testo(a.finestra);
   if (a.tipo === 'rianima' || a.tipo === 'pronto') return typeof a.attivo === 'boolean';

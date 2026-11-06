@@ -15,7 +15,7 @@ export function faiIstantanea(stato) {
     f: FASI.indexOf(stato.fase),
     r: stato.round,
     tf: r2(Math.max(0, stato.timerFase)),
-    z: stato.zombie.map(z => [z.id, r2(z.x), r2(z.z), r2(z.yaw), STATI_ZOMBIE.indexOf(z.stato), z.corre ? 1 : 0, z.variante, Math.max(0, Math.round((z.vita / z.vitaMax) * 100)), Math.max(0, ELENCO_TIPI_ZOMBIE.indexOf(z.tipo ?? 'normale'))]),
+    z: stato.zombie.map(z => [z.id, r2(z.x), r2(z.z), r2(z.yaw), STATI_ZOMBIE.indexOf(z.stato), z.corre ? 1 : 0, z.variante, Math.max(0, Math.round((z.vita / z.vitaMax) * 100)), Math.max(0, ELENCO_TIPI_ZOMBIE.indexOf(z.tipo ?? 'normale')), z.gelato > 0 ? 100 : Math.round(Math.min(1, z.gelo ?? 0) * 100)]),
     w: FINESTRE.map(f => stato.finestre[f.id]),
     p: [...stato.porte],
     g: stato.giocatori.map(g => ({
@@ -33,6 +33,8 @@ export function faiIstantanea(stato) {
     cp: stato.campanella ? 1 : 0,
     co: stato.conto === null || stato.conto === undefined ? -1 : r2(stato.conto),
     gr: (stato.granate ?? []).map(gr => [gr.id, r2(gr.x), r2(gr.y), r2(gr.z)]),
+    pj: (stato.proiettili ?? []).map(p => [p.id, r2(p.x), r2(p.y), r2(p.z)]),
+    bh: (stato.buchi ?? []).map(b => [b.id, r2(b.x), r2(b.y), r2(b.z), r2(Math.max(0, b.timer)), r2(b.raggio)]),
     m: stato.missione
       ? [stato.missione.fusibili, stato.missione.messi, Math.max(0, STATI_GENERATORE.indexOf(stato.missione.generatore)), Math.round(stato.missione.progresso * 100), stato.missione.presideFusibile ? 1 : 0]
       : [0, 0, 0, 0, 1],
@@ -46,7 +48,7 @@ export function espandi(ist) {
     fase: FASI[ist.f],
     round: ist.r,
     timerFase: ist.tf,
-    zombie: ist.z.map(([id, x, z, yaw, s, corre, variante, vita, tipo]) => ({ id, x, z, yaw, stato: STATI_ZOMBIE[s], corre: !!corre, variante, vita, tipo: ELENCO_TIPI_ZOMBIE[tipo] ?? 'normale' })),
+    zombie: ist.z.map(([id, x, z, yaw, s, corre, variante, vita, tipo, gelo]) => ({ id, x, z, yaw, stato: STATI_ZOMBIE[s], corre: !!corre, variante, vita, tipo: ELENCO_TIPI_ZOMBIE[tipo] ?? 'normale', gelo: (gelo ?? 0) / 100 })),
     finestre: Object.fromEntries(FINESTRE.map((f, i) => [f.id, ist.w[i]])),
     porte: new Set(ist.p),
     giocatori: ist.g.map(g => ({
@@ -63,6 +65,8 @@ export function espandi(ist) {
     campanella: !!ist.cp,
     conto: ist.co === undefined || ist.co < 0 ? null : ist.co,
     granate: (ist.gr ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
+    proiettili: (ist.pj ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
+    buchi: (ist.bh ?? []).map(([id, x, y, z, timer, raggio]) => ({ id, x, y, z, timer, raggio })),
     missione: {
       fusibili: ist.m?.[0] ?? 0,
       messi: ist.m?.[1] ?? 0,
@@ -110,5 +114,6 @@ export function interpola(a, b, f) {
     zombie: interpolaElenco(a.zombie, b.zombie, t, false),
     giocatori: interpolaElenco(a.giocatori, b.giocatori, t, true),
     granate: interpolaGranate(a.granate ?? [], b.granate ?? [], t),
+    proiettili: interpolaGranate(a.proiettili ?? [], b.proiettili ?? [], t),
   };
 }

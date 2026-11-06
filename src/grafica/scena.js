@@ -28,6 +28,104 @@ const ONDEGGIO = 0.01;
 const RAGGIO_BOMBA = 0.034;
 const SU = new THREE.Vector3(0, 1, 0);
 
+function texturaDisco() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const s = ctx.createRadialGradient(128, 128, 40, 128, 128, 128);
+  s.addColorStop(0, 'rgba(0,0,0,0)');
+  s.addColorStop(0.32, 'rgba(255,190,120,0.95)');
+  s.addColorStop(0.5, 'rgba(190,90,255,0.8)');
+  s.addColorStop(0.8, 'rgba(90,30,180,0.35)');
+  s.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = s;
+  ctx.fillRect(0, 0, 256, 256);
+  ctx.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 40; i++) {
+    ctx.strokeStyle = `rgba(0,0,0,${0.2 + Math.random() * 0.35})`;
+    ctx.lineWidth = 2 + Math.random() * 4;
+    ctx.beginPath();
+    const r = 50 + Math.random() * 70;
+    const a = Math.random() * Math.PI * 2;
+    ctx.arc(128, 128, r, a, a + 0.6 + Math.random());
+    ctx.stroke();
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function creaVuoto3d(scena, effetti) {
+  const disco = texturaDisco();
+  const nero = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const materialeDisco = new THREE.MeshBasicMaterial({ map: disco, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+  const materialeAlone = new THREE.SpriteMaterial({ map: disco, color: 0xb06cff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const sfere = new Map();
+  const buchi = new Map();
+  let tempo = 0;
+  const sincronizza = (elenco, mappa, crea) => {
+    const presenti = new Set();
+    for (const e of elenco ?? []) {
+      presenti.add(e.id);
+      if (!mappa.has(e.id)) mappa.set(e.id, crea());
+    }
+    for (const [id, g] of mappa) {
+      if (presenti.has(id)) continue;
+      scena.remove(g);
+      mappa.delete(id);
+    }
+  };
+  function creaSfera() {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 12), nero));
+    const a = new THREE.Sprite(materialeAlone);
+    a.scale.setScalar(0.75);
+    g.add(a);
+    scena.add(g);
+    return g;
+  }
+  function creaBuco() {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 18), nero));
+    const anello = new THREE.Mesh(new THREE.RingGeometry(0.45, 2, 64), materialeDisco);
+    anello.rotation.x = Math.PI / 2 - 0.4;
+    const anello2 = new THREE.Mesh(new THREE.RingGeometry(0.45, 1.3, 48), materialeDisco);
+    anello2.rotation.y = Math.PI / 2;
+    const a = new THREE.Sprite(materialeAlone);
+    a.scale.setScalar(2.4);
+    g.add(a, anello, anello2);
+    g.userData = { anello, anello2, eta: 0 };
+    scena.add(g);
+    return g;
+  }
+  return {
+    aggiorna(vista, dt) {
+      tempo += dt;
+      sincronizza(vista.proiettili, sfere, creaSfera);
+      for (const p of vista.proiettili ?? []) {
+        const g = sfere.get(p.id);
+        g.position.set(p.x, p.y, p.z);
+        effetti.scia(g.position, 0xb06cff);
+      }
+      sincronizza(vista.buchi, buchi, creaBuco);
+      for (const b of vista.buchi ?? []) {
+        const g = buchi.get(b.id);
+        const u = g.userData;
+        u.eta += dt;
+        const scala = Math.min(1, u.eta * 4) * Math.min(1, b.timer * 4 + 0.15) * (b.raggio / 6);
+        g.scale.setScalar(Math.max(0.05, scala));
+        g.position.set(b.x, b.y + Math.sin(tempo * 3) * 0.05, b.z);
+        u.anello.rotation.z += dt * 2.5;
+        u.anello2.rotation.z -= dt * 1.7;
+        effetti.risucchio(g.position, b.raggio * 0.6, 4);
+      }
+    },
+    svuota() {
+      for (const g of [...sfere.values(), ...buchi.values()]) scena.remove(g);
+      sfere.clear();
+      buchi.clear();
+    },
+  };
+}
+
 function creaGranate3d(scena) {
   const corpo = new THREE.SphereGeometry(RAGGIO_BOMBA, 12, 10).scale(1, 1.25, 1);
   const tappo = new THREE.CylinderGeometry(0.011, 0.014, 0.03, 8);
@@ -135,6 +233,7 @@ export async function creaMondo(contenitore) {
   const zombi = creaGestoreZombi(scena, risorseZombi);
   const effetti = creaEffetti(scena);
   const granate3d = creaGranate3d(scena);
+  const vuoto3d = creaVuoto3d(scena, effetti);
   const vista1p = creaVista1p(materialiArmi);
   vista1p.scena.environment = ambiente;
   vista1p.scena.environmentIntensity = 0.5;
@@ -216,6 +315,7 @@ export async function creaMondo(contenitore) {
     scuola.aggiorna(vista, dt, tempo);
     zombi.aggiorna(vista, dt);
     granate3d.aggiorna(vista.granate, dt);
+    vuoto3d.aggiorna(vista, dt);
     bonus3d.aggiorna(vista, dt);
     segreti.aggiorna(vista, dt);
     aggiornaCompagni(vista, mioId, dt);
@@ -244,6 +344,13 @@ export async function creaMondo(contenitore) {
     campanella: () => segreti.suona(),
     bersagli: vista => zombi.bersagli(vista),
     colpito: (id, testa) => zombi.colpito(id, testa),
+    frantuma(id, x, z) {
+      zombi.nascondi(id);
+      effetti.ghiaccio(new THREE.Vector3(x, 1, z));
+    },
+    fulmine(punti) {
+      effetti.fulmine(punti.map(p => new THREE.Vector3(p.x, p.y, p.z)));
+    },
     decapita(id) {
       const punto = zombi.decapita(id);
       if (!punto) return;
@@ -254,6 +361,7 @@ export async function creaMondo(contenitore) {
     svuota() {
       zombi.svuota();
       granate3d.svuota();
+      vuoto3d.svuota();
       effetti.svuota();
       bonus3d.svuota();
       for (const c of compagni.values()) c.chiudi();

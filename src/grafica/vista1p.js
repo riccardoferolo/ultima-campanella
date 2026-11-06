@@ -49,6 +49,7 @@ export function creaVista1p(materialiArmi) {
   let rinculo = 0;
   let tempoLampo = 0;
   let passo = 0;
+  let tempo = 0;
   const posizione = RIPOSO.clone();
 
   function mostra(tipo) {
@@ -82,6 +83,8 @@ export function creaVista1p(materialiArmi) {
     get coloreLampo() { return lampo.material.color.getHex(); },
     aggiorna({ dt, movimento, mira, ricarica, cambio, coltellata, corsa }) {
       passo += dt * (corsa ? 14 : 9) * movimento;
+      tempo += dt;
+      modelli.get(attuale)?.gruppo.userData.anima?.(tempo);
       rinculo = Math.max(0, rinculo - dt * 9);
       tempoLampo = Math.max(0, tempoLampo - dt);
       lampo.visible = tempoLampo > 0;

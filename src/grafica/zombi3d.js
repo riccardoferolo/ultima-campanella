@@ -10,6 +10,9 @@ const SMORZA_SUSSULTO = 5;
 const PIEGA_BUSTO = 0.42;
 const PIEGA_TESTA = 0.35;
 const ARRETRA = 0.09;
+const GHIACCIO = new THREE.Color(0xcdeeff);
+const GHIACCIO_LUCE = new THREE.Color(0x3fa9ff);
+const SOLLEVA = 0.9;
 const VARIANTI = Object.freeze([
   { tinta: 0xffffff, scala: 1 },
   { tinta: 0xc7d1bf, scala: 0.95 },
@@ -144,7 +147,7 @@ export function creaGestoreZombi(scena, risorse) {
     }
     const voce = {
       radice, corpo, testa, busto, mixer, azioni, dati, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3,
-      vitaPrima: z.vita, sussulto: 0, senzaTesta: false,
+      vitaPrima: z.vita, sussulto: 0, senzaTesta: false, gelo: null, sollevato: 0, giro: 0,
     };
     zombi.set(z.id, voce);
     return voce;
@@ -177,6 +180,40 @@ export function creaGestoreZombi(scena, risorse) {
     if (voce.senzaTesta && voce.testa) voce.testa.scale.setScalar(0.001);
   }
 
+  function ghiaccia(voce, gelo) {
+    if (gelo <= 0.01 && !voce.gelo) return;
+    if (!voce.gelo) {
+      voce.gelo = [];
+      voce.corpo.traverse(o => {
+        if (!o.isMesh) return;
+        const copie = [].concat(o.material).map(m => {
+          const c = m.clone();
+          voce.gelo.push({ m: c, colore: c.color.clone(), luce: c.emissive.clone() });
+          return c;
+        });
+        o.material = Array.isArray(o.material) ? copie : copie[0];
+      });
+    }
+    for (const g of voce.gelo) {
+      g.m.color.copy(g.colore).lerp(GHIACCIO, Math.min(1, gelo) * 0.85);
+      g.m.emissive.copy(g.luce).lerp(GHIACCIO_LUCE, Math.min(1, gelo) * 0.35);
+    }
+    voce.mixer.timeScale = gelo >= 1 ? 0 : 1 - gelo * 0.6;
+  }
+
+  function sospendi(voce, z, buchi, dt) {
+    let voluto = 0;
+    if (!voce.dati.alto && z.stato !== 'morto') {
+      for (const b of buchi) {
+        const d = Math.hypot(z.x - b.x, z.z - b.z);
+        if (d < b.raggio) voluto = Math.max(voluto, SOLLEVA * (1 - d / b.raggio) + 0.2);
+      }
+    }
+    voce.sollevato += (voluto - voce.sollevato) * Math.min(1, dt * (voluto > voce.sollevato ? 3 : 6));
+    if (voluto > 0) voce.giro += dt * 4;
+    return voce.sollevato;
+  }
+
   function rimuovi(id) {
     const voce = zombi.get(id);
     if (!voce) return;
@@ -190,14 +227,18 @@ export function creaGestoreZombi(scena, risorse) {
   return {
     aggiorna(vista, dt) {
       const vivi = new Set();
+      const buchi = vista.buchi ?? [];
       for (const z of vista.zombie) {
         vivi.add(z.id);
         const voce = zombi.get(z.id) ?? crea(z);
         const spostamento = Math.hypot(z.x - voce.ultimaPosizione.x, z.z - voce.ultimaPosizione.y);
         voce.ultimaPosizione.set(z.x, z.z);
         suona(voce, logica(z, spostamento > 0.2 * dt));
-        voce.radice.position.set(z.x, 0, z.z);
-        voce.radice.rotation.y = z.yaw;
+        const alto = sospendi(voce, z, buchi, dt);
+        voce.radice.position.set(z.x, alto, z.z);
+        voce.radice.rotation.y = z.yaw + voce.giro;
+        voce.radice.rotation.z = alto > 0.05 ? Math.sin(voce.giro * 1.3) * 0.4 * alto : 0;
+        ghiaccia(voce, z.gelo ?? 0);
         if (z.stato === 'morto') {
           voce.tempoMorto += dt;
           if (voce.tempoMorto > AFFONDA_DOPO) voce.radice.position.y = -(voce.tempoMorto - AFFONDA_DOPO) * 0.6;
@@ -225,6 +266,10 @@ export function creaGestoreZombi(scena, risorse) {
     colpito(id, testa) {
       const voce = zombi.get(id);
       if (voce) scuoti(voce, testa ? 0.9 : 0.6);
+    },
+    nascondi(id) {
+      const voce = zombi.get(id);
+      if (voce) voce.radice.visible = false;
     },
     decapita(id) {
       const voce = zombi.get(id);
