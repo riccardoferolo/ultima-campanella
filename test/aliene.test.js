@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { R, ARMI, ARMI_CASSA, saltiArco } from '../src/regole.js';
+import { R, ARMI, ARMI_CASSA, ARMI_DI_BASE, saltiArco } from '../src/regole.js';
+import { haFormaAliena } from '../src/grafica/armiAliene3d.js';
 import { creaPartita, passo } from '../src/partita.js';
 import { faiIstantanea, espandi } from '../src/istantanea.js';
 import { valida } from '../src/rete/protocollo.js';
@@ -32,11 +33,14 @@ function zombie(stato, extra = {}) {
 test('le tre armi nuove escono dalla cassa e hanno la versione potenziata', () => {
   for (const a of ['singolarita', 'criogeno', 'arco']) {
     assert.ok(ARMI_CASSA.includes(a), a);
-    assert.ok(ARMI[a].aspetto, `${a} senza aspetto suo`);
     assert.ok(ARMI[`${a}+`].potenziata);
   }
   assert.equal(ARMI['singolarita+'].nome, 'Orizzonte degli Eventi');
   assert.equal(saltiArco(ARMI['arco+']), saltiArco(ARMI.arco) * 2);
+});
+
+test('ogni arma aliena ha una forma organica sua, non da pistola', () => {
+  for (const a of ARMI_DI_BASE.filter(x => ARMI[x].aliena)) assert.ok(haFormaAliena(a), a);
 });
 
 test('Singolarità: la sfera vola, apre un buco nero che risucchia e poi implode', () => {
