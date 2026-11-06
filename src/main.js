@@ -1,5 +1,5 @@
 import './stile.css';
-import { R, ARMI, BEVANDE, BONUS, COLTELLO, saltiArco } from './regole.js';
+import { R, ARMI, BEVANDE, BONUS, COLTELLO, saltiArco, fattoreBevande } from './regole.js';
 import { semeCasuale } from './caso.js';
 import { MURI, OSTACOLI, PORTE, ACQUISTI, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
 import { muoviCerchio } from './fisica.js';
@@ -333,6 +333,7 @@ function suEventi(eventi) {
       case 'rianimato': audio.suona('rianimato'); hud.avviso(perMe ? 'Sei di nuovo in piedi' : `${nomeDi(e.a)} è di nuovo in piedi`, 'bene'); break;
       case 'morto': hud.avviso(perMe ? 'Sei morto' : `${nomeDi(e.a)} è morto`); break;
       case 'rinato': if (perMe) azzera(arsenale); break;
+      case 'armi': if (perMe) allinea(arsenale, e.armi); break;
       case 'fine': mostraFine(e); break;
       default:
     }
@@ -493,7 +494,7 @@ function muovi(lettura, me, dt) {
   const lunghezza = Math.hypot(lettura.avanti, lettura.lato);
   io.movimento = vivo && lunghezza > 0 ? 1 : 0;
   if (!io.movimento) return;
-  const velocita = (io.corsa ? R.VELOCITA_CORSA : R.VELOCITA) * (io.inMira ? 0.6 : 1);
+  const velocita = (io.corsa ? R.VELOCITA_CORSA : R.VELOCITA) * (io.inMira ? 0.6 : 1) * fattoreBevande(me.bevande, 'velocita');
   const avanti = lettura.avanti / lunghezza;
   const lato = lettura.lato / lunghezza;
   const dx = (Math.sin(io.yaw) * avanti - Math.cos(io.yaw) * lato) * velocita * dt;
@@ -640,7 +641,7 @@ function usaArmi(lettura, me, vista, dt) {
     }
     return;
   }
-  const colpo = spara(arsenale);
+  const colpo = spara(arsenale, me.bevande);
   if (!colpo) return;
   if (vista.effetti?.infinite > 0) armaAttiva(arsenale).caricatore += 1;
   sparaColpo(colpo, vista);

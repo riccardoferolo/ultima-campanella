@@ -1,6 +1,6 @@
 import {
   R, ARMI, ARMI_CASSA, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
-  dannoGranata, moltiplicatoreBoss, faseCustode, saltiArco, fattoreOrda,
+  dannoGranata, moltiplicatoreBoss, faseCustode, saltiArco, fattoreOrda, armiPortate,
 } from './regole.js';
 import { passoCaso } from './caso.js';
 import {
@@ -137,7 +137,7 @@ function aggiornaPosizioni(stato, posizioni) {
 
 function prendiArma(stato, giocatore, arma, eventi, extra = {}) {
   if (!giocatore.armi.includes(arma)) {
-    if (giocatore.armi.length < 2) giocatore.armi.push(arma);
+    if (giocatore.armi.length < armiPortate(giocatore.bevande)) giocatore.armi.push(arma);
     else giocatore.armi[giocatore.armi.indexOf(giocatore.armaAttiva)] = arma;
   }
   giocatore.armaAttiva = arma;
@@ -237,7 +237,7 @@ function potenziatore(stato, giocatore, eventi) {
   if (macchina.stato === 'pronta' && macchina.per === giocatore.id) {
     const da = giocatore.armi.indexOf(armaBase(macchina.arma));
     if (da >= 0) giocatore.armi[da] = macchina.arma;
-    else if (giocatore.armi.length < 2) giocatore.armi.push(macchina.arma);
+    else if (giocatore.armi.length < armiPortate(giocatore.bevande)) giocatore.armi.push(macchina.arma);
     else giocatore.armi[giocatore.armi.indexOf(giocatore.armaAttiva)] = macchina.arma;
     giocatore.armaAttiva = macchina.arma;
     eventi.push({ k: 'acquisto', a: giocatore.id, arma: macchina.arma, armi: [...giocatore.armi], potenziata: true });
@@ -956,6 +956,10 @@ function ferisci(stato, giocatore, eventi, danno = R.DANNO_ZOMBIE) {
   if (giocatore.vita > 0) return;
   Object.assign(giocatore, { stato: 'terra', vita: 0, timerTerra: R.TEMPO_A_TERRA, bevande: [], vitaMax: R.VITA, progressoRianimazione: 0, rianimando: false });
   eventi.push({ k: 'aTerra', a: giocatore.id });
+  if (giocatore.armi.length <= armiPortate()) return;
+  giocatore.armi = giocatore.armi.slice(0, armiPortate());
+  if (!giocatore.armi.includes(giocatore.armaAttiva)) giocatore.armaAttiva = giocatore.armi[0];
+  eventi.push({ k: 'armi', a: giocatore.id, armi: [...giocatore.armi], arma: giocatore.armaAttiva });
 }
 
 function aggiornaGiocatori(stato, dt, eventi) {

@@ -1,4 +1,4 @@
-import { ARMI, COLTELLO } from './regole.js';
+import { ARMI, COLTELLO, fattoreBevande } from './regole.js';
 
 const FATTORE_LAMPO = 0.5;
 const CAMBIO_ARMA = 0.35;
@@ -28,11 +28,11 @@ export function aggiorna(a, dt) {
   return true;
 }
 
-export function spara(a) {
+export function spara(a, bevande = []) {
   const arma = armaAttiva(a);
   if (occupato(a) || a.attesa > 0 || arma.caricatore <= 0) return null;
   arma.caricatore -= 1;
-  a.attesa = ARMI[arma.tipo].cadenza;
+  a.attesa = ARMI[arma.tipo].cadenza * fattoreBevande(bevande, 'cadenza');
   return ARMI[arma.tipo];
 }
 

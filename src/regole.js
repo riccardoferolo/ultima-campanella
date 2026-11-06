@@ -208,7 +208,20 @@ export const BEVANDE = Object.freeze({
   ferro: Object.freeze({ nome: 'Bibita Ferro', descrizione: 'più vita', costo: 2500, colore: 0xc0392b }),
   lampo: Object.freeze({ nome: 'Bibita Lampo', descrizione: 'ricarica veloce', costo: 2000, colore: 0x27ae60 }),
   ritorno: Object.freeze({ nome: 'Bibita Ritorno', descrizione: 'rianimi in fretta', costo: 1500, colore: 0x2e86de }),
+  raffica: Object.freeze({ nome: 'Bibita Raffica', descrizione: 'spari più veloce', costo: 2000, colore: 0xe67e22, cadenza: 0.75 }),
+  scatto: Object.freeze({ nome: 'Bibita Scatto', descrizione: 'corri e cammini più veloce', costo: 1500, colore: 0xf1c40f, velocita: 1.15 }),
+  tasca: Object.freeze({ nome: 'Bibita Tasca', descrizione: 'porti una terza arma', costo: 4000, colore: 0x8e44ad, armi: 3 }),
 });
+
+export const ARMI_PORTATE = 2;
+
+export function armiPortate(bevande = []) {
+  return Math.max(ARMI_PORTATE, ...bevande.map(b => BEVANDE[b]?.armi ?? ARMI_PORTATE));
+}
+
+export function fattoreBevande(bevande = [], chiave) {
+  return bevande.reduce((f, b) => f * (BEVANDE[b]?.[chiave] ?? 1), 1);
+}
 
 export const TIPI_ZOMBIE = Object.freeze({
   normale: Object.freeze({ nome: 'Zombie', vita: 1, velocita: 1, danno: 1, portata: 1, punti: 1 }),
