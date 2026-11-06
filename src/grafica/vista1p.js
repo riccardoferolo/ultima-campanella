@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 import { modelloArma, creaBraccio, creaManoSinistra } from './armi3d.js';
 
-const RIPOSO = new THREE.Vector3(0.17, -0.17, -0.36);
-const MIRA = new THREE.Vector3(0, -0.075, -0.3);
+const RIPOSO = new THREE.Vector3(0.11, -0.095, -0.29);
+const MIRA = new THREE.Vector3(0, -0.068, -0.24);
 const DURATA_LAMPO = 0.05;
+const SOSTEGNO_PISTOLA = new THREE.Vector3(-0.018, -0.05, 0.04);
+const COLORE_LAMPO = 0xfff3c4;
 
 function texturaLampo() {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 32;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff3c4';
+  ctx.fillStyle = '#ffffff';
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
     ctx.beginPath();
@@ -26,8 +28,8 @@ function texturaLampo() {
 export function creaVista1p(materialiArmi) {
   const scena = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 10);
-  scena.add(new THREE.HemisphereLight(0xc9d6e8, 0x30261c, 1.6));
-  const luce = new THREE.DirectionalLight(0xfff0d0, 1.2);
+  scena.add(new THREE.HemisphereLight(0xc9d6e8, 0x30261c, 2.6));
+  const luce = new THREE.DirectionalLight(0xfff0d0, 2);
   luce.position.set(1, 2, 1);
   scena.add(luce);
   const supporto = new THREE.Group();
@@ -60,8 +62,10 @@ export function creaVista1p(materialiArmi) {
     const m = modelli.get(tipo);
     m.gruppo.visible = true;
     lampo.position.copy(m.bocca);
-    manoSinistra.visible = m.presa !== null;
-    if (m.presa) manoSinistra.position.copy(m.presa);
+    lampo.material.color.setHex(m.colore ?? COLORE_LAMPO);
+    lampo.scale.setScalar(m.colore ? 0.24 : 0.18);
+    manoSinistra.visible = true;
+    manoSinistra.position.copy(m.presa ?? SOSTEGNO_PISTOLA);
     attuale = tipo;
   }
 
@@ -75,6 +79,7 @@ export function creaVista1p(materialiArmi) {
       lampo.material.rotation = Math.random() * Math.PI;
     },
     get lampoAcceso() { return tempoLampo > 0; },
+    get coloreLampo() { return lampo.material.color.getHex(); },
     aggiorna({ dt, movimento, mira, ricarica, cambio, coltellata, corsa }) {
       passo += dt * (corsa ? 14 : 9) * movimento;
       rinculo = Math.max(0, rinculo - dt * 9);

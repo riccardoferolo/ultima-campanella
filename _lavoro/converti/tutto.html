@@ -1,0 +1,254 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>converti tutto</title></head>
+<body style="margin:0;background:#ddd">
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
+
+const ARMI = '/_lavoro/scaricati/armi/estratti/Ultimate Gun Pack - July 2019/FBX/';
+const ALIENE = '/_lavoro/scaricati/scifi/estratti/';
+const ZOMBI = '/_lavoro/scaricati/zombie_kit/';
+const OGGETTI = '/_lavoro/scaricati/ambiente/estratti/glTF/';
+const SCHIARISCI = 5.2;
+const LATO = 256;
+
+const FAMIGLIE = [
+  ['AssaultRifle2_', 'AssaultRifle2_1', 0.84],
+  ['AssaultRifle_', 'AssaultRifle_2', 0.88],
+  ['Bullpup_', 'Bullpup_1', 0.74],
+  ['Pistol_', 'Pistol_1', 0.21],
+  ['Revolver_', 'Revolver_1', 0.28],
+  ['Shotgun_', 'Shotgun_1', 1.0],
+  ['SniperRifle_', 'SniperRifle_1', 1.18],
+  ['SubmachineGun_', 'SubmachineGun_2', 0.62],
+  ['Accessories/Bayonet', 'Accessories/Bayonet', 0.3],
+];
+
+const PRESE = {
+  AssaultRifle2_1: [0.31, 0.65], AssaultRifle2_2: [0.31, 0.63], AssaultRifle2_3: [0.08, 0.52], AssaultRifle2_4: [0.33, 0.72],
+  AssaultRifle_1: [0.09, 0.68], AssaultRifle_2: [0.3, 0.69], AssaultRifle_3: [0.06, 0.67], AssaultRifle_4: [0.31, 0.69], AssaultRifle_5: [0.3, 0.65],
+  Bullpup_1: [0.52, 0.87], Bullpup_2: [0.35, 0.81], Bullpup_3: [0.4, 0.78],
+  Pistol_1: [0.25, null], Pistol_2: [0.25, null], Pistol_3: [0.2, null], Pistol_4: [0.22, null], Pistol_5: [0.2, null], Pistol_6: [0.15, null],
+  Revolver_1: [0.13, null], Revolver_2: [0.15, null], Revolver_3: [0.13, null], Revolver_4: [0.15, null], Revolver_5: [0.12, null],
+  Shotgun_1: [0.33, 0.67], Shotgun_2: [0.31, 0.56], Shotgun_3: [0.33, 0.61], Shotgun_4: [0.33, 0.59], Shotgun_SawedOff: [0.15, 0.6], Shotgun_ShortStock: [0.15, 0.8],
+  SniperRifle_1: [0.3, 0.63], SniperRifle_2: [0.3, 0.63], SniperRifle_3: [0.3, 0.6], SniperRifle_4: [0.28, 0.55], SniperRifle_5: [0.24, 0.6], SniperRifle_6: [0.31, 0.6],
+  SubmachineGun_1: [0.24, 0.52], SubmachineGun_2: [0.44, 0.66], SubmachineGun_3: [0.46, 0.81], SubmachineGun_4: [0.2, 0.48], SubmachineGun_5: [0.33, 0.52],
+  'Accessories/Bayonet': [0.2, null],
+};
+const ALIENE_PRESE = { Gun_Pistol: [0.2, null, 0.3], Gun_Revolver: [0.13, null, 0.36], Gun_Rifle: [0.39, 0.74, 0.85], Gun_Sniper: [0.31, 0.7, 1.2] };
+
+function schiarito(colore) {
+  const c = colore.clone().convertLinearToSRGB();
+  c.r = Math.min(1, c.r * SCHIARISCI);
+  c.g = Math.min(1, c.g * SCHIARISCI);
+  c.b = Math.min(1, c.b * SCHIARISCI);
+  return c.convertSRGBToLinear();
+}
+
+function pulisciNaN(g) {
+  const a = g.attributes.position;
+  const indici = g.index ? g.index.array : null;
+  const n = indici ? indici.length : a.count;
+  const v = i => (indici ? indici[i] : i);
+  const valido = i => Number.isFinite(a.getX(i)) && Number.isFinite(a.getY(i)) && Number.isFinite(a.getZ(i));
+  let tolti = 0;
+  for (let t = 0; t < n; t += 3) {
+    const tri = [v(t), v(t + 1), v(t + 2)];
+    if (tri.every(valido)) continue;
+    const buono = tri.find(valido);
+    for (const i of tri) {
+      if (valido(i)) continue;
+      a.setXYZ(i, buono === undefined ? 0 : a.getX(buono), buono === undefined ? 0 : a.getY(buono), buono === undefined ? 0 : a.getZ(buono));
+      tolti += 1;
+    }
+  }
+  for (let i = 0; i < a.count; i++) if (!valido(i)) { a.setXYZ(i, 0, 0, 0); tolti += 1; }
+  a.needsUpdate = true;
+  return tolti;
+}
+
+function cuoci(radice) {
+  radice.updateMatrixWorld(true);
+  const pezzi = [];
+  radice.traverse(o => {
+    if (!o.isMesh) return;
+    const g = o.geometry.clone();
+    g.applyMatrix4(o.matrixWorld);
+    pulisciNaN(g);
+    pezzi.push({ geometria: g, materiale: o.material });
+  });
+  return pezzi;
+}
+
+function misura(pezzi) {
+  const s = new THREE.Box3();
+  for (const p of pezzi) { p.geometria.computeBoundingBox(); s.union(p.geometria.boundingBox); }
+  return s;
+}
+
+function fetta(pezzi, x) {
+  const raggio = new THREE.Raycaster(new THREE.Vector3(x, 50, 0), new THREE.Vector3(0, -1, 0), 0, 100);
+  const mesh = pezzi.map(p => new THREE.Mesh(p.geometria, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })));
+  const colpi = [];
+  for (const dz of [-0.004, 0, 0.004]) {
+    raggio.ray.origin.set(x, 50, dz);
+    for (const c of raggio.intersectObjects(mesh, false)) colpi.push(c.point.y);
+  }
+  colpi.sort((a, b) => b - a);
+  if (!colpi.length) return null;
+  return { max: colpi[0], min: colpi[colpi.length - 1], primi: (colpi[0] + (colpi[1] ?? colpi[0])) / 2 };
+}
+
+function preparaArma(pezzi, lunghezza, [presaDestra, presaSinistra], versoX) {
+  if (versoX < 0) for (const p of pezzi) p.geometria.applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI));
+  let s = misura(pezzi);
+  const k = lunghezza / (s.max.x - s.min.x);
+  for (const p of pezzi) p.geometria.applyMatrix4(new THREE.Matrix4().makeScale(k, k, k));
+  s = misura(pezzi);
+  const L = s.max.x - s.min.x;
+  for (const p of pezzi) p.geometria.applyMatrix4(new THREE.Matrix4().makeTranslation(0, 0, -(s.min.z + s.max.z) / 2));
+  let bocca = null;
+  for (let f = 0.004; !bocca && f < 0.1; f += 0.004) bocca = fetta(pezzi, s.max.x - L * f);
+  const boccaY = bocca.primi;
+  const ox = s.min.x + L * presaDestra;
+  const oy = boccaY - Math.min(0.035, L * 0.12);
+  const oz = 0;
+  const sposta = new THREE.Matrix4().makeRotationY(Math.PI / 2).multiply(new THREE.Matrix4().makeTranslation(-ox, -oy, -oz));
+  const punto = (x, y) => new THREE.Vector3(x - ox, y - oy, 0).applyMatrix4(new THREE.Matrix4().makeRotationY(Math.PI / 2));
+  let presa = null;
+  if (presaSinistra !== null) {
+    for (let d = 0; !presa && d < 0.1; d += 0.01) presa = fetta(pezzi, s.min.x + L * (presaSinistra + d)) ?? fetta(pezzi, s.min.x + L * (presaSinistra - d));
+  }
+  for (const p of pezzi) { p.geometria.applyMatrix4(sposta); p.geometria.deleteAttribute('normal'); }
+  const dati = { lunghezza: Number(L.toFixed(3)), bocca: punto(s.max.x, boccaY).toArray().map(v => +v.toFixed(4)), presa: null };
+  if (presa) dati.presa = punto(s.min.x + L * presaSinistra, presa.min + (presa.max - presa.min) * 0.4).toArray().map(v => +v.toFixed(4));
+  return dati;
+}
+
+async function textureRidotta(url) {
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const c = document.createElement('canvas');
+  c.width = c.height = LATO;
+  c.getContext('2d').drawImage(img, 0, 0, LATO, LATO);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.flipY = false;
+  return t;
+}
+
+async function esporta(oggetto, animazioni = []) {
+  const glb = await new GLTFExporter().parseAsync(oggetto, { binary: true, animations: animazioni, maxTextureSize: LATO });
+  const byte = new Uint8Array(glb);
+  let binario = '';
+  for (let i = 0; i < byte.length; i += 0x8000) binario += String.fromCharCode(...byte.subarray(i, i + 0x8000));
+  return btoa(binario);
+}
+
+async function armiVere() {
+  const radice = new THREE.Scene();
+  const info = {};
+  const materiali = new Map();
+  for (const [prefisso, riferimento, lunghezzaRif] of FAMIGLIE) {
+    const nomi = Object.keys(PRESE).filter(n => n.startsWith(prefisso));
+    const rif = cuoci(await new FBXLoader().loadAsync(ARMI + riferimento + '.fbx'));
+    const sRif = misura(rif);
+    const fattore = lunghezzaRif / (sRif.max.x - sRif.min.x);
+    for (const nome of nomi) {
+      const fbx = await new FBXLoader().loadAsync(ARMI + nome + '.fbx');
+      const pezzi = cuoci(fbx);
+      const s = misura(pezzi);
+      const dati = preparaArma(pezzi, (s.max.x - s.min.x) * fattore, PRESE[nome], 1);
+      const gruppo = new THREE.Group();
+      gruppo.name = nome.replace('Accessories/', '');
+      gruppo.userData = dati;
+      for (const p of pezzi) {
+        const lista = [].concat(p.materiale).map(m => {
+          const chiave = `${m.name}:${m.color.getHexString()}`;
+          if (!materiali.has(chiave)) materiali.set(chiave, new THREE.MeshLambertMaterial({ name: m.name, color: schiarito(m.color) }));
+          return materiali.get(chiave);
+        });
+        gruppo.add(new THREE.Mesh(p.geometria, Array.isArray(p.materiale) ? lista : lista[0]));
+      }
+      radice.add(gruppo);
+      info[gruppo.name] = dati;
+    }
+  }
+  return { info, base64: await esporta(radice) };
+}
+
+async function armiAliene() {
+  const radice = new THREE.Scene();
+  const info = {};
+  const emissivi = {
+    MI_Guns_Batch1: await textureRidotta(ALIENE + 'Textures/T_Guns_Batch1_Emissive.png'),
+    MI_Guns_Batch2: await textureRidotta(ALIENE + 'Textures/T_Guns_Batch2_Emissive.png'),
+  };
+  const basi = {
+    MI_Guns_Batch1: await textureRidotta(ALIENE + 'glTF/T_Guns_Batch1_BaseColor.png'),
+    MI_Guns_Batch2: await textureRidotta(ALIENE + 'glTF/T_Guns_Batch2_BaseColor.png'),
+  };
+  const materiali = Object.fromEntries(Object.keys(basi).map(n => [n, new THREE.MeshStandardMaterial({
+    name: n, map: basi[n], emissiveMap: emissivi[n], emissive: new THREE.Color(0xffffff), roughness: 1, metalness: 0,
+  })]));
+  for (const [nome, [destra, sinistra, lunghezza]] of Object.entries(ALIENE_PRESE)) {
+    const g = await new GLTFLoader().loadAsync(ALIENE + 'glTF/' + nome + '.gltf');
+    const pezzi = cuoci(g.scene);
+    const dati = preparaArma(pezzi, lunghezza, [destra, sinistra], -1);
+    const gruppo = new THREE.Group();
+    gruppo.name = nome;
+    gruppo.userData = dati;
+    for (const p of pezzi) gruppo.add(new THREE.Mesh(p.geometria, materiali[[].concat(p.materiale)[0].name] ?? materiali.MI_Guns_Batch1));
+    radice.add(gruppo);
+    info[nome] = dati;
+  }
+  return { info, base64: await esporta(radice) };
+}
+
+const ANIMAZIONI_UTILI = new Set(['Crawl', 'Death', 'HitReact', 'Idle', 'Punch', 'Run', 'Run_Attack', 'Run_Arms', 'Walk', 'Attack', 'HitReact_Left', 'Eating', 'Idle_Gun', 'Run_Gun', 'Walk_Gun']);
+
+async function zombi(nome) {
+  const g = await new GLTFLoader().loadAsync(nome.includes('/') ? '/_lavoro/scaricati/' + nome + '.gltf' : ZOMBI + nome + '.gltf');
+  g.animations = g.animations.filter(a => ANIMAZIONI_UTILI.has(a.name));
+  const s = new THREE.Box3().setFromObject(g.scene);
+  g.scene.traverse(o => {
+    if (!o.isMesh) return;
+    const nuovi = [].concat(o.material).map(m => new THREE.MeshLambertMaterial({ name: m.name, map: m.map, vertexColors: !!o.geometry.attributes.color }));
+    o.material = Array.isArray(o.material) ? nuovi : nuovi[0];
+  });
+  const info = { altezza: +(s.max.y - s.min.y).toFixed(3), dim: s.getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(3)), animazioni: g.animations.map(a => `${a.name}:${a.duration.toFixed(2)}`) };
+  return { info, base64: await esporta(g.scene, g.animations) };
+}
+
+async function oggetti(nomi) {
+  const radice = new THREE.Scene();
+  const info = {};
+  for (const nome of nomi) {
+    const g = await new GLTFLoader().loadAsync(OGGETTI + nome + '.gltf');
+    const gruppo = new THREE.Group();
+    gruppo.name = nome;
+    for (const p of cuoci(g.scene)) {
+      p.geometria.deleteAttribute('normal');
+      const lista = [].concat(p.materiale).map(m => new THREE.MeshLambertMaterial({ name: m.name, map: m.map, color: m.color }));
+      gruppo.add(new THREE.Mesh(p.geometria, Array.isArray(p.materiale) ? lista : lista[0]));
+    }
+    const s = new THREE.Box3().setFromObject(gruppo);
+    info[nome] = { min: s.min.toArray().map(v => +v.toFixed(2)), dim: s.getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)) };
+    radice.add(gruppo);
+  }
+  return { info, base64: await esporta(radice) };
+}
+
+window.converti = async (cosa, extra) => {
+  if (cosa === 'armi') return armiVere();
+  if (cosa === 'aliene') return armiAliene();
+  if (cosa === 'zombi') return zombi(extra);
+  if (cosa === 'oggetti') return oggetti(extra);
+  throw new Error('sconosciuto ' + cosa);
+};
+window.pronto = true;
+</script>
+</body></html>

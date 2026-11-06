@@ -1,4 +1,4 @@
-import { ARMI, BEVANDE } from './regole.js';
+import { ARMI, BEVANDE, BONUS } from './regole.js';
 
 const $ = id => document.getElementById(id);
 const DURATA_AVVISO_MS = 2200;
@@ -10,6 +10,14 @@ export function creaHud() {
     round: $('round'), punti: $('punti'), nomeArma: $('nome-arma'), munizioni: $('munizioni'), bibite: $('bibite'),
     avviso: $('avviso'), suggerimento: $('suggerimento'), barra: $('barra-rianima'), terra: $('stato-terra'), rete: $('rete'), clicca: $('clicca'),
   };
+  const sala = document.createElement('div');
+  sala.id = 'sala';
+  sala.hidden = true;
+  const effetti = document.createElement('div');
+  effetti.id = 'effetti';
+  n.radice.append(sala, effetti);
+  let chiaveSala = '';
+  let chiaveEffetti = '';
   let scadenzaAvviso = 0;
   let scadenzaSegno = 0;
   let puntiPrima = null;
@@ -93,6 +101,37 @@ export function creaHud() {
       if (morto) n.terra.textContent = 'SEI MORTO — torni al prossimo round';
       n.rete.textContent = rete;
       n.clicca.hidden = bloccato;
+      const inSala = vista.fase === 'attesa';
+      sala.hidden = !inSala;
+      if (inSala) {
+        const conto = vista.conto === null ? null : Math.ceil(vista.conto);
+        const chiave = `${conto}|${vista.giocatori.map(g => `${g.nome}:${g.pronto}`).join()}|${io?.pronto}`;
+        if (chiave !== chiaveSala) {
+          chiaveSala = chiave;
+          const titolo = document.createElement('h3');
+          titolo.textContent = conto === null ? "SALA D'ATTESA" : `SI PARTE TRA ${conto}`;
+          const righe = vista.giocatori.map(g => {
+            const riga = document.createElement('div');
+            riga.className = g.pronto ? 'pronto' : '';
+            riga.textContent = `${g.nome} — ${g.pronto ? 'PRONTO' : 'si sta preparando'}`;
+            return riga;
+          });
+          const nota = document.createElement('p');
+          nota.textContent = io?.pronto ? 'Invio: aspetta, non sono pronto' : 'Prova le armi al muro (F) · INVIO quando sei pronto';
+          sala.replaceChildren(titolo, ...righe, nota);
+        }
+      }
+      const attivi = Object.entries(vista.effetti ?? {}).filter(([, s]) => s > 0);
+      const chiaveAttivi = attivi.map(([t, s]) => `${t}${Math.ceil(s)}`).join();
+      if (chiaveAttivi !== chiaveEffetti) {
+        chiaveEffetti = chiaveAttivi;
+        effetti.replaceChildren(...attivi.map(([tipo, secondi]) => {
+          const chip = document.createElement('span');
+          chip.style.setProperty('--colore', `#${BONUS[tipo].colore.toString(16).padStart(6, '0')}`);
+          chip.textContent = `${BONUS[tipo].simbolo} ${BONUS[tipo].nome} ${Math.ceil(secondi)}`;
+          return chip;
+        }));
+      }
     },
   };
 }

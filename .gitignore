@@ -1,3 +1,11 @@
 node_modules/
 dist/
-_lavoro/
+_lavoro/*
+!_lavoro/package.json
+!_lavoro/collaudo.mjs
+!_lavoro/vetrina3.mjs
+!_lavoro/mani.mjs
+!_lavoro/foglio.mjs
+!_lavoro/converti-tutto.mjs
+!_lavoro/esegui-conversione.mjs
+!_lavoro/converti/

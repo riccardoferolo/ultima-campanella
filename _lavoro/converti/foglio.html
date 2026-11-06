@@ -1,0 +1,88 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>foglio</title></head>
+<body style="margin:0;background:#ddd">
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+const ARMI = '/_lavoro/scaricati/armi/estratti/Ultimate Gun Pack - July 2019/FBX/';
+const ALIENE = '/_lavoro/scaricati/scifi/estratti/glTF/';
+const SCHIARISCI = 5.2;
+
+function schiarito(colore) {
+  const c = colore.clone().convertLinearToSRGB();
+  c.r = Math.min(1, c.r * SCHIARISCI);
+  c.g = Math.min(1, c.g * SCHIARISCI);
+  c.b = Math.min(1, c.b * SCHIARISCI);
+  return c.convertSRGBToLinear();
+}
+
+async function caricaArma(nome) {
+  if (nome.startsWith('Gun_')) {
+    const g = await new GLTFLoader().loadAsync(ALIENE + nome + '.gltf');
+    return g.scene;
+  }
+  const o = await new FBXLoader().loadAsync(ARMI + nome + '.fbx');
+  o.traverse(m => {
+    if (!m.isMesh) return;
+    const nuovi = [].concat(m.material).map(x => new THREE.MeshLambertMaterial({ name: x.name, color: schiarito(x.color), flatShading: true }));
+    m.material = Array.isArray(m.material) ? nuovi : nuovi[0];
+  });
+  return o;
+}
+
+function etichetta(testo, colore = '#000') {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 40;
+  const x = c.getContext('2d');
+  x.fillStyle = colore; x.font = 'bold 26px sans-serif'; x.fillText(testo, 2, 30);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+  s.scale.set(0.64, 0.1, 1);
+  return s;
+}
+
+window.foglio = async (nomi, colonne, vista) => {
+  const scena = new THREE.Scene();
+  scena.background = new THREE.Color(0xdddddd);
+  scena.add(new THREE.HemisphereLight(0xffffff, 0x666666, 2.2));
+  const sole = new THREE.DirectionalLight(0xffffff, 1.5);
+  sole.position.set(0, 2, 5);
+  scena.add(sole);
+  const righe = Math.ceil(nomi.length / colonne);
+  for (let i = 0; i < nomi.length; i++) {
+    const o = await caricaArma(nomi[i]);
+    const contenitore = new THREE.Group();
+    contenitore.add(o);
+    if (vista === 'alto') o.rotation.x = Math.PI / 2;
+    const s = new THREE.Box3().setFromObject(contenitore);
+    const dim = s.getSize(new THREE.Vector3());
+    const k = 1.8 / dim.x;
+    contenitore.scale.setScalar(k);
+    const centro = s.getCenter(new THREE.Vector3()).multiplyScalar(k);
+    const cx = (i % colonne) * 2.2 - (colonne - 1) * 1.1;
+    const cy = -Math.floor(i / colonne) * 1.3 + (righe - 1) * 0.65;
+    contenitore.position.set(cx - centro.x, cy - centro.y, 0);
+    scena.add(contenitore);
+    for (let t = 0; t <= 10; t++) {
+      const tacca = new THREE.Mesh(new THREE.BoxGeometry(0.006, t % 5 === 0 ? 0.12 : 0.06, 0.01), new THREE.MeshBasicMaterial({ color: t % 5 === 0 ? 0xff0000 : 0x0000ff }));
+      tacca.position.set(cx - 0.9 + t * 0.18, cy - dim.y * k / 2 - 0.08, 0.5);
+      scena.add(tacca);
+    }
+    const nome = etichetta(`${i} ${nomi[i]}`);
+    nome.position.set(cx - 0.5, cy + 0.55, 0.5);
+    scena.add(nome);
+  }
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  const larghezza = colonne * 2.2;
+  const altezza = righe * 1.3;
+  renderer.setSize(colonne * 330, righe * 195);
+  document.body.appendChild(renderer.domElement);
+  const camera = new THREE.OrthographicCamera(-larghezza / 2, larghezza / 2, altezza / 2, -altezza / 2, 0.1, 100);
+  camera.position.set(0, 0, 10);
+  renderer.render(scena, camera);
+  return renderer.domElement.toDataURL('image/png');
+};
+window.pronto = true;
+</script>
+</body></html>

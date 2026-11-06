@@ -1,5 +1,5 @@
 import './stile.css';
-import { R, ARMI, BEVANDE, COLTELLO } from './regole.js';
+import { R, ARMI, BEVANDE, BONUS, COLTELLO } from './regole.js';
 import { semeCasuale } from './caso.js';
 import { MURI, OSTACOLI, PORTE, ACQUISTI, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
 import { muoviCerchio } from './fisica.js';
@@ -203,7 +203,7 @@ function iniziaPartita(seme, daClic = false) {
   if (s.sonoHost) {
     const giocatori = [{ id: s.mioId, nome: s.nome }];
     if (s.idAltro && collegato()) giocatori.push({ id: s.idAltro, nome: s.nomeAltro });
-    s.partita = creaPartita({ seme, giocatori });
+    s.partita = creaPartita({ seme, giocatori, sala: true });
   }
   mostraSchermata(null);
   hud.mostra(true);
@@ -246,7 +246,26 @@ function suEventi(eventi) {
     switch (e.k) {
       case 'round': audio.suona('round'); hud.avviso(`Round ${e.round}`); break;
       case 'fineRound': audio.suona('fineRound'); break;
-      case 'ucciso': mondo.effetti.macchia(e.x, e.z); break;
+      case 'ucciso':
+        mondo.effetti.macchia(e.x, e.z);
+        if (e.bomba) mondo.effetti.esplosione({ x: e.x, y: 1, z: e.z }, 'fuoco');
+        break;
+      case 'via': azzera(arsenale); audio.suona('round'); hud.avviso('Si comincia! Restate vicini', 'bene'); break;
+      case 'conto': audio.suona('conto'); break;
+      case 'contoAnnullato': hud.avviso('Partenza annullata: qualcuno non è pronto'); break;
+      case 'bonusCompare': audio.suona('bonusCompare'); break;
+      case 'bonus':
+        audio.suona(e.tipo === 'bomba' ? 'bomba' : 'bonus');
+        hud.avviso(`${BONUS[e.tipo].nome} — ${BONUS[e.tipo].descrizione}`, 'bene');
+        if (e.tipo === 'munizioni') arsenale.armi.forEach(a => riempi(arsenale, a.tipo));
+        break;
+      case 'frammento': audio.suona('frammento'); hud.avviso(`Frammento di meteorite ${e.trovati}/${e.totale}`, 'bene'); break;
+      case 'segreto': audio.suona('segreto'); hud.avviso('La meteorite si risveglia: avete il Disintegratore!', 'bene'); break;
+      case 'campanella':
+        audio.suona('campanella');
+        mondo.campanella();
+        if (e.regalo) hud.avviso("L'ultima campanella vi ha lasciato un regalo…", 'bene');
+        break;
       case 'assaRotta': audio.suona('assaRotta'); break;
       case 'assaMessa': audio.suona('assaMessa'); break;
       case 'porta': audio.suona('porta'); hud.avviso('Porta aperta', 'bene'); break;
@@ -424,12 +443,13 @@ function sparaColpo(arma, vista) {
   const colpiti = new Map();
   for (let i = 0; i < arma.pallini; i++) {
     const d = disperdi(centro, arma.dispersione * (io.inMira ? 0.4 : 1) * (io.movimento ? 1.6 : 1), Math.random);
-    const colpo = colpisciZombie(origine, d, bersagli, ostacoli, arma.esplosione ? PORTATA_RAGGI : Infinity);
+    const colpo = colpisciZombie(origine, d, bersagli, ostacoli, arma.portata ?? (arma.esplosione ? PORTATA_RAGGI : Infinity));
+    if (arma.fiamma) mondo.effetti.fiamma(mondo.bocca(), d, arma.colore);
     if (!Number.isFinite(colpo.t)) continue;
     const punto = { x: origine.x + d.x * colpo.t, y: origine.y + d.y * colpo.t, z: origine.z + d.z * colpo.t };
     if (arma.esplosione) {
-      mondo.raggio(punto);
-      mondo.effetti.esplosione(punto);
+      mondo.raggio(punto, arma.colore ?? undefined);
+      mondo.effetti.esplosione(punto, arma.esplosione.tipo, arma.esplosione.colore ?? arma.colore ?? null);
       for (const { id, fattore } of esplosione(punto, bersagli, arma.esplosione.raggio)) {
         if (id === colpo.id) continue;
         const somma = colpiti.get(id) ?? { danno: 0, testa: false };
@@ -458,7 +478,9 @@ function usaArmi(lettura, me, vista, dt) {
   if (aggiornaArsenale(arsenale, dt)) audio.suona('ricarica');
   if (me.stato !== 'vivo' || s.fase !== 'gioco') return;
   for (const azione of lettura.azioni) {
-    if (azione === 'ricarica' && ricarica(arsenale, me.bevande)) audio.suona('ricarica');
+    if (azione === 'pronto') {
+      if (vista.fase === 'attesa') inviaAzione({ tipo: 'pronto', attivo: !me.pronto });
+    } else if (azione === 'ricarica' && ricarica(arsenale, me.bevande)) audio.suona('ricarica');
     else if (azione === 'cambia') cambia(arsenale);
     else if (azione?.arma !== undefined) cambia(arsenale, azione.arma);
     else if (azione === 'coltello' && coltellata(arsenale)) {
@@ -485,6 +507,7 @@ function usaArmi(lettura, me, vista, dt) {
   }
   const colpo = spara(arsenale);
   if (!colpo) return;
+  if (vista.effetti?.infinite > 0) armaAttiva(arsenale).caricatore += 1;
   sparaColpo(colpo, vista);
   if (armaAttiva(arsenale).caricatore === 0) ricarica(arsenale, me.bevande);
 }
@@ -504,6 +527,10 @@ function interagisci(lettura, me, vista) {
       inviaAzione({ tipo: 'compra', acquisto: interazione.acquisto, arma: armaAttiva(arsenale).tipo });
       locale.ultimoAcquisto = { id: interazione.acquisto, quando: oraS };
     }
+  }
+  if (lettura.fPremuto && (interazione.tipo === 'prova' || interazione.tipo === 'frammento') && !ripetuto) {
+    inviaAzione(interazione.tipo === 'prova' ? { tipo: 'prova', arma: interazione.arma } : { tipo: 'frammento', id: interazione.id });
+    locale.ultimoAcquisto = { id: interazione.acquisto, quando: oraS };
   }
   if (lettura.f && interazione.tipo === 'rianima' && !locale.inRianimazione) {
     inviaAzione({ tipo: 'rianima', attivo: true });
@@ -532,9 +559,11 @@ function suoniAmbiente(vista, dt) {
 }
 
 let ultimoFotogramma = performance.now();
+let fps = 60;
 function ciclo(ora) {
   const dt = Math.min(0.1, (ora - ultimoFotogramma) / 1000);
   ultimoFotogramma = ora;
+  if (dt > 0) fps += (1 / dt - fps) * 0.05;
   if ((s.fase === 'gioco' || s.fase === 'fine') && mondo) {
     const vista = s.sonoHost ? (s.partita ? espandi(faiIstantanea(s.partita)) : null) : vistaOspite(ora);
     const me = vista?.giocatori.find(g => g.id === s.mioId);
@@ -546,6 +575,7 @@ function ciclo(ora) {
       comandi.applicaVista(io);
       muovi(lettura, me, dt);
       usaArmi(lettura, me, vista, dt);
+      if (vista.fase === 'attesa') for (const a of arsenale.armi) a.riserva = ARMI[a.tipo].riserva;
       const interazione = interagisci(lettura, me, vista);
       suoniAmbiente(vista, dt);
       const ferito = vista.giocatori.find(g => g.id !== s.mioId && g.stato === 'terra');
@@ -559,7 +589,7 @@ function ciclo(ora) {
       hud.aggiorna({
         vista, mioId: s.mioId, arma: armaAttiva(arsenale), suggerimento: interazione?.testo ?? null,
         rianimazione: locale.inRianimazione && ferito ? ferito.progressoRianimazione / (me.bevande.includes('ritorno') ? R.RIANIMA_RAPIDO : R.RIANIMA_IN) : null,
-        inMira: io.inMira, cannocchiale, bloccato: comandi.bloccato || s.fase !== 'gioco', rete: testoRete(),
+        inMira: io.inMira, cannocchiale, bloccato: comandi.bloccato || s.fase !== 'gioco', rete: [testoRete(), `${Math.round(fps)} fps`].filter(Boolean).join(' · '),
         apertura: 6 + (io.movimento ? 6 : 0) + (io.corsa ? 8 : 0) - (io.inMira ? 4 : 0),
       });
     }
@@ -634,7 +664,7 @@ creaMondo($('mondo')).then(m => {
 
 if (import.meta.env.DEV) {
   window.__gioco = {
-    stato: () => ({ fase: s.fase, mioId: s.mioId, modo: s.coll?.modo ?? null, vista: s.vista, io: { ...io }, arma: { ...armaAttiva(arsenale) }, armi: arsenale.armi.map(a => a.tipo), nomeAltro: s.nomeAltro, buffer: s.buffer.length }),
+    stato: () => ({ fps: Math.round(fps), fase: s.fase, mioId: s.mioId, modo: s.coll?.modo ?? null, vista: s.vista, io: { ...io }, arma: { ...armaAttiva(arsenale) }, armi: arsenale.armi.map(a => a.tipo), nomeAltro: s.nomeAltro, buffer: s.buffer.length }),
     partita: () => s.partita,
     puntaA(x, y, z) {
       io.yaw = Math.atan2(x - io.x, z - io.z);
@@ -647,6 +677,7 @@ if (import.meta.env.DEV) {
     spara() {
       locale.sparoForzato = true;
     },
+    azione: a => inviaAzione(a),
     pronto: () => mondo !== null,
   };
 }

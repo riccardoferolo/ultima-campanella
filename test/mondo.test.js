@@ -70,7 +70,7 @@ test('con la porta chiusa il corridoio non si raggiunge, aperta sì', () => {
 
 test('ogni zona è raggiungibile dalle sue finestre con tutte le porte aperte', () => {
   const tutte = new Set(PORTE.map(p => p.id));
-  for (const zona of ZONE) {
+  for (const zona of ZONE.filter(z => !z.sala)) {
     const campo = campoVerso(griglia(tutte), [{ x: (zona.x0 + zona.x1) / 2, z: (zona.z0 + zona.z1) / 2 }]);
     for (const f of FINESTRE) assert.ok(Number.isFinite(distanzaCampo(campo, f.interno.x, f.interno.z)), `${f.id} → ${zona.id}`);
   }

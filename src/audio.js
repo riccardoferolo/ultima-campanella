@@ -1,12 +1,16 @@
+import { ARMI } from './regole.js';
+
 const VOLUME = 0.5;
 const SPARI = Object.freeze({
   pistola: { durata: 0.18, filtro: 1800, volume: 0.6, botto: 110 },
+  revolver: { durata: 0.3, filtro: 1300, volume: 0.85, botto: 75 },
   pompa: { durata: 0.45, filtro: 900, volume: 1, botto: 60 },
   mitra: { durata: 0.12, filtro: 2200, volume: 0.45, botto: 130 },
   assalto: { durata: 0.16, filtro: 1500, volume: 0.6, botto: 90 },
+  battaglia: { durata: 0.22, filtro: 1250, volume: 0.75, botto: 80 },
   mitragliatrice: { durata: 0.2, filtro: 1100, volume: 0.7, botto: 70 },
   precisione: { durata: 0.6, filtro: 2600, volume: 1, botto: 55 },
-  raggi: { durata: 0.3, filtro: 3000, volume: 0.35, botto: 0, raggio: true },
+  aliena: { durata: 0.3, filtro: 3000, volume: 0.35, botto: 0, raggio: true },
 });
 
 export function creaAudio() {
@@ -100,6 +104,13 @@ export function creaAudio() {
     corrente: () => { nota(60, { durata: 0.25, tipo: 'square', volume: 0.4 }); nota(110, { durata: 2.2, tipo: 'sawtooth', volume: 0.12, ritardo: 0.2, scendi: 120 }); soffio({ durata: 0.6, da: 2000, a: 200, volume: 0.4 }); },
     potenzia: () => { for (let i = 0; i < 6; i++) nota(220 + i * 70, { durata: 0.45, tipo: 'sawtooth', volume: 0.08, ritardo: i * 0.45 }); soffio({ durata: 3, da: 300, a: 2000, tipo: 'bandpass', volume: 0.3 }); },
     potenziata: () => { [392, 523, 659, 1046].forEach((f, i) => nota(f, { durata: 0.4, tipo: 'triangle', volume: 0.22, ritardo: i * 0.09 })); },
+    conto: () => nota(660, { durata: 0.15, tipo: 'square', volume: 0.15 }),
+    bonusCompare: () => { [1046, 1318].forEach((f, i) => nota(f, { durata: 0.25, tipo: 'sine', volume: 0.15, ritardo: i * 0.1 })); },
+    bonus: () => { [523, 784, 1046, 1568].forEach((f, i) => nota(f, { durata: 0.35, tipo: 'triangle', volume: 0.2, ritardo: i * 0.08 })); soffio({ durata: 0.8, da: 4000, a: 600, tipo: 'bandpass', volume: 0.25 }); },
+    bomba: () => { nota(45, { durata: 2.5, tipo: 'sawtooth', volume: 0.5, scendi: 25 }); soffio({ durata: 2.5, da: 1500, a: 60, volume: 1 }); },
+    frammento: () => { [1568, 2093, 2637].forEach((f, i) => nota(f, { durata: 0.6, tipo: 'sine', volume: 0.12, ritardo: i * 0.15 })); },
+    segreto: () => { [262, 330, 392, 523, 392, 523, 659, 784, 1046].forEach((f, i) => nota(f, { durata: 0.5, tipo: 'triangle', volume: 0.16, ritardo: i * 0.18 })); soffio({ durata: 3, da: 200, a: 3000, tipo: 'bandpass', volume: 0.3 }); },
+    campanella: () => { for (let i = 0; i < 6; i++) { nota(1175, { durata: 0.5, tipo: 'sine', volume: 0.18, ritardo: i * 0.16 }); nota(1760, { durata: 0.3, tipo: 'sine', volume: 0.08, ritardo: i * 0.16 }); } },
     fine: () => { [196, 165, 131, 98].forEach((f, i) => nota(f, { durata: 1.2, tipo: 'sawtooth', volume: 0.18, ritardo: i * 0.6 })); },
   };
 
@@ -110,7 +121,7 @@ export function creaAudio() {
     },
     sparo(arma, distanza = 0, angolo = 0) {
       if (!pronto()) return;
-      const s = SPARI[arma.replace(/\+$/, '')] ?? SPARI.pistola;
+      const s = SPARI[ARMI[arma]?.famiglia] ?? SPARI.pistola;
       const destinazione = distanza > 0 ? spazio(distanza, angolo) : uscita;
       if (s.raggio) {
         nota(1400, { durata: s.durata, tipo: 'square', volume: 0.12, scendi: 180, destinazione });

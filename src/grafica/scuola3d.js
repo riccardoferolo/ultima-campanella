@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { R, ARMI, BEVANDE } from '../regole.js';
 import { ALTEZZA_SOFFITTO, ZONE, MURI, RECINZIONI, ALTEZZA_RECINZIONE, OSTACOLI, FINESTRE, PORTE, ACQUISTI } from '../mappa.js';
-import { texturaTesto, texturaGesso } from './texture.js';
+import { texturaTesto } from './texture.js';
 import { modelloArma } from './armi3d.js';
 import { creaCaso } from './caso-grafica.js';
 
@@ -49,18 +49,11 @@ function piano(scena, materiale, x0, z0, x1, z1, y, metri, sotto = false) {
   return mesh;
 }
 
-const SAGOME = {
-  pompa: ctx => { ctx.rect(14, 18, 88, 8); ctx.rect(90, 22, 26, 14); ctx.rect(34, 26, 22, 6); },
-  precisione: ctx => { ctx.rect(8, 20, 100, 6); ctx.rect(40, 10, 34, 8); ctx.rect(96, 22, 24, 14); ctx.rect(70, 26, 6, 10); },
-  mitra: ctx => { ctx.rect(30, 14, 60, 14); ctx.rect(48, 28, 8, 16); ctx.rect(76, 28, 8, 10); ctx.rect(18, 18, 12, 4); },
-  assalto: ctx => { ctx.rect(14, 16, 70, 10); ctx.rect(84, 16, 30, 14); ctx.rect(50, 26, 8, 16); ctx.rect(70, 26, 6, 8); },
-};
-
 function orientamento(mesh, verso) {
   mesh.rotation.y = Math.atan2(verso.x, verso.z);
 }
 
-export function costruisciScuola(scena, texture, materialiArmi) {
+export function costruisciScuola(scena, texture, materialiArmi, oggetti) {
   const mat = {
     muro: new THREE.MeshLambertMaterial({ map: texture.muro }),
     soffitto: new THREE.MeshLambertMaterial({ map: texture.soffitto }),
@@ -185,12 +178,20 @@ export function costruisciScuola(scena, texture, materialiArmi) {
   for (const a of ACQUISTI) {
     const { x, z } = a.posizione;
     if (a.tipo === 'arma') {
-      const gesso = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.7), new THREE.MeshBasicMaterial({
-        map: texturaGesso(SAGOME[a.arma], [ARMI[a.arma].nome.toUpperCase(), `${a.costo}`]), transparent: true,
+      const supporto = new THREE.Group();
+      supporto.position.set(x, 0, z);
+      orientamento(supporto, a.verso);
+      const { gruppo, lunghezza } = modelloArma(a.arma, materialiArmi);
+      gruppo.rotation.y = Math.PI / 2;
+      gruppo.position.set(-lunghezza * 0.12, 1.55, 0.08);
+      const cornice = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(0.7, lunghezza + 0.25), 0.62), new THREE.MeshLambertMaterial({ map: texture.pannello }));
+      cornice.position.set(0, 1.5, 0.012);
+      const gesso = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.22), new THREE.MeshBasicMaterial({
+        map: texturaTesto([ARMI[a.arma].nome.toUpperCase(), `${a.costo}`], { larghezza: 160, altezza: 36, colore: '#ecebe2', font: 'bold 12px monospace' }), transparent: true,
       }));
-      gesso.position.set(x + a.verso.x * 0.01, 1.5, z + a.verso.z * 0.01);
-      orientamento(gesso, a.verso);
-      scena.add(gesso);
+      gesso.position.set(0, 1.08, 0.015);
+      supporto.add(cornice, gruppo, gesso);
+      scena.add(supporto);
     } else if (a.tipo === 'bevanda') {
       const bevanda = BEVANDE[a.bevanda];
       const macchina = new THREE.Group();
@@ -240,15 +241,12 @@ export function costruisciScuola(scena, texture, materialiArmi) {
 
   const cassaDati = ACQUISTI.find(a => a.tipo === 'cassa');
   const cassa = new THREE.Group();
-  const fondo = new THREE.Mesh(scatolaUV(1.1, 0.55, 0.6, 0.6), mat.legnoChiaro);
-  fondo.position.y = 0.28;
+  const fondo = oggetti.get('Chest_Special').clone();
+  fondo.scale.setScalar(1.35);
   const perno = new THREE.Group();
   perno.position.set(0, 0.56, -0.3);
-  const coperchio = new THREE.Mesh(scatolaUV(1.12, 0.08, 0.62, 0.6), mat.legnoChiaro);
-  coperchio.position.set(0, 0, 0.3);
-  perno.add(coperchio);
-  const punto = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), new THREE.MeshBasicMaterial({ map: texturaTesto(['?'], { larghezza: 32, altezza: 32, colore: '#7dd3fc', font: 'bold 28px monospace' }), transparent: true }));
-  punto.position.set(0, 0.3, 0.31);
+  const punto = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshBasicMaterial({ map: texturaTesto(['?'], { larghezza: 32, altezza: 32, colore: '#7dd3fc', font: 'bold 28px monospace' }), transparent: true }));
+  punto.position.set(0, 0.85, 0.05);
   const alone = new THREE.PointLight(0x7dd3fc, 0, 4, 1.5);
   alone.position.set(0, 1, 0.3);
   cassa.add(fondo, perno, punto, alone);

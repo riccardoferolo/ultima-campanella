@@ -23,7 +23,10 @@ const TIPI = {
   polvere: { colore: 0x8c8270, vita: 0.7, gravita: 0.4, dimensione: 0.18, sparsa: 0.8, additivo: false },
   legno: { colore: 0x6b4a2b, vita: 0.9, gravita: -8, dimensione: 0.1, sparsa: 2.5, additivo: false },
   energia: { colore: 0x5fe9ff, vita: 0.45, gravita: 0.5, dimensione: 0.28, sparsa: 4, additivo: true },
+  fuoco: { colore: 0xff8a2a, vita: 0.55, gravita: 1.2, dimensione: 0.34, sparsa: 3.5, additivo: true },
+  fiamma: { colore: 0xff7a1a, vita: 0.35, gravita: 1.5, dimensione: 0.22, sparsa: 0.6, additivo: true },
 };
+const COLORI_ESPLOSIONE = Object.freeze({ energia: 0x5fe9ff, fuoco: 0xff8a2a, fulmine: 0xd8f0ff });
 const DURATA_RAGGIO = 0.14;
 const DURATA_LAMPO = 0.18;
 const INTENSITA_LAMPO = 25;
@@ -46,7 +49,7 @@ export function creaEffetti(scena) {
   const geometriaMacchia = new THREE.CircleGeometry(0.35, 6).rotateX(-Math.PI / 2);
   const materialeMacchia = new THREE.MeshBasicMaterial({ color: 0x4a0606, transparent: true, opacity: 0.85, depthWrite: false });
 
-  function emetti(nome, punto, quante, verso = null) {
+  function emetti(nome, punto, quante, verso = null, colore = null, spinta = 0.6) {
     const tipo = TIPI[nome];
     for (let i = 0; i < quante && libere.length; i++) {
       const p = libere.pop();
@@ -54,9 +57,9 @@ export function creaEffetti(scena) {
       p.vita = 0;
       p.durata = tipo.vita * (0.6 + Math.random() * 0.8);
       p.velocita.set((Math.random() - 0.5) * tipo.sparsa, Math.random() * tipo.sparsa * 0.6, (Math.random() - 0.5) * tipo.sparsa);
-      if (verso) p.velocita.addScaledVector(verso, tipo.sparsa * 0.6);
+      if (verso) p.velocita.addScaledVector(verso, tipo.sparsa * spinta);
       p.sprite.position.copy(punto);
-      p.sprite.material.color.setHex(tipo.colore);
+      p.sprite.material.color.setHex(colore ?? tipo.colore);
       p.sprite.material.blending = tipo.additivo ? THREE.AdditiveBlending : THREE.NormalBlending;
       p.sprite.scale.setScalar(tipo.dimensione);
       p.sprite.visible = true;
@@ -75,16 +78,22 @@ export function creaEffetti(scena) {
     schegge(punto) {
       emetti('legno', punto, 10);
     },
-    raggio(da, a) {
+    raggio(da, a, colore = 0x7ef0ff) {
       const geometria = new THREE.BufferGeometry().setFromPoints([da, a]);
-      const linea = new THREE.Line(geometria, new THREE.LineBasicMaterial({ color: 0x7ef0ff, transparent: true, blending: THREE.AdditiveBlending }));
+      const linea = new THREE.Line(geometria, new THREE.LineBasicMaterial({ color: colore, transparent: true, blending: THREE.AdditiveBlending }));
       scena.add(linea);
       raggi.push({ linea, vita: DURATA_RAGGIO });
     },
-    esplosione(punto) {
-      emetti('energia', punto, 22);
+    esplosione(punto, tipo = 'energia', colore = null) {
+      const tinta = colore ?? COLORI_ESPLOSIONE[tipo] ?? COLORI_ESPLOSIONE.energia;
+      emetti(tipo === 'fuoco' ? 'fuoco' : 'energia', punto, tipo === 'fuoco' ? 30 : 22, null, tinta);
+      if (tipo === 'fuoco') emetti('polvere', punto, 8);
+      lampoEsplosione.color.setHex(tinta);
       lampoEsplosione.position.copy(punto);
       tempoLampo = DURATA_LAMPO;
+    },
+    fiamma(da, verso, colore) {
+      emetti('fiamma', da, 4, verso, colore, 6);
     },
     macchia(x, z) {
       const mesh = macchie.length >= MACCHIE_MASSIME ? macchie.shift() : new THREE.Mesh(geometriaMacchia, materialeMacchia);

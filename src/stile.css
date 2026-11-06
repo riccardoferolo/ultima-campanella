@@ -180,3 +180,18 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 .clicca { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; background: rgba(0, 0, 0, 0.5); gap: 6px; }
 .clicca b { font-size: 46px; font-weight: 400; font-family: 'Creepster', cursive; color: var(--oro); }
 .clicca[hidden] { display: none; }
+
+#sala {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  min-width: 340px; padding: 10px 18px 12px; text-align: center;
+  background: rgba(8, 12, 14, 0.78); border: 1px solid rgba(47, 183, 160, 0.6); border-radius: 6px;
+  font-size: 22px; line-height: 1.15;
+}
+#sala h3 { margin: 0 0 6px; font-family: 'Creepster', 'VT323', cursive; font-weight: 400; font-size: 34px; color: #7ff0d6; letter-spacing: 0.06em; }
+#sala .pronto { color: var(--verde); }
+#sala p { margin: 8px 0 0; color: var(--tenue); font-size: 19px; }
+#effetti { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+#effetti span {
+  padding: 2px 10px; border: 1px solid var(--colore); border-radius: 4px; color: var(--colore);
+  background: rgba(0, 0, 0, 0.55); font-size: 21px; white-space: nowrap;
+}

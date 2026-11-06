@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><script type="module">
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+window.ispeziona = async () => {
+  const g = await new GLTFLoader().loadAsync('/public/modelli/zombie.glb');
+  const ossa = []; g.scene.traverse(o => { if (o.isBone) ossa.push(o.name); });
+  const clip = g.animations.map(a => ({ nome: a.name, tracce: a.tracks.length, prime: a.tracks.slice(0, 3).map(t => t.name) }));
+  const f = await new FBXLoader().loadAsync('/_lavoro/scaricati/estratti/' + encodeURIComponent('Zombie Walk.fbx'));
+  const m = await new FBXLoader().loadAsync('/_lavoro/scaricati/estratti/InfectedCityMan.fbx');
+  const ossaM = []; m.traverse(o => { if (o.isBone) ossaM.push(o.name); });
+  return { ossaGlb: ossa.slice(0, 6), nOssa: ossa.length, clip, fbxTracce: f.animations[0].tracks.slice(0, 4).map(t => t.name), ossaFbxModello: ossaM.slice(0, 6), animModello: m.animations.map(a => [a.name, a.tracks.length, a.tracks.slice(0,2).map(t=>t.name)]) };
+};
+window.pronto = true;
+</script></body></html>

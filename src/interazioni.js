@@ -1,13 +1,31 @@
 import { R, ARMI, BEVANDE, armaBase, versionePotenziata } from './regole.js';
-import { FINESTRE, PORTE, ACQUISTI, zoneAperte } from './mappa.js';
+import { FINESTRE, PORTE, ACQUISTI, RASTRELLIERA, FRAMMENTI, zoneAperte } from './mappa.js';
 
 const distanza = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
+function provaInSala(io) {
+  let migliore = null;
+  for (const posto of RASTRELLIERA) {
+    const d = distanza(posto, io);
+    if (d <= R.DISTANZA_PROVA && (!migliore || d < migliore.d)) migliore = { d, posto };
+  }
+  if (!migliore) return null;
+  const arma = migliore.posto.arma;
+  const inMano = io.armi.includes(arma);
+  return { tipo: 'prova', arma, acquisto: `prova:${arma}`, testo: inMano ? `${ARMI[arma].nome}: ce l'hai già` : `Premi F per provare: ${ARMI[arma].nome}` };
+}
+
 export function interazioneVicina(io, vista) {
+  if (vista.fase === 'attesa') return provaInSala(io);
   const compagno = vista.giocatori.find(g => g.id !== io.id && g.stato === 'terra' && distanza(g, io) <= R.RIANIMA_DISTANZA);
   if (compagno) return { tipo: 'rianima', testo: `Tieni premuto F per rianimare ${compagno.nome}`, bersaglio: compagno.id };
 
   const candidati = [];
+  for (const f of FRAMMENTI) {
+    if (vista.frammenti?.includes(f.id)) continue;
+    const d = distanza(f, io);
+    if (d <= R.DISTANZA_FRAMMENTO) candidati.push({ d: d - 1, tipo: 'frammento', id: f.id, acquisto: `frammento:${f.id}`, testo: 'Premi F per raccogliere lo strano frammento luminoso' });
+  }
   for (const porta of PORTE) {
     if (vista.porte.has(porta.id)) continue;
     const d = distanza(porta.centro, io);
@@ -54,8 +72,10 @@ function descrivi(a, io, vista) {
     return vista.corrente ? { costo: Infinity, testo: 'La corrente è accesa' } : { costo: 0, testo: 'Premi F per accendere la corrente' };
   }
   if (a.tipo === 'potenziatore') return descriviPotenziatore(io, vista);
+  if (a.tipo === 'campanella') return { costo: 0, testo: 'Premi F per suonare la vecchia campanella' };
   const cassa = vista.cassa;
   if (cassa.stato === 'aperta' && cassa.per === io.id) return { costo: 0, testo: `Premi F per prendere: ${ARMI[cassa.arma].nome}` };
   if (cassa.stato === 'aperta') return { costo: Infinity, testo: 'La cassa è occupata' };
-  return { costo: R.COSTO_CASSA, testo: `Premi F per la cassa a sorpresa [${R.COSTO_CASSA}]` };
+  const costo = vista.effetti?.saldi > 0 ? R.COSTO_CASSA_SALDI : R.COSTO_CASSA;
+  return { costo, testo: `Premi F per la cassa a sorpresa [${costo}]${costo < R.COSTO_CASSA ? ' SALDI!' : ''}` };
 }

@@ -3,20 +3,28 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { TESTA } from '../colpi.js';
 
-const SCALA = 0.01;
 const DISSOLVENZA = 0.25;
 const AFFONDA_DOPO = 2.6;
+const SCALA_QUATERNIUS = 1.32;
 const VARIANTI = Object.freeze([
   { tinta: 0xffffff, scala: 1 },
   { tinta: 0xa9c79a, scala: 0.95 },
   { tinta: 0xd9c3c3, scala: 1.06 },
   { tinta: 0x8a7f78, scala: 1.02 },
 ]);
-const VELOCITA_ANIMAZIONE = Object.freeze({ cammina: 1, cammina2: 0.9, corre: 1.05, attacco: 1.6, attacco2: 1.7, muore: 1.2, fermo: 1, urla: 1.3 });
+const CLIP_QUATERNIUS = Object.freeze({ cammina: 'Walk', corre: 'Run', attacco: 'Punch', attacco2: 'Run_Attack', muore: 'Death', fermo: 'Idle' });
+const MODELLI = Object.freeze({
+  normale: { url: './modelli/zombie.glb', scala: 0.01, varianti: true, clip: { cammina: 'cammina', cammina2: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' }, velocita: { cammina: 1, cammina2: 0.9, corre: 1.05, attacco: 1.6, attacco2: 1.7, muore: 1.2, fermo: 1 } },
+  base: { url: './modelli/zombi_base.glb', scala: SCALA_QUATERNIUS, clip: CLIP_QUATERNIUS, velocita: { cammina: 0.9, corre: 1, attacco: 1.2 } },
+  grasso: { url: './modelli/zombi_grasso.glb', scala: SCALA_QUATERNIUS * 1.05, clip: CLIP_QUATERNIUS, velocita: { cammina: 0.7, corre: 0.8, attacco: 1 }, raggio: 0.45, alto: 1.55 },
+  scheletro: { url: './modelli/zombi_scheletro.glb', scala: SCALA_QUATERNIUS, clip: { cammina: 'Crawl', corre: 'Crawl', attacco: 'HitReact', attacco2: 'HitReact', muore: 'Death', fermo: 'Idle' }, velocita: { cammina: 1.6, corre: 2.2 }, alto: 0.9, testa: 0.75 },
+  braccio: { url: './modelli/zombi_braccio.glb', scala: SCALA_QUATERNIUS, clip: { ...CLIP_QUATERNIUS, corre: 'Run_Arms' }, velocita: { cammina: 0.9, corre: 1, attacco: 1.1 } },
+  cane: { url: './modelli/cane.glb', scala: 1.05, clip: { cammina: 'Walk', corre: 'Run', attacco: 'Attack', attacco2: 'Attack', muore: 'Death', fermo: 'Idle' }, velocita: { corre: 1.1, attacco: 1.5 }, alto: 0.8, testa: 0.7, raggio: 0.3 },
+  manichino: { url: './modelli/zombi_base.glb', scala: SCALA_QUATERNIUS, tinta: 0xc9b48f, clip: CLIP_QUATERNIUS, velocita: {} },
+});
 
-export async function caricaZombi(url) {
-  const gltf = await new GLTFLoader().loadAsync(url);
-  gltf.scene.traverse(o => {
+function sistemaTexture(radice) {
+  radice.traverse(o => {
     if (!o.isMesh) return;
     o.frustumCulled = false;
     for (const m of [].concat(o.material)) {
@@ -27,27 +35,50 @@ export async function caricaZombi(url) {
       m.map.needsUpdate = true;
     }
   });
-  const materialiVariante = VARIANTI.map(v => {
+}
+
+function materialiTinti(radice, tinte) {
+  return tinte.map(tinta => {
     const mappa = new Map();
-    gltf.scene.traverse(o => {
+    radice.traverse(o => {
       if (!o.isMesh) return;
       for (const m of [].concat(o.material)) {
         if (mappa.has(m)) continue;
         const copia = m.clone();
-        copia.color = new THREE.Color(v.tinta);
+        copia.color = new THREE.Color(tinta);
         mappa.set(m, copia);
       }
     });
     return mappa;
   });
-  return { modello: gltf.scene, clip: new Map(gltf.animations.map(a => [a.name, a])), materialiVariante };
 }
 
-function animazionePer(z, dati, siMuove) {
+export async function caricaZombi() {
+  const file = new Map();
+  const carica = url => {
+    if (!file.has(url)) file.set(url, new GLTFLoader().loadAsync(url));
+    return file.get(url);
+  };
+  const risorse = new Map();
+  await Promise.all(Object.entries(MODELLI).map(async ([tipo, dati]) => {
+    const gltf = await carica(dati.url);
+    sistemaTexture(gltf.scene);
+    const tinte = dati.varianti ? VARIANTI.map(v => v.tinta) : [dati.tinta ?? null];
+    risorse.set(tipo, {
+      dati,
+      modello: gltf.scene,
+      clip: new Map(gltf.animations.map(a => [a.name, a])),
+      materialiVariante: tinte[0] === null ? null : materialiTinti(gltf.scene, tinte),
+    });
+  }));
+  return risorse;
+}
+
+function logica(z, siMuove) {
   if (z.stato === 'morto') return 'muore';
   if (z.stato === 'assi') return 'attacco';
   if (z.stato === 'attacco') return 'attacco2';
-  if (z.stato === 'dentro' && !siMuove) return 'fermo';
+  if (z.tipo === 'manichino' || (z.stato === 'dentro' && !siMuove)) return 'fermo';
   if (z.corre) return 'corre';
   return z.variante % 2 ? 'cammina2' : 'cammina';
 }
@@ -56,15 +87,24 @@ export function creaGestoreZombi(scena, risorse) {
   const zombi = new Map();
 
   function crea(z) {
+    const risorsa = risorse.get(z.tipo) ?? risorse.get('normale');
+    const { dati } = risorsa;
     const radice = new THREE.Group();
-    const corpo = clonaScheletro(risorse.modello);
-    const variante = VARIANTI[z.variante % VARIANTI.length];
-    corpo.scale.setScalar(SCALA * variante.scala);
-    corpo.rotation.y = 0;
-    const materiali = risorse.materialiVariante[z.variante % VARIANTI.length];
+    const corpo = clonaScheletro(risorsa.modello);
+    const variante = dati.varianti ? VARIANTI[z.variante % VARIANTI.length] : { scala: 1 };
+    corpo.scale.setScalar(dati.scala * variante.scala);
+    if (risorsa.materialiVariante) {
+      const materiali = risorsa.materialiVariante[dati.varianti ? z.variante % VARIANTI.length : 0];
+      corpo.traverse(o => {
+        if (!o.isMesh) return;
+        o.material = Array.isArray(o.material) ? o.material.map(m => materiali.get(m) ?? m) : materiali.get(o.material) ?? o.material;
+      });
+    }
     corpo.traverse(o => {
-      if (!o.isMesh) return;
-      o.material = Array.isArray(o.material) ? o.material.map(m => materiali.get(m) ?? m) : materiali.get(o.material) ?? o.material;
+      if (!o.isSkinnedMesh) return;
+      o.frustumCulled = true;
+      o.computeBoundingSphere();
+      o.boundingSphere.radius *= 1.8;
     });
     radice.add(corpo);
     scena.add(radice);
@@ -72,30 +112,33 @@ export function creaGestoreZombi(scena, risorse) {
     corpo.traverse(o => { if (!testa && o.isBone && /Head$/.test(o.name)) testa = o; });
     const mixer = new THREE.AnimationMixer(corpo);
     const azioni = new Map();
-    for (const [nome, clip] of risorse.clip) {
+    for (const [logico, nome] of Object.entries(dati.clip)) {
+      const clip = risorsa.clip.get(nome);
+      if (!clip) continue;
       const azione = mixer.clipAction(clip);
-      azione.timeScale = VELOCITA_ANIMAZIONE[nome] ?? 1;
-      if (nome === 'muore') {
+      azione.timeScale = dati.velocita[logico] ?? 1;
+      if (logico === 'muore') {
         azione.setLoop(THREE.LoopOnce, 1);
         azione.clampWhenFinished = true;
       }
-      azioni.set(nome, azione);
+      azioni.set(logico, azione);
     }
-    const voce = { radice, corpo, testa, mixer, azioni, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3 };
+    const voce = { radice, corpo, testa, mixer, azioni, dati, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3 };
     zombi.set(z.id, voce);
     return voce;
   }
 
   function suona(voce, nome) {
-    if (voce.attuale === nome) return;
-    const nuova = voce.azioni.get(nome);
+    const scelto = voce.azioni.has(nome) ? nome : nome === 'cammina2' ? 'cammina' : nome === 'attacco2' ? 'attacco' : nome;
+    if (voce.attuale === scelto) return;
+    const nuova = voce.azioni.get(scelto);
     if (!nuova) return;
     const vecchia = voce.azioni.get(voce.attuale);
     nuova.reset();
-    if (nome !== 'muore') nuova.time = voce.fase;
+    if (scelto !== 'muore') nuova.time = voce.fase;
     nuova.play();
     if (vecchia) vecchia.crossFadeTo(nuova, DISSOLVENZA, false);
-    voce.attuale = nome;
+    voce.attuale = scelto;
   }
 
   function rimuovi(id) {
@@ -116,14 +159,13 @@ export function creaGestoreZombi(scena, risorse) {
         const voce = zombi.get(z.id) ?? crea(z);
         const spostamento = Math.hypot(z.x - voce.ultimaPosizione.x, z.z - voce.ultimaPosizione.y);
         voce.ultimaPosizione.set(z.x, z.z);
-        const siMuove = spostamento > 0.2 * dt;
-        suona(voce, animazionePer(z, voce, siMuove));
+        suona(voce, logica(z, spostamento > 0.2 * dt));
         voce.radice.position.set(z.x, 0, z.z);
         voce.radice.rotation.y = z.yaw;
         if (z.stato === 'morto') {
           voce.tempoMorto += dt;
-          if (voce.tempoMorto > AFFONDA_DOPO) voce.radice.position.y = -(voce.tempoMorto - AFFONDA_DOPO) * 0.6;
-        }
+          if (z.tipo !== 'manichino' && voce.tempoMorto > AFFONDA_DOPO) voce.radice.position.y = -(voce.tempoMorto - AFFONDA_DOPO) * 0.6;
+        } else voce.tempoMorto = 0;
         voce.mixer.update(dt);
       }
       for (const id of [...zombi.keys()]) if (!vivi.has(id)) rimuovi(id);
@@ -132,11 +174,13 @@ export function creaGestoreZombi(scena, risorse) {
       const punto = new THREE.Vector3();
       return vista.zombie.filter(z => z.stato !== 'morto').map(z => {
         const voce = zombi.get(z.id);
+        const dati = MODELLI[z.tipo] ?? MODELLI.normale;
+        const forma = { id: z.id, x: z.x, z: z.z, alto: dati.alto, raggio: dati.raggio };
         if (voce?.testa) {
           voce.testa.getWorldPosition(punto);
-          return { id: z.id, x: z.x, z: z.z, testa: { x: punto.x, y: punto.y + 0.06, z: punto.z } };
+          return { ...forma, testa: { x: punto.x, y: punto.y + 0.06, z: punto.z } };
         }
-        return { id: z.id, x: z.x, z: z.z, testa: { x: z.x, y: TESTA.altezza, z: z.z } };
+        return { ...forma, testa: { x: z.x, y: dati.testa ?? TESTA.altezza, z: z.z } };
       });
     },
     posizioneTesta(id) {

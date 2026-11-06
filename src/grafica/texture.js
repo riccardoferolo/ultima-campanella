@@ -220,7 +220,21 @@ export function creaTexture() {
     ctx.fillRect(0, 0, l, a);
     rumore(ctx, l, a, caso, ['#15281a', '#2b4d24', '#183020'], 300);
   });
-  return { muro, piastrelle, parquet, soffitto, legno, porta, armadietti, terra, lavagna, metallo, legnoChiaro, linoleum, cemento, asfalto, rete, pulmino, corteccia, fogliame };
+  const mimetica = disegna(32, 32, (ctx, l, a, caso) => {
+    ctx.fillStyle = '#4b5237';
+    ctx.fillRect(0, 0, l, a);
+    macchie(ctx, l, a, caso, 'rgba(35,40,25,0.9)', 7);
+    macchie(ctx, l, a, caso, 'rgba(110,98,66,0.8)', 5);
+    rumore(ctx, l, a, caso, ['#3c4230', '#585f40'], 160);
+  });
+  const pannello = disegna(64, 32, (ctx, l, a, caso) => {
+    ctx.fillStyle = '#5b4632';
+    ctx.fillRect(0, 0, l, a);
+    rumore(ctx, l, a, caso, ['#4a3828', '#6b5440'], 260);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let x = 4; x < l; x += 8) for (let y = 4; y < a; y += 8) ctx.fillRect(x, y, 2, 2);
+  });
+  return { muro, piastrelle, parquet, soffitto, legno, porta, armadietti, terra, lavagna, metallo, legnoChiaro, linoleum, cemento, asfalto, rete, pulmino, corteccia, fogliame, mimetica, pannello };
 }
 
 export function texturaTesto(righe, { larghezza = 128, altezza = 64, sfondo = null, colore = '#f2efe6', font = 'bold 14px monospace', bordo = null } = {}) {

@@ -1,3 +1,5 @@
+import { ARMI, ARMI_DI_BASE } from './regole.js';
+
 const SPESSORE = 0.3;
 export const ALTEZZA_SOFFITTO = 3.2;
 
@@ -9,7 +11,10 @@ export const ZONE = Object.freeze([
   Object.freeze({ id: 'laboratorio', nome: 'Laboratorio', x0: -2, z0: 22, x1: 8, z1: 32, pavimento: 'piastrelle' }),
   Object.freeze({ id: 'caldaia', nome: 'Caldaia', x0: 18, z0: -16, x1: 26, z1: -8, pavimento: 'cemento' }),
   Object.freeze({ id: 'cortile', nome: 'Cortile', x0: 8, z0: 8, x1: 26, z1: 30, pavimento: 'asfalto', aperto: true }),
+  Object.freeze({ id: 'sala', nome: "Sala d'attesa", x0: -48, z0: -5, x1: -28, z1: 5, pavimento: 'parquet', sala: true }),
 ]);
+
+export const SALA = Object.freeze({ x0: -48, z0: -5, x1: -28, z1: 5 });
 
 export const LIMITI = Object.freeze({ x0: -18, z0: -18, x1: 28, z1: 34 });
 
@@ -37,6 +42,7 @@ export const MURI = Object.freeze([
   verticale(18, -16, -8), orizzontale(-8, 24, 26),
   verticale(26, -16, -13), verticale(26, -11, -8),
   orizzontale(-16, 18, 21), orizzontale(-16, 23, 26),
+  orizzontale(-5, -48, -28), orizzontale(5, -48, -28), verticale(-48, -5, 5), verticale(-28, -5, 5),
 ].map(Object.freeze));
 
 export const RECINZIONI = Object.freeze([
@@ -131,10 +137,14 @@ export const ACQUISTI = Object.freeze([
   Object.freeze({ id: 'cassa', tipo: 'cassa', zona: 'palestra', posizione: Object.freeze({ x: 16, z: 7.2 }), verso: Object.freeze({ x: 0, z: -1 }) }),
   Object.freeze({ id: 'interruttore', tipo: 'interruttore', zona: 'caldaia', posizione: Object.freeze({ x: 25.7, z: -9.5 }), verso: Object.freeze({ x: -1, z: 0 }) }),
   Object.freeze({ id: 'potenziatore', tipo: 'potenziatore', zona: 'laboratorio', posizione: Object.freeze({ x: 6.6, z: 30.6 }), verso: Object.freeze({ x: -1, z: 0 }) }),
+  Object.freeze({ id: 'muro-raffica', tipo: 'arma', arma: 'raffica', costo: 900, munizioni: 450, zona: 'laboratorio', posizione: Object.freeze({ x: 7.84, z: 24.2 }), verso: Object.freeze({ x: -1, z: 0 }) }),
+  Object.freeze({ id: 'muro-carabina', tipo: 'arma', arma: 'carabina', costo: 1600, munizioni: 800, zona: 'cortile', posizione: Object.freeze({ x: 18, z: 8.16 }), verso: Object.freeze({ x: 0, z: 1 }) }),
+  Object.freeze({ id: 'muro-doppietta', tipo: 'arma', arma: 'doppietta', costo: 1000, munizioni: 500, zona: 'caldaia', posizione: Object.freeze({ x: 18.16, z: -9.6 }), verso: Object.freeze({ x: 1, z: 0 }) }),
+  Object.freeze({ id: 'campanella', tipo: 'campanella', zona: 'atrio', posizione: Object.freeze({ x: -3, z: 5.84 }), verso: Object.freeze({ x: 0, z: -1 }) }),
 ]);
 
 export function scatolaAcquisto(acquisto) {
-  if (acquisto.tipo === 'arma' || acquisto.tipo === 'interruttore') return null;
+  if (acquisto.tipo === 'arma' || acquisto.tipo === 'interruttore' || acquisto.tipo === 'campanella') return null;
   const { x, z } = acquisto.posizione;
   const lungo = acquisto.tipo === 'potenziatore' ? 0.8 : 0.5;
   const largo = acquisto.tipo === 'potenziatore' ? 0.6 : 0.35;
@@ -144,6 +154,70 @@ export function scatolaAcquisto(acquisto) {
 }
 
 export const PARTENZE = Object.freeze([Object.freeze({ x: -1.5, z: 0 }), Object.freeze({ x: 1.5, z: 0 })]);
+export const PARTENZE_SALA = Object.freeze([Object.freeze({ x: -45, z: -1.2 }), Object.freeze({ x: -45, z: 1.2 })]);
+
+const ARMI_IN_SALA = ARMI_DI_BASE.filter(a => !ARMI[a].segreta);
+const PER_PARETE = Math.ceil(ARMI_IN_SALA.length / 2);
+const PASSO_RASTRELLIERA = 18.4 / PER_PARETE;
+export const RASTRELLIERA = Object.freeze(ARMI_IN_SALA.map((arma, i) => {
+  const nord = i < PER_PARETE;
+  const k = nord ? i : i - PER_PARETE;
+  return Object.freeze({
+    arma,
+    x: -47.2 + PASSO_RASTRELLIERA * (k + 0.5),
+    z: nord ? -4.84 : 4.84,
+    verso: Object.freeze({ x: 0, z: nord ? 1 : -1 }),
+  });
+}));
+
+export const MANICHINI = Object.freeze([
+  Object.freeze({ x: -31.5, z: -2.6 }), Object.freeze({ x: -30.5, z: 0 }), Object.freeze({ x: -31.5, z: 2.6 }),
+]);
+export const CARTELLO_PRONTI = Object.freeze({ x: -28.16, z: 0, verso: Object.freeze({ x: -1, z: 0 }) });
+
+export const FRAMMENTI = Object.freeze([
+  Object.freeze({ id: 0, x: 19.6, z: -15.3, y: 0.25 }),
+  Object.freeze({ id: 1, x: -13.4, z: 13, y: 0.86 }),
+  Object.freeze({ id: 2, x: 12.5, z: 27.7, y: 0.25 }),
+]);
+
+const solido = (x, z, l, p) => Object.freeze({ x0: x - l / 2, z0: z - p / 2, x1: x + l / 2, z1: z + p / 2, altezza: 1 });
+export const ARREDI = Object.freeze([
+  { modello: 'Container_Red', x: 30.5, z: 13.5, rot: Math.PI / 2 },
+  { modello: 'Container_Green', x: 31, z: 25.5, rot: Math.PI / 2 + 0.08 },
+  { modello: 'Container_Green', x: 2.5, z: 36.5, rot: 0.05 },
+  { modello: 'WaterTower', x: 35, z: 36, rot: 0 },
+  { modello: 'TownSign', x: 13, z: 35.5, rot: 0 },
+  { modello: 'StreetLights', x: 21, z: 33.5, rot: Math.PI },
+  { modello: 'StreetLights', x: 30, z: 6, rot: -Math.PI / 2 },
+  { modello: 'Barrel', x: 25.2, z: 9, rot: 0.3, solido: solido(25.2, 9, 0.7, 0.7) },
+  { modello: 'Barrel', x: 24.4, z: 9.3, rot: 1.2, solido: solido(24.4, 9.3, 0.7, 0.7) },
+  { modello: 'TrafficCone_1', x: 13.8, z: 9.4, rot: 0 },
+  { modello: 'TrafficCone_2', x: 14.6, z: 9.1, rot: 0.6 },
+  { modello: 'TrafficBarrier_1', x: 9.5, z: 14.5, rot: Math.PI / 2, solido: solido(9.5, 14.5, 0.9, 1.56) },
+  { modello: 'PlasticBarrier', x: 22, z: 28.7, rot: 0.1, solido: solido(22, 28.7, 1.04, 0.4) },
+  { modello: 'TrashBag_1', x: 25.3, z: 28.9, rot: 0 },
+  { modello: 'TrashBag_2', x: 24.4, z: 29.2, rot: 2 },
+  { modello: 'Pallet', x: 25.2, z: 26.4, rot: 0.2 },
+  { modello: 'Pallet_Broken', x: 24.9, z: 11.4, rot: 1.4 },
+  { modello: 'Wheels_Stack', x: 18.5, z: 25.2, rot: 0, solido: solido(18.5, 25.2, 0.66, 0.6) },
+  { modello: 'FireHydrant', x: 9, z: 9.1, rot: 0.8 },
+  { modello: 'Blood_1', x: 15, z: 18, rot: 0.4 },
+  { modello: 'Blood_2', x: 3, z: -2.5, rot: 1.1 },
+  { modello: 'Blood_3', x: 0, z: 17, rot: 0 },
+  { modello: 'Blood_2', x: -9, z: 15, rot: 2.2 },
+  { modello: 'Blood_3', x: 20, z: 1, rot: 0.7 },
+  { modello: 'Blood_1', x: 2, z: 28, rot: 2.6 },
+  { modello: 'Pipes', x: 18.5, z: -12.9, rot: 0, solido: solido(18.5, -12.9, 0.75, 3.36) },
+  { modello: 'CinderBlock', x: 25.3, z: -15.3, rot: 0.3 },
+  { modello: 'CinderBlock', x: 25.1, z: -14.8, rot: 1.5 },
+  { modello: 'TrashBag_1', x: -10.2, z: 23.3, rot: 0 },
+  { modello: 'Barrel', x: 7.3, z: 23.1, rot: 0, solido: solido(7.3, 23.1, 0.7, 0.7) },
+  { modello: 'Chest', x: 9.6, z: -7.2, rot: 0, solido: solido(9.6, -7.2, 0.64, 0.48) },
+  { modello: 'Couch', x: -44.5, z: 3.9, rot: Math.PI, solido: solido(-44.5, 3.9, 3, 1.2) },
+  { modello: 'Barrel', x: -29, z: -4, rot: 0, solido: solido(-29, -4, 0.7, 0.7) },
+  { modello: 'Barrel', x: -29, z: 4, rot: 1, solido: solido(-29, 4, 0.7, 0.7) },
+].map(Object.freeze));
 
 export function zonaDi(x, z) {
   return ZONE.find(zona => x >= zona.x0 && x <= zona.x1 && z >= zona.z0 && z <= zona.z1)?.id ?? null;
@@ -163,5 +237,8 @@ export function ostacoliPerGiocatori(porteAperte) {
     ...FINESTRE.map(f => f.scatola),
     ...PORTE.filter(p => !porteAperte.has(p.id)).map(p => p.scatola),
     ...ACQUISTI.map(scatolaAcquisto).filter(Boolean),
+    ...ARREDI.filter(a => a.solido).map(a => a.solido),
   ];
 }
+
+export const dentroSala = (x, z) => x >= SALA.x0 && x <= SALA.x1 && z >= SALA.z0 && z <= SALA.z1;

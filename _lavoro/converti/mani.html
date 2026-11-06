@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><base href="/"><title>mani</title></head>
+<body style="margin:0;background:#333">
+<script type="module">
+import * as THREE from 'three';
+import { caricaArmi, creaMaterialiArmi } from '/src/grafica/armi3d.js';
+import { creaVista1p } from '/src/grafica/vista1p.js';
+import { creaTexture } from '/src/grafica/texture.js';
+
+window.foto = async (armi, riduzione = 1) => {
+  const libreria = await caricaArmi();
+  const materiali = creaMaterialiArmi(creaTexture(), libreria);
+  const vista = creaVista1p(materiali);
+  const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+  renderer.setSize(640 / riduzione, 360 / riduzione);
+  renderer.setClearColor(0x556677);
+  document.body.appendChild(renderer.domElement);
+  vista.camera.aspect = 16 / 9;
+  vista.camera.updateProjectionMatrix();
+  const immagini = [];
+  for (const arma of armi) {
+    vista.mostra(arma);
+    for (let i = 0; i < 40; i++) vista.aggiorna({ dt: 0.05, movimento: 0, mira: false, ricarica: 0, cambio: 0, coltellata: 0, corsa: false });
+    renderer.render(vista.scena, vista.camera);
+    immagini.push(renderer.domElement.toDataURL('image/png'));
+  }
+  return immagini;
+};
+window.pronto = true;
+</script>
+</body></html>

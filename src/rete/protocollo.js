@@ -33,13 +33,17 @@ function eGiocatore(g) {
 function eIstantanea(ist) {
   return !!ist && typeof ist === 'object'
     && [ist.t, ist.f, ist.r, ist.tf].every(numero)
-    && elencoNumeri(ist.z, 8)
+    && elencoNumeri(ist.z, 9)
     && Array.isArray(ist.w) && ist.w.every(numero)
     && Array.isArray(ist.p) && ist.p.every(p => testo(p))
     && Array.isArray(ist.g) && ist.g.every(eGiocatore)
     && Array.isArray(ist.c) && ist.c.length === 4
     && numero(ist.e) && Array.isArray(ist.k) && ist.k.length === 4 && [0, 1, 2].includes(ist.k[0]) && numero(ist.k[3])
-    && (ist.k[1] === '' || arma(ist.k[1]));
+    && (ist.k[1] === '' || arma(ist.k[1]))
+    && elencoNumeri(ist.b, 5)
+    && Array.isArray(ist.x) && ist.x.every(numero)
+    && Array.isArray(ist.fr) && ist.fr.every(numero)
+    && numero(ist.cp) && numero(ist.co);
 }
 
 function eAzione(a) {
@@ -47,7 +51,9 @@ function eAzione(a) {
   if (a.tipo === 'colpo') return numero(a.zombie) && numero(a.danno);
   if (a.tipo === 'compra') return testo(a.acquisto) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'assa') return testo(a.finestra);
-  if (a.tipo === 'rianima') return typeof a.attivo === 'boolean';
+  if (a.tipo === 'rianima' || a.tipo === 'pronto') return typeof a.attivo === 'boolean';
+  if (a.tipo === 'prova') return arma(a.arma);
+  if (a.tipo === 'frammento') return numero(a.id);
   return false;
 }
 
