@@ -206,7 +206,6 @@ export function creaAudio() {
 
   const SUONI = {
     vuoto: () => nota(900, { durata: 0.04, tipo: 'square', volume: 0.12 }),
-    ricarica: () => { nota(500, { durata: 0.05, tipo: 'square', volume: 0.12, ritardo: 0.05 }); nota(320, { durata: 0.06, tipo: 'square', volume: 0.14, ritardo: 0.35 }); },
     coltello: () => soffio({ durata: 0.18, da: 3000, a: 900, tipo: 'bandpass', volume: 0.5 }),
     carne: () => { soffio({ durata: 0.12, da: 700, a: 200, volume: 0.6 }); nota(90, { durata: 0.1, volume: 0.25, scendi: 50 }); },
     testa: () => { soffio({ durata: 0.16, da: 1200, a: 300, volume: 0.8 }); nota(1400, { durata: 0.06, tipo: 'triangle', volume: 0.12 }); },
