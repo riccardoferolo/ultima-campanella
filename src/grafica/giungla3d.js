@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ARMI } from '../regole.js';
 import { ALTEZZA_SOFFITTO, ZONE, MURI, OSTACOLI, FINESTRE, PORTE, ACQUISTI, CARTELLO_PRONTI } from '../mappa.js';
 import { OGGETTI, INTERNE } from '../mappe/giungla.js';
@@ -11,10 +11,15 @@ import { modelloArma } from './armi3d.js';
 import { creaCaso } from './caso-grafica.js';
 import { blocco, piano, scatolaUV, orientamento } from './scuola3d.js';
 import { creaMacchine } from './macchine3d.js';
+import { costruisciBordi } from './bordiGiungla.js';
+import { istanzeACelle } from './celle.js';
 
 const H = ALTEZZA_SOFFITTO;
 const ALTEZZA_SIEPE = 4.2;
 const URL_GIUNGLA = './modelli/giungla.glb';
+const LUCI_ACCESE = 3;
+const SCEGLI_LUCI_OGNI_S = 0.3;
+const ACCENSIONE_LUCE_S = 0.4;
 const SFONDO_LUCI = Object.freeze([
   { x: 0, z: 3, colore: 0xff8a3a, intensita: 18, portata: 16, fuoco: true },
   { x: 0, z: -22, colore: 0xff9a4a, intensita: 16, portata: 15, fuoco: true },
@@ -223,20 +228,43 @@ function geometriaPalma() {
   return { tronco, chioma };
 }
 
-function istanzia(scena, modello, matrici) {
-  if (!modello || matrici.length === 0) return;
-  modello.updateMatrixWorld(true);
-  const radice = new THREE.Matrix4().copy(modello.matrixWorld).invert();
-  const m = new THREE.Matrix4();
-  modello.traverse(o => {
-    if (!o.isMesh) return;
-    const locale = new THREE.Matrix4().multiplyMatrices(radice, o.matrixWorld);
-    const istanze = new THREE.InstancedMesh(o.geometry, o.material, matrici.length);
-    matrici.forEach((base, i) => istanze.setMatrixAt(i, m.multiplyMatrices(base, locale)));
-    istanze.computeBoundingSphere();
-    scena.add(istanze);
-  });
+function geometriaFelce() {
+  const fronde = [];
+  for (let i = 0; i < 7; i++) {
+    const g = new THREE.PlaneGeometry(0.42, 1.25, 1, 5).translate(0, 0.62, 0);
+    const p = g.attributes.position;
+    for (let k = 0; k < p.count; k++) {
+      const y = p.getY(k);
+      p.setZ(k, -0.38 * y * y);
+    }
+    g.rotateX(-0.45 - (i % 2) * 0.3);
+    g.rotateY((i / 7) * Math.PI * 2 + (i % 2) * 0.35);
+    fronde.push(g);
+  }
+  const felce = mergeGeometries(fronde);
+  const n = felce.attributes.normal;
+  for (let k = 0; k < n.count; k++) n.setXYZ(k, n.getX(k) * 0.3, 1, n.getZ(k) * 0.3);
+  return felce;
 }
+
+function geometriaRoccia(caso) {
+  const sfera = new THREE.IcosahedronGeometry(1, 2);
+  sfera.deleteAttribute('normal');
+  const g = mergeVertices(sfera);
+  const p = g.attributes.position;
+  const v = new THREE.Vector3();
+  for (let k = 0; k < p.count; k++) {
+    v.fromBufferAttribute(p, k);
+    const scarto = 0.78 + caso() * 0.3 + Math.sin(v.x * 3.1 + v.z * 2.3) * 0.08;
+    v.multiplyScalar(scarto);
+    if (v.y < 0) v.y *= 0.25;
+    p.setXYZ(k, v.x, v.y, v.z);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+const TINTE_FELCI = Object.freeze([0xb8d49a, 0x9cc28a, 0xc9d79a, 0x8fb592, 0xa9c47e]);
 
 const matrice = (x, y, z, rot = 0, scala = 1, inclina = 0) => new THREE.Matrix4().compose(
   new THREE.Vector3(x, y, z),
@@ -268,8 +296,8 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
     cortecciaPalma: pbr('cortecciaPalma'),
     metallo: pbr('metallo', { metalness: 0.6, color: 0x9aa0a0 }),
     legno: pbr('legno'),
-    siepe: new THREE.MeshStandardMaterial({ map: texturaSiepe(), roughness: 0.95 }),
-    fronda: new THREE.MeshStandardMaterial({ map: texturaFronda(), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.8 }),
+    siepe: new THREE.MeshLambertMaterial({ map: texturaSiepe(), color: 0x4f5e48 }),
+    fronda: new THREE.MeshLambertMaterial({ map: texturaFronda(), alphaTest: 0.45, side: THREE.DoubleSide }),
     telo: new THREE.MeshStandardMaterial({ color: 0x5a5a3a, roughness: 0.95, side: THREE.DoubleSide }),
     giada: new THREE.MeshStandardMaterial({ color: 0x1d6b44, emissive: 0x2fd884, emissiveIntensity: 0.9, roughness: 0.25 }),
     osso: new THREE.MeshStandardMaterial({ color: 0xd8cbb0, roughness: 0.6 }),
@@ -300,6 +328,10 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
     const m = muroDi(muro);
     blocco(scena, m, muro, 0, m === mat.siepe ? ALTEZZA_SIEPE : H, m === mat.siepe ? 4 : H);
   }
+  costruisciBordi(scena, {
+    muri: MURI.filter(m => muroDi(m) === mat.siepe), zone: ZONE, acquisti: ACQUISTI, porte: PORTE,
+    altezzaSiepe: ALTEZZA_SIEPE, corteccia: mat.corteccia, caso,
+  });
 
   const { tronco, chioma } = geometriaPalma();
   const palme = [];
@@ -310,20 +342,19 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
     if (ZONE.some(q => x > q.x0 - 1 && x < q.x1 + 1 && z > q.z0 - 1 && z < q.z1 + 1) || (z > 21 && z < 29)) continue;
     palme.push([x, z, 6 + caso() * 5]);
   }
-  const tronchi = new THREE.InstancedMesh(tronco, mat.cortecciaPalma, palme.length);
-  const chiome = new THREE.InstancedMesh(chioma, mat.fronda, palme.length);
-  palme.forEach(([x, z, alto], i) => {
+  const vociTronchi = [];
+  const vociChiome = [];
+  palme.forEach(([x, z, alto]) => {
     const rot = caso() * Math.PI * 2;
     const incl = (caso() - 0.5) * 0.12;
-    tronchi.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(incl, rot, 0)), new THREE.Vector3(1, alto, 1)));
-    chiome.setMatrixAt(i, matrice(x + Math.sin(alto * 2.2) * 0.12 * alto * 0.4, alto - 1, z, rot, 0.9 + caso() * 0.4));
+    vociTronchi.push({ matrice: new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(incl, rot, 0)), new THREE.Vector3(1, alto, 1)) });
+    vociChiome.push({ matrice: matrice(x + Math.sin(alto * 2.2) * 0.12 * alto * 0.4, alto - 1, z, rot, 0.9 + caso() * 0.4) });
   });
-  tronchi.computeBoundingSphere();
-  chiome.computeBoundingSphere();
-  scena.add(tronchi, chiome);
+  const tronchi = istanzeACelle(scena, tronco, mat.cortecciaPalma, vociTronchi);
+  istanzeACelle(scena, chioma, mat.fronda, vociChiome);
+  tronchi.forEach(t => { t.name = 'tronchiPalme'; });
 
   const felci = [];
-  const cespugli = [];
   const erba = [];
   for (const zona of ZONE.filter(q => q.aperto)) {
     const area = (zona.x1 - zona.x0) * (zona.z1 - zona.z0);
@@ -332,23 +363,35 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
       const z = zona.z0 + 0.6 + caso() * (zona.z1 - zona.z0 - 1.2);
       const bordo = Math.min(x - zona.x0, zona.x1 - x, z - zona.z0, zona.z1 - z) < 2.5;
       if (dentroAlgo(x, z, 0.5) || (!bordo && caso() < 0.65)) continue;
-      (caso() < 0.6 ? felci : erba).push(matrice(x, 0, z, caso() * Math.PI * 2, 0.8 + caso() * 0.7));
+      (caso() < 0.6 ? felci : erba).push(matrice(x, 0, z, caso() * Math.PI * 2, 0.8 + caso() * 0.7, (caso() - 0.5) * 0.2));
     }
   }
-  for (const muro of MURI) {
-    if (muroDi(muro) !== mat.siepe) continue;
-    const lungo = Math.max(muro.x1 - muro.x0, muro.z1 - muro.z0);
-    for (let t = 2; t < lungo; t += 6) {
-      const orizz = muro.x1 - muro.x0 > muro.z1 - muro.z0;
-      const x = orizz ? muro.x0 + t : (muro.x0 + muro.x1) / 2;
-      const z = orizz ? (muro.z0 + muro.z1) / 2 : muro.z0 + t;
-      cespugli.push(matrice(x, 0, z, caso() * Math.PI * 2, 0.6 + caso() * 0.3));
-    }
-  }
-  istanzia(scena, modelli.get('fern_02'), felci);
-  istanzia(scena, modelli.get('grass_medium_01'), erba.slice(0, 60).map(m => m.multiply(new THREE.Matrix4().makeScale(0.5, 0.8, 0.5))));
-  istanzia(scena, modelli.get('shrub_02'), cespugli);
+  const tintaFelce = () => TINTE_FELCI[Math.floor(caso() * TINTE_FELCI.length)];
+  istanzeACelle(scena, geometriaFelce(), mat.fronda, [
+    ...felci.map(matrice => ({ matrice, colore: tintaFelce() })),
+    ...erba.map(m => ({ matrice: m.multiply(new THREE.Matrix4().makeScale(0.55, 0.6, 0.55)), colore: tintaFelce() })),
+  ]);
 
+  const sasso = geometriaRoccia(caso);
+  const roccia = (materiale, x, z, larghezza, altezza, profondita, rot = caso() * Math.PI * 2) => {
+    const r = new THREE.Mesh(sasso, materiale);
+    r.position.set(x, 0, z);
+    r.scale.set(larghezza / 2, altezza, profondita / 2);
+    r.rotation.y = rot;
+    scena.add(r);
+    return r;
+  };
+  const cassa = (x, z, rot, scala = 1, y = 0) => {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(1.05 * scala, 0.55 * scala, 0.6 * scala).translate(0, 0.275 * scala, 0), mat.assiVecchie);
+    c.position.set(x, y, z);
+    c.rotation.y = rot;
+    scena.add(c);
+  };
+  const ceppo = (x, z, scala) => {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.42 * scala, 0.55 * scala, 0.6 * scala, 10).translate(0, 0.3 * scala, 0), mat.corteccia);
+    c.position.set(x, 0, z);
+    scena.add(c);
+  };
   const posa = (nome, x, z, rot = 0, scala = 1, y = 0) => {
     const m = modelli.get(nome)?.clone();
     if (!m) return null;
@@ -374,8 +417,8 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
         break;
       }
       case 'casse':
-        posa('wooden_military_crate', cx, cz, 0.3, 1.1);
-        posa('wooden_military_crate', cx + 0.2, cz + 0.1, 1.2, 1, 0.48);
+        cassa(cx, cz, 0.3, 1.1);
+        cassa(cx + 0.2, cz + 0.1, 1.2, 1, 0.6);
         break;
       case 'tavolo': {
         blocco(scena, mat.legno, { x0: o.x0, x1: o.x1, z0: o.z0, z1: o.z1 }, 0.75, 0.82, 1);
@@ -396,7 +439,7 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
         g.add(corpo, serbatoio, spia, targa);
         g.position.set(cx, 0, cz);
         scena.add(g);
-        posa('metal_jerrycan', cx + l / 2 + 0.3, cz, 0.4);
+        blocco(scena, new THREE.MeshStandardMaterial({ color: 0x8a2a1a, roughness: 0.6, metalness: 0.3 }), { x0: cx + l / 2 + 0.15, x1: cx + l / 2 + 0.5, z0: cz - 0.1, z1: cz + 0.1 }, 0, 0.45, 1);
         generatori.push({ gruppo: g, spia });
         break;
       }
@@ -449,8 +492,7 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
         blocco(scena, o.tipo === 'pilastro' ? mat.pietraTempio : mat.pietraMuschio, o, 0, H, H);
         break;
       case 'roccia': {
-        const r = posa('rock_face_01', cx, cz, caso() * 6, Math.max(l, p) / 4.5);
-        if (!r) blocco(scena, mat.roccia, o, 0, o.altezza, 2);
+        roccia(mat.roccia, cx, cz, l * 1.05, o.altezza ?? 1.6, p * 1.05, 0);
         break;
       }
       default:
@@ -458,10 +500,10 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
   }
   posa('stone_fire_pit', 0, 3, 0, 1.1);
   posa('stone_fire_pit', 0, -22, 0.6, 1.2);
-  posa('rock_moss_set_02', -33, 13, 0.4, 0.8);
-  posa('rock_moss_set_02', 30, 37, 2.1, 0.7);
-  posa('tree_stump_01', -14, 33, 0.3, 1.2);
-  posa('tree_stump_01', 44, -6, 1.9, 1.1);
+  roccia(mat.pietraMuschio, -33, 13, 2.2, 1, 1.6);
+  roccia(mat.pietraMuschio, 30, 37, 1.8, 0.8, 1.4);
+  ceppo(-14, 33, 1.2);
+  ceppo(44, -6, 1.1);
   for (const [x, z] of [[-9.4, 9.4], [9.4, -9.4], [-23, -40.5], [23, -11.5], [-12.6, 55.4], [12.6, 55.4]]) posa('wooden_lantern_01', x, z, 0, 1.4);
 
   for (const f of FINESTRE) {
@@ -624,18 +666,45 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
     return g;
   }
 
-  const cassaFiume = posa('wooden_military_crate', 0, 25, 0, 0.8, -0.15) ?? new THREE.Group();
+  const cassaFiume = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.45, 0.5).translate(0, 0.22, 0), mat.assiVecchie);
+  cassaFiume.position.set(0, -0.15, 25);
+  scena.add(cassaFiume);
   const nubi = new Map();
   const pietreCadenti = new Map();
   const materialeNube = new THREE.SpriteMaterial({ map: alone, color: 0x7dff6a, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
   const materialeSegno = new THREE.MeshBasicMaterial({ color: 0xff3a2a, transparent: true, opacity: 0.6, depthWrite: false });
 
-  const luci = SFONDO_LUCI.map(l => {
-    const luce = new THREE.PointLight(l.colore, l.intensita, l.portata, 1.4);
-    luce.position.set(l.x, l.fuoco ? 1.2 : H - 0.5, l.z);
+  const luci = Array.from({ length: LUCI_ACCESE }, () => {
+    const luce = new THREE.PointLight(0xffffff, 0, 10, 1.4);
     scena.add(luce);
-    return { luce, ...l };
+    return { luce, fonte: null, accensione: 0 };
   });
+  let attesaLuci = 0;
+  const distanzaDa = (punto, f) => Math.hypot(f.x - punto.x, f.z - punto.z);
+  function aggiornaLuci(dt, tempo, punto) {
+    attesaLuci -= dt;
+    if (punto && attesaLuci <= 0) {
+      attesaLuci = SCEGLI_LUCI_OGNI_S;
+      const vicine = [...SFONDO_LUCI].sort((a, b) => distanzaDa(punto, a) - distanzaDa(punto, b)).slice(0, LUCI_ACCESE);
+      const libere = luci.filter(l => !vicine.includes(l.fonte));
+      for (const f of vicine) {
+        if (luci.some(l => l.fonte === f)) continue;
+        const l = libere.shift();
+        l.fonte = f;
+        l.accensione = 0;
+        l.luce.color.setHex(f.colore);
+        l.luce.distance = f.portata;
+        l.luce.position.set(f.x, f.fuoco ? 1.2 : H - 0.5, f.z);
+      }
+    }
+    for (const l of luci) {
+      if (!l.fonte) continue;
+      const f = l.fonte;
+      l.accensione = Math.min(1, l.accensione + dt / ACCENSIONE_LUCE_S);
+      const tremolio = f.fuoco ? 0.82 + Math.sin(tempo * 9 + f.x) * 0.1 + Math.sin(tempo * 23 + f.z) * 0.08 : 1;
+      l.luce.intensity = f.intensita * l.accensione * tremolio;
+    }
+  }
 
   const macchine = creaMacchine(scena, { materialiArmi, oggetti, metallo: mat.metallo, legno: mat.legno });
   const sincronizza = (elenco, mappa, crea) => {
@@ -652,14 +721,14 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
   };
 
   return {
-    aggiorna(vista, dt, tempo) {
+    aggiorna(vista, dt, tempo, punto) {
       macchine.aggiorna(vista, dt, tempo);
+      aggiornaLuci(dt, tempo, punto);
       acqua.map.offset.x = (acqua.map.offset.x + dt * 0.05) % 1;
       cascata.map.offset.y = (cascata.map.offset.y + dt * 0.9) % 1;
       cascataVeloce.map.offset.y = (cascataVeloce.map.offset.y + dt * 1.7) % 1;
       schiuma.map.offset.x = (schiuma.map.offset.x + dt * 0.12) % 1;
       anelloSchiuma.rotation.y = Math.sin(tempo * 0.7) * 0.05;
-      for (const l of luci) if (l.fuoco) l.luce.intensity = l.intensita * (0.82 + Math.sin(tempo * 9 + l.x) * 0.1 + Math.sin(tempo * 23 + l.z) * 0.08);
       for (const p of PORTE) {
         const porta = porte.get(p.id);
         if (porta.tipo === 'ponte') {

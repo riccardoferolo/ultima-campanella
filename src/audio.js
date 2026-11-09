@@ -1,10 +1,9 @@
 import { ARMI } from './regole.js';
 import { creaMotore } from './suoni/motore.js';
 import { creaAmbiente } from './suoni/ambiente.js';
-import { RICETTE_ARMI, FAMIGLIE_SPARO } from './suoni/armi.js';
-import { RICETTE_ZOMBI, TIPI_LAMENTO } from './suoni/zombi.js';
-import { RICETTE_EVENTI } from './suoni/eventi.js';
-import { RICETTE_AMBIENTE } from './suoni/ambiente.js';
+import { FAMIGLIE_SPARO } from './suoni/armi.js';
+import { TIPI_LAMENTO } from './suoni/zombi.js';
+import { RICETTE } from './suoni/ricette.js';
 
 const VOLUME = 0.5;
 const VOLUME_MUSICA = 0.32;
@@ -31,7 +30,6 @@ function salvaPreferenza(si) {
     return false;
   }
 }
-const RICETTE = Object.freeze({ ...RICETTE_ARMI, ...RICETTE_ZOMBI, ...RICETTE_EVENTI, ...RICETTE_AMBIENTE });
 const PRIMA_DA_PREPARARE = Object.freeze([
   ...FAMIGLIE_SPARO.map(f => `sparo_${f}`), 'm_clic', 'm_clac', 'm_slitta', 'm_scivolo', 'm_bossolo', 'fendente_coltello',
   'z_lamento', 'z_rantolo', 'z_ringhio', 'esplosione', 'm_guscio', 'm_pompa', 'm_otturatore', 'm_cricchetto',

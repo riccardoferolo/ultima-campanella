@@ -55,7 +55,13 @@ export function creaMotore(ricette, volume) {
   uscita.gain.value = volume;
   uscita.connect(compressore);
   const riverbero = creaRiverbero(ctx, uscita);
-  const banco = creaBanco(ctx, ricette);
+  let lavoratore = null;
+  try {
+    lavoratore = new Worker(new URL('./fabbrica-worker.js', import.meta.url), { type: 'module' });
+  } catch {
+    lavoratore = null;
+  }
+  const banco = creaBanco(ctx, ricette, { lavoratore });
   const pool = { effetti: [], ambiente: [] };
   const spente = [];
   const ambiente = { mappa: 'scuola', aperto: false, umido: 1 };
@@ -166,11 +172,16 @@ export function creaMotore(ricette, volume) {
     const ora = ctx.currentTime;
     for (const ramo of riverbero.rami) {
       const chiave = scelta[ramo.lato];
-      impostaRamo(ctx, ramo, banco.prendi(chiave), chiave, uscita);
+      if (banco.pronto(chiave)) impostaRamo(ctx, ramo, banco.prendi(chiave), chiave, uscita);
+      else banco.prenota(chiave);
       ramo.g.gain.setTargetAtTime((ramo.lato === 'aperto') === aperto ? 1 : 0, ora, 0.35);
     }
   }
 
+  banco.suPronto(chiave => {
+    const scelta = IMPULSI[ambiente.mappa] ?? IMPULSI.scuola;
+    if (chiave === scelta.aperto || chiave === scelta.chiuso) impostaAmbiente(ambiente.mappa, ambiente.aperto);
+  });
   impostaAmbiente('scuola', false);
   setInterval(() => pulisci(ctx.currentTime), PULIZIA_MS);
 

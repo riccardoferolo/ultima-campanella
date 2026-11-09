@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { creaNuvola, creaTracce } from './particelle.js';
 
-const MASSIMO = 220;
+const PER_NUVOLA = 260;
 const MACCHIE_MASSIME = 50;
 
 function texturaPunto() {
@@ -39,14 +40,8 @@ const INTENSITA_LAMPO = 25;
 
 export function creaEffetti(scena) {
   const texture = texturaPunto();
-  const libere = [];
-  const attive = [];
-  for (let i = 0; i < MASSIMO; i++) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
-    sprite.visible = false;
-    scena.add(sprite);
-    libere.push({ sprite, velocita: new THREE.Vector3(), vita: 0, durata: 1, tipo: null });
-  }
+  const nuvole = { normale: creaNuvola(scena, texture, PER_NUVOLA, false), additiva: creaNuvola(scena, texture, PER_NUVOLA, true) };
+  const tracce = creaTracce(scena);
   const raggi = [];
   const lampoEsplosione = new THREE.PointLight(0x5fe9ff, 0, 9, 1.4);
   scena.add(lampoEsplosione);
@@ -57,29 +52,31 @@ export function creaEffetti(scena) {
 
   function emetti(nome, punto, quante, verso = null, colore = null, spinta = 0.6) {
     const tipo = TIPI[nome];
-    for (let i = 0; i < quante && libere.length; i++) {
-      const p = libere.pop();
-      p.tipo = tipo;
-      p.vita = 0;
-      p.durata = tipo.vita * (0.6 + Math.random() * 0.8);
-      p.velocita.set((Math.random() - 0.5) * tipo.sparsa, Math.random() * tipo.sparsa * 0.6, (Math.random() - 0.5) * tipo.sparsa);
-      if (verso) p.velocita.addScaledVector(verso, tipo.sparsa * spinta);
-      p.sprite.position.copy(punto);
-      p.sprite.material.color.setHex(colore ?? tipo.colore);
-      p.sprite.material.blending = tipo.additivo ? THREE.AdditiveBlending : THREE.NormalBlending;
-      p.sprite.scale.setScalar(tipo.dimensione);
-      p.sprite.visible = true;
-      attive.push(p);
+    const nuvola = tipo.additivo ? nuvole.additiva : nuvole.normale;
+    const spinto = verso ? tipo.sparsa * spinta : 0;
+    for (let i = 0; i < quante; i++) {
+      nuvola.nuova(
+        punto.x, punto.y, punto.z,
+        (Math.random() - 0.5) * tipo.sparsa + (verso?.x ?? 0) * spinto,
+        Math.random() * tipo.sparsa * 0.6 + (verso?.y ?? 0) * spinto,
+        (Math.random() - 0.5) * tipo.sparsa + (verso?.z ?? 0) * spinto,
+        colore ?? tipo.colore, tipo.dimensione, tipo.vita * (0.6 + Math.random() * 0.8), tipo.gravita,
+      );
     }
   }
 
   return {
-    sangue(punto, verso) {
-      emetti('sangue', punto, 10, verso);
+    sangue(punto, verso, quante = 10) {
+      emetti('sangue', punto, quante, verso);
     },
-    impatto(punto) {
-      emetti('scintilla', punto, 5);
-      emetti('polvere', punto, 3);
+    impatto(punto, quante = 5) {
+      emetti('scintilla', punto, quante);
+      emetti('polvere', punto, Math.ceil(quante * 0.6));
+    },
+    traccia: (da, a) => tracce.traccia(da, a),
+    dimensiona(altezza) {
+      nuvole.normale.altezza(altezza);
+      nuvole.additiva.altezza(altezza);
     },
     schegge(punto) {
       emetti('legno', punto, 10);
@@ -115,20 +112,15 @@ export function creaEffetti(scena) {
       emetti('vuoto', punto, 2, null, colore);
     },
     risucchio(centro, raggio, quante = 5) {
-      for (let i = 0; i < quante && libere.length; i++) {
-        const p = libere.pop();
+      const durata = 0.6;
+      for (let i = 0; i < quante; i++) {
         const angolo = Math.random() * Math.PI * 2;
         const r = raggio * (0.5 + Math.random() * 0.5);
-        p.tipo = TIPI.vuoto;
-        p.vita = 0;
-        p.durata = 0.6;
-        p.sprite.position.set(centro.x + Math.cos(angolo) * r, centro.y + (Math.random() - 0.5) * 1.6, centro.z + Math.sin(angolo) * r);
-        p.velocita.set(centro.x - p.sprite.position.x, centro.y - p.sprite.position.y, centro.z - p.sprite.position.z).multiplyScalar(1 / p.durata);
-        p.sprite.material.color.setHex(Math.random() < 0.3 ? 0xffb070 : TIPI.vuoto.colore);
-        p.sprite.material.blending = THREE.AdditiveBlending;
-        p.sprite.scale.setScalar(TIPI.vuoto.dimensione);
-        p.sprite.visible = true;
-        attive.push(p);
+        const x = centro.x + Math.cos(angolo) * r;
+        const y = centro.y + (Math.random() - 0.5) * 1.6;
+        const z = centro.z + Math.sin(angolo) * r;
+        nuvole.additiva.nuova(x, y, z, (centro.x - x) / durata, (centro.y - y) / durata, (centro.z - z) / durata,
+          Math.random() < 0.3 ? 0xffb070 : TIPI.vuoto.colore, TIPI.vuoto.dimensione, durata, 0);
       }
     },
     fulmine(punti, colore = 0x9cf0ff) {
@@ -168,7 +160,7 @@ export function creaEffetti(scena) {
       scena.add(mesh);
       macchie.push(mesh);
     },
-    aggiorna(dt) {
+    aggiorna(dt, occhio) {
       tempoLampo = Math.max(0, tempoLampo - dt);
       lampoEsplosione.intensity = INTENSITA_LAMPO * (tempoLampo / DURATA_LAMPO);
       for (let i = raggi.length - 1; i >= 0; i--) {
@@ -181,25 +173,14 @@ export function creaEffetti(scena) {
         r.linea.material.dispose();
         raggi.splice(i, 1);
       }
-      for (let i = attive.length - 1; i >= 0; i--) {
-        const p = attive[i];
-        p.vita += dt;
-        if (p.vita >= p.durata || p.sprite.position.y < 0) {
-          p.sprite.visible = false;
-          attive.splice(i, 1);
-          libere.push(p);
-          continue;
-        }
-        p.velocita.y += p.tipo.gravita * dt;
-        p.sprite.position.addScaledVector(p.velocita, dt);
-        p.sprite.material.opacity = 1 - p.vita / p.durata;
-      }
+      nuvole.normale.aggiorna(dt);
+      nuvole.additiva.aggiorna(dt);
+      tracce.aggiorna(dt, occhio);
     },
     svuota() {
-      for (const p of attive.splice(0)) {
-        p.sprite.visible = false;
-        libere.push(p);
-      }
+      nuvole.normale.svuota();
+      nuvole.additiva.svuota();
+      tracce.svuota();
       for (const m of macchie.splice(0)) scena.remove(m);
     },
   };

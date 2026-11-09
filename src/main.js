@@ -41,6 +41,8 @@ const RIPETI_ACQUISTO_DOPO_S = 1;
 const SALTO_ARCO = 6;
 const ALTEZZA_SCARICA = 1.25;
 const DURATA_AFFONDO = 0.14;
+const MIRA_POMPA = 0.8;
+const PORTATA_TRACCIA = 30;
 const FERMATI_PRIMA = 0.55;
 const COLPITI_COLTELLO = 2;
 const COLPITI_RELIQUIA = 3;
@@ -714,13 +716,19 @@ function sparaColpo(arma, vista) {
     return;
   }
   const colpiti = new Map();
+  const rosa = arma.famiglia === 'pompa';
+  const bocca = rosa ? mondo.bocca() : null;
   for (let i = 0; i < arma.pallini; i++) {
-    const d = disperdi(centro, arma.dispersione * (io.inMira ? 0.4 : 1) * (io.movimento ? 1.6 : 1), Math.random);
+    const d = disperdi(centro, arma.dispersione * (io.inMira ? (rosa ? MIRA_POMPA : 0.4) : 1) * (io.movimento ? 1.6 : 1), Math.random);
     const colpo = colpisciZombie(origine, d, bersagli, ostacoli, arma.portata ?? (arma.esplosione ? PORTATA_RAGGI : Infinity));
     if (arma.fiamma) mondo.effetti.fiamma(mondo.bocca(), d, arma.colore);
     if (arma.gelo) mondo.effetti.brina(mondo.bocca(), d);
-    if (!Number.isFinite(colpo.t)) continue;
+    if (!Number.isFinite(colpo.t)) {
+      if (rosa) mondo.effetti.traccia(bocca, { x: origine.x + d.x * PORTATA_TRACCIA, y: origine.y + d.y * PORTATA_TRACCIA, z: origine.z + d.z * PORTATA_TRACCIA });
+      continue;
+    }
     const punto = { x: origine.x + d.x * colpo.t, y: origine.y + d.y * colpo.t, z: origine.z + d.z * colpo.t };
+    if (rosa) mondo.effetti.traccia(bocca, punto);
     if (arma.esplosione) {
       mondo.raggio(punto, arma.colore ?? undefined);
       mondo.effetti.esplosione(punto, arma.esplosione.tipo, arma.esplosione.colore ?? arma.colore ?? null);
@@ -732,10 +740,10 @@ function sparaColpo(arma, vista) {
       }
     }
     if (colpo.id === null) {
-      mondo.effetti.impatto(punto);
+      mondo.effetti.impatto(punto, rosa ? 3 : 5);
       continue;
     }
-    mondo.effetti.sangue(punto, d);
+    mondo.effetti.sangue(punto, d, rosa ? 4 : 10);
     const somma = colpiti.get(colpo.id) ?? { danno: 0, testa: false, gelo: 0 };
     somma.danno += colpo.testa ? arma.danno * 2 : arma.danno;
     somma.testa ||= colpo.testa;
@@ -1040,5 +1048,7 @@ if (import.meta.env.DEV) {
     },
     azione: a => inviaAzione(a),
     pronto: () => mondo !== null,
+    mondo: () => mondo,
+    audio,
   };
 }

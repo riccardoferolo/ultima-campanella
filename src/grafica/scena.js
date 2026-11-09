@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA } from './texture.js';
 import { caricaGiungla, costruisciGiungla } from './giungla3d.js';
 import { TINTE_ASPETTO } from './compagno3d.js';
+import { creaAnimali } from './animali3d.js';
 import { caricaArmi, creaMaterialiArmi } from './armi3d.js';
 import { costruisciScuola } from './scuola3d.js';
 import { caricaZombi, creaGestoreZombi } from './zombi3d.js';
@@ -20,6 +21,7 @@ const FPS_BASSI = 50;
 const FPS_ALTI = 58;
 const VERIFICA_OGNI_S = 1.5;
 const FOV = 72;
+const MARGINE_VISTA = 10;
 const FOV_MIRA = 52;
 const FOV_CANNOCCHIALE = 20;
 const ONDEGGIO = 0.01;
@@ -209,7 +211,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
   luna.position.set(-20, 30, -30);
   scena.add(luna);
 
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 120);
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, atmosfera.nebbiaFuori + MARGINE_VISTA);
   camera.rotation.order = 'YXZ';
   const torcia = new THREE.SpotLight(0xfff0d0, 28, 24, 0.45, 0.55, 1.3);
   torcia.position.set(0.15, -0.1, 0);
@@ -240,6 +242,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
   }
   const bonus3d = creaBonus3d(scena);
   const segreti = giungla ? vuoto : creaSegreti(scena);
+  const animali = creaAnimali(scena, mappa);
   usaMappa(mappaPrima);
   const zombi = creaGestoreZombi(scena, risorseZombi);
   const effetti = creaEffetti(scena);
@@ -263,6 +266,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
     const l = Math.max(1, Math.floor(contenitore.clientWidth * scala));
     const a = Math.max(1, Math.floor(contenitore.clientHeight * scala));
     renderer.setSize(l, a, false);
+    effetti.dimensiona(a);
     camera.aspect = l / a;
     camera.updateProjectionMatrix();
     vista1p.camera.aspect = l / a;
@@ -323,14 +327,15 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
     scena.fog.far += ((fuori ? atmosfera.nebbiaFuori : atmosfera.nebbiaDentro) - scena.fog.far) * fattore;
     scena.fog.color.lerp(new THREE.Color(fuori ? atmosfera.cielo : atmosfera.buio), fattore);
     scena.background.copy(scena.fog.color);
-    mondoMappa.aggiorna(vista, dt, tempo);
+    mondoMappa.aggiorna(vista, dt, tempo, camera.position);
     zombi.aggiorna(vista, dt);
     granate3d.aggiorna(vista.granate, dt);
     vuoto3d.aggiorna(vista, dt);
     bonus3d.aggiorna(vista, dt);
     segreti.aggiorna(vista, dt);
+    animali.aggiorna(vista, dt, tempo, camera);
     aggiornaCompagni(vista, mioId, dt);
-    effetti.aggiorna(dt);
+    effetti.aggiorna(dt, camera.position);
     vista1p.mostra(arma);
     vista1p.nascondi(aTerra || morto || cannocchiale);
     vista1p.aggiorna({ dt, movimento, mira: inMira, ricarica, colpiRicarica, cambio, coltellata, corsa });
@@ -353,6 +358,8 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
       effetti.raggio(bocca, new THREE.Vector3(punto.x, punto.y, punto.z), colore);
     },
     mappa,
+    scena,
+    renderer,
     tela: renderer.domElement,
     campanella: () => segreti.suona(),
     tingiManica(aspetto) {
@@ -398,6 +405,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
       vuoto3d.svuota();
       effetti.svuota();
       bonus3d.svuota();
+      animali.svuota();
       for (const c of compagni.values()) c.chiudi();
       compagni.clear();
       ultimePosizioni.clear();

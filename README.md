@@ -15,7 +15,16 @@ npm test
 
 - Sala d'attesa prima della partita: tasto 1 sceglie la pistola iniziale (Pistola, Magnum, Aquila, Raffica),
   2 la divisa (sei colori), 3 la mappa (solo chi ha creato la stanza); Invio quando sei pronto, conto alla rovescia di 5 secondi.
-- Due mappe: La scuola e Il tempio nella giungla.
+- Due mappe: La scuola e Il tempio nella giungla. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
+  alberi con la chioma che sporge, palme e felci) e la mappa è piena di animaletti che scappano quando arrivi:
+  pappagalli sulle palme, pipistrelli in grotta e nel tempio, lucciole, farfalle blu, rane sulle ninfee del fiume;
+  nella scuola corvi e pipistrelli.
+- Suoni naturali generati al volo (in un worker, senza file audio): spari diversi per famiglia con coda ed eco,
+  ricariche meccaniche, rantoli degli zombie, riverbero di corridoio, cortile, giungla e grotta; nella giungla
+  cicale, grilli, rane, uccelli notturni, gufo, scimmia urlatrice lontana e acqua.
+- Fucili a pompa che sparano a rosa: ogni pallino ha la sua scia, il suo impatto e il suo schizzo di sangue.
+- 60 fps: vegetazione divisa a celle (si disegna solo quella inquadrata), luci della giungla a rotazione sui fuochi
+  più vicini, particelle in due soli disegni.
 - Coltello (tasto V) che colpisce ad arco fino a due zombie, fa uno scatto verso lo zombie vicino e scala coi round.
 - 24 armi (21 vere, una per ruolo, + 3 aliene: Singolarità, Criogeno, Arco Voltaico), ognuna con la sua versione potenziata.
 - Ricarica animata per tipo d'arma (caricatore, tamburo del revolver, cartucce della pompa, otturatore, capsula aliena) con suoni sincronizzati.
