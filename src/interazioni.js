@@ -4,6 +4,7 @@ import { COSTO_BOTOLA, COSTO_SENTINELLA, COSTO_TRAPPOLA, DURATA_SENTINELLA, DURA
 import { OGGETTI } from './mappe/giungla.js';
 import { ID_ASSI, ID_SCHEGGIA_GROTTA, ID_SCHEGGIA_FIUME, ID_MASCHERA, RELIQUIE, ASSI, SCHEGGE, ANIME_PER_IDOLO } from './giungla.js';
 import { RUNE } from './storia.js';
+import { descrivi as descriviPalude } from './palude.js';
 
 const DISTANZA_OGGETTO = 1.8;
 const PORTE_CHIUSE = Object.freeze({
@@ -12,7 +13,10 @@ const PORTE_CHIUSE = Object.freeze({
   sigillo: "Il sigillo del cuore: cede solo al colpo speciale di una reliquia",
   sipario: 'Il sipario è chiuso: la leva del generatore è sul retro del palco',
   centrali: 'Le doppie porte della platea si aprono quando torna la corrente',
+  pLaboratorio: 'La grata del laboratorio è senza corrente: riavviate il motore della segheria',
+  pRadici: 'Radici corrotte sbarrano la passerella: qui i punti non servono',
 });
+const SENZA_CORRENTE = Object.freeze({ palude: 'Il potenziatore non ha corrente: riavviate il motore della segheria' });
 const NOMI_TRAPPOLE = Object.freeze({ sinistra: 'della scaletta sinistra', destra: 'della scaletta destra', corridoio: 'del corridoio dei camerini' });
 
 function descriviTeatro(a, io, vista) {
@@ -162,7 +166,7 @@ export function interazioneVicina(io, vista) {
 function descriviPotenziatore(io, vista) {
   const macchina = vista.potenziatore;
   const nome = NOMI.potenziatore ?? 'Il potenziatore';
-  if (!vista.corrente) return { costo: Infinity, testo: NOMI.potenziatore ? `${nome}: serve la corrente del generatore` : 'Il potenziatore non ha corrente: accendila in caldaia' };
+  if (!vista.corrente) return { costo: Infinity, testo: NOMI.potenziatore ? `${nome}: serve la corrente del generatore` : SENZA_CORRENTE[vista.mappa] ?? 'Il potenziatore non ha corrente: accendila in caldaia' };
   if (macchina.stato === 'pronta' && macchina.per === io.id) return { costo: 0, testo: `Premi F per prendere: ${ARMI[macchina.arma].nome}` };
   if (macchina.stato !== 'libero') return { costo: Infinity, testo: macchina.per === io.id ? `${nome}: sta lavorando…` : `${nome}: è occupata` };
   const potenziata = io.armaAttiva ? versionePotenziata(io.armaAttiva) : null;
@@ -198,6 +202,8 @@ function descrivi(a, io, vista) {
   if (giungla) return giungla;
   const teatro = vista.teatro ? descriviTeatro(a, io, vista) : null;
   if (teatro) return teatro;
+  const palude = vista.palude ? descriviPalude(a, io, vista) : null;
+  if (palude) return palude;
   if (a.tipo === 'arma') {
     const possiede = io.armi.some(x => armaBase(x) === a.arma);
     const costo = possiede ? a.munizioni : a.costo;
@@ -217,6 +223,10 @@ function descrivi(a, io, vista) {
   if (a.tipo === 'generatore') return descriviGeneratore(vista);
   if (a.tipo === 'allarme') return descriviAllarme(vista);
   if (a.tipo === 'campanella') return { costo: 0, testo: 'Premi F per suonare la vecchia campanella' };
+  if (a.tipo === 'munizioni') {
+    const costo = ARMI[io.armaAttiva]?.potenziata ? R.COSTO_MUNIZIONI_POTENZIATE : R.COSTO_MUNIZIONI;
+    return { costo, testo: `Premi F per le munizioni: ${ARMI[io.armaAttiva].nome} [${costo}]` };
+  }
   const cassa = vista.cassa;
   if (cassa.stato === 'aperta' && cassa.per === io.id) return { costo: 0, testo: `Premi F per prendere: ${ARMI[cassa.arma].nome}` };
   if (cassa.stato === 'aperta') return { costo: Infinity, testo: 'La cassa è occupata' };

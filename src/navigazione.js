@@ -32,10 +32,10 @@ const cellaDi = (g, x, z) => [Math.floor((x - g.x0) / CELLA), Math.floor((z - g.
 const centroCella = (g, c, r) => [g.x0 + (c + 0.5) * CELLA, g.z0 + (r + 0.5) * CELLA];
 const dentro = (g, c, r) => c >= 0 && r >= 0 && c < g.colonne && r < g.righe;
 
-export function campoVerso(g, bersagli) {
+export function nuovoCalcolo(g, bersagli, riciclo = null) {
   const totale = g.colonne * g.righe;
-  const distanze = new Float32Array(totale).fill(Infinity);
-  const coda = new Int32Array(totale * 2);
+  const distanze = riciclo?.distanze?.length === totale ? riciclo.distanze.fill(Infinity) : new Float32Array(totale).fill(Infinity);
+  const coda = riciclo?.coda?.length === totale * 2 ? riciclo.coda : new Int32Array(totale * 2);
   let fine = 0;
   for (const { x, z } of bersagli) {
     const [c, r] = cellaDi(g, x, z);
@@ -43,9 +43,17 @@ export function campoVerso(g, bersagli) {
     distanze[r * g.colonne + c] = 0;
     coda[fine++] = r * g.colonne + c;
   }
+  return { g, distanze, coda, testa: 0, fine };
+}
+
+export function avanzaCalcolo(calcolo, massimo = Infinity) {
+  const { g, distanze, coda } = calcolo;
   const { colonne, righe, libera } = g;
-  for (let testa = 0; testa < fine; testa++) {
-    const i = coda[testa];
+  let { testa, fine } = calcolo;
+  let passi = 0;
+  while (testa < fine && passi < massimo) {
+    const i = coda[testa++];
+    passi += 1;
     const c = i % colonne;
     const r = (i - c) / colonne;
     const base = distanze[i];
@@ -64,7 +72,17 @@ export function campoVerso(g, bersagli) {
       if (fine < coda.length) coda[fine++] = j;
     }
   }
-  return { ...g, distanze };
+  calcolo.testa = testa;
+  calcolo.fine = fine;
+  return testa >= fine;
+}
+
+export const campoDa = calcolo => ({ ...calcolo.g, distanze: calcolo.distanze });
+
+export function campoVerso(g, bersagli) {
+  const calcolo = nuovoCalcolo(g, bersagli);
+  avanzaCalcolo(calcolo);
+  return campoDa(calcolo);
 }
 
 export function direzione(campo, x, z) {

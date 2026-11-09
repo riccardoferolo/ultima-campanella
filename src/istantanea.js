@@ -1,6 +1,7 @@
 import { FINESTRE, ELENCO_MAPPE } from './mappa.js';
 import { istantanea as istantaneaGiungla, espandi as espandiGiungla } from './giungla.js';
 import { istantanea as istantaneaTeatro, espandi as espandiTeatro } from './teatro.js';
+import { istantanea as istantaneaPalude, espandi as espandiPalude } from './palude.js';
 import { ELENCO_TIPI_ZOMBIE, ELENCO_BONUS, BONUS_A_TEMPO } from './regole.js';
 
 export const STATI_ZOMBIE = Object.freeze(['arriva', 'assi', 'scavalca', 'dentro', 'attacco', 'morto', 'emerge']);
@@ -24,7 +25,7 @@ export function faiIstantanea(stato) {
       id: g.id, n: g.nome, x: r2(g.x), z: r2(g.z), y: r2(g.yaw), p: r2(g.pitch),
       s: STATI_GIOCATORE.indexOf(g.stato), v: Math.round(g.vita), vm: g.vitaMax, pt: g.punti,
       a: g.armaAttiva, ar: [...g.armi], b: [...g.bevande], c: g.colpi, tt: r2(g.timerTerra),
-      pr: r2(g.progressoRianimazione), ri: g.rianimando ? 1 : 0, u: g.uccisioni, tp: g.teletrasporto, ok: g.pronto ? 1 : 0, gn: g.granate ?? 0, rc: Math.round((g.carica ?? 0) * 100), ps: g.pistola ?? 'pistola', as: g.aspetto ?? 0,
+      pr: r2(g.progressoRianimazione), ri: g.rianimando ? 1 : 0, u: g.uccisioni, tp: g.teletrasporto, ok: g.pronto ? 1 : 0, gn: g.granate ?? 0, rc: Math.round((g.carica ?? 0) * 100), ps: g.pistola ?? 'pistola', as: g.aspetto ?? 0, an: g.anime ?? 0,
     })),
     c: [stato.cassa.stato === 'aperta' ? 1 : 0, stato.cassa.arma ?? '', stato.cassa.per ?? '', r2(stato.cassa.timer)],
     e: stato.corrente ? 1 : 0,
@@ -45,6 +46,7 @@ export function faiIstantanea(stato) {
     ms: Math.max(0, ELENCO_MAPPE.indexOf(stato.mappaScelta ?? stato.mappa ?? 'scuola')),
     ...istantaneaGiungla(stato),
     ...istantaneaTeatro(stato),
+    ...istantaneaPalude(stato),
   };
 }
 
@@ -60,7 +62,7 @@ export function espandi(ist) {
     giocatori: ist.g.map(g => ({
       id: g.id, nome: g.n, x: g.x, z: g.z, yaw: g.y, pitch: g.p, stato: STATI_GIOCATORE[g.s], vita: g.v, vitaMax: g.vm,
       punti: g.pt, armaAttiva: g.a, armi: g.ar, bevande: g.b, colpi: g.c, timerTerra: g.tt, progressoRianimazione: g.pr,
-      rianimando: !!g.ri, uccisioni: g.u, teletrasporto: g.tp, pronto: !!g.ok, granate: g.gn ?? 0, carica: (g.rc ?? 0) / 100, pistola: g.ps ?? 'pistola', aspetto: g.as ?? 0,
+      rianimando: !!g.ri, uccisioni: g.u, teletrasporto: g.tp, pronto: !!g.ok, granate: g.gn ?? 0, carica: (g.rc ?? 0) / 100, pistola: g.ps ?? 'pistola', aspetto: g.as ?? 0, anime: g.an ?? 0,
     })),
     cassa: { stato: ist.c[0] ? 'aperta' : 'chiusa', arma: ist.c[1] || null, per: ist.c[2] || null, timer: ist.c[3] },
     corrente: !!ist.e,
@@ -74,6 +76,7 @@ export function espandi(ist) {
     mappaScelta: ELENCO_MAPPE[ist.ms ?? ist.mp ?? 0] ?? 'scuola',
     giungla: espandiGiungla(ist),
     teatro: espandiTeatro(ist),
+    palude: espandiPalude(ist),
     granate: (ist.gr ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
     proiettili: (ist.pj ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
     buchi: (ist.bh ?? []).map(([id, x, y, z, timer, raggio]) => ({ id, x, y, z, timer, raggio })),

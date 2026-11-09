@@ -11,6 +11,7 @@ const PULIZIA_MS = 1000;
 const IMPULSI = Object.freeze({
   scuola: { aperto: 'ir_cortile', chiuso: 'ir_stanza', umido: { aperto: 0.7, chiuso: 1 } },
   giungla: { aperto: 'ir_giungla', chiuso: 'ir_grotta', umido: { aperto: 0.8, chiuso: 1.3 } },
+  palude: { aperto: 'ir_giungla', chiuso: 'ir_stanza', umido: { aperto: 0.8, chiuso: 1 } },
 });
 
 const attenua = (d, rif) => (d <= rif ? 1 : rif / d);

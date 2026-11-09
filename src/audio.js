@@ -277,6 +277,7 @@ export function creaAudio() {
     speciale_veleno: () => buffer('e_veleno', { volume: 0.75, umido: 0.3 }),
     buco: () => { nota(40, { durata: 2.4, tipo: 'sine', volume: 0.45, scendi: 70 }); soffio({ durata: 2.6, da: 120, a: 900, tipo: 'bandpass', volume: 0.55 }); },
     implosione: () => { soffio({ durata: 0.35, da: 200, a: 4000, tipo: 'bandpass', volume: 0.6 }); nota(46, { durata: 1.4, tipo: 'sawtooth', volume: 0.5, scendi: 24, ritardo: 0.3 }); soffio({ durata: 1.2, da: 2200, a: 60, volume: 1.1, ritardo: 0.3 }); },
+    teschio: () => { soffio({ durata: 0.55, da: 260, a: 2600, tipo: 'bandpass', volume: 0.55 }); nota(68, { durata: 0.7, tipo: 'sawtooth', volume: 0.32, scendi: 28 }); nota(820, { durata: 0.25, tipo: 'triangle', volume: 0.08, scendi: 260 }); },
     congelato: () => { nota(2600, { durata: 0.08, tipo: 'triangle', volume: 0.12 }); soffio({ durata: 0.35, da: 8000, a: 3000, tipo: 'highpass', volume: 0.35 }); },
     frantumato: () => { for (let i = 0; i < 6; i++) nota(2200 + Math.random() * 2600, { durata: 0.12, tipo: 'triangle', volume: 0.07, ritardo: i * 0.03 }); soffio({ durata: 0.45, da: 9000, a: 2500, tipo: 'highpass', volume: 0.6 }); },
     fine: () => { [196, 165, 131, 98].forEach((f, i) => nota(f, { durata: 1.2, tipo: 'sawtooth', volume: 0.18, ritardo: i * 0.6 })); },

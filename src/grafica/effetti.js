@@ -82,6 +82,9 @@ export function creaEffetti(scena) {
     schegge(punto) {
       emetti('legno', punto, 10);
     },
+    ossa(punto, quante = 14) {
+      emetti('legno', punto, quante, null, 0xe8dcc0);
+    },
     raggio(da, a, colore = 0x7ef0ff) {
       const geometria = new THREE.BufferGeometry().setFromPoints([da, a]);
       const linea = new THREE.Line(geometria, new THREE.LineBasicMaterial({ color: colore, transparent: true, blending: THREE.AdditiveBlending }));

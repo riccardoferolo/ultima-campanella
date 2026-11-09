@@ -9,6 +9,9 @@ import { muoviCerchio } from './fisica.js';
 import { CORPO, colpisciZombie, direzioneDa, disperdi, esplosione, primoMuro, raggioSfera } from './colpi.js';
 import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi } from './arsenale.js';
 import { DURATA_BEVUTA } from './grafica/vista1p.js';
+import { illuminaTeschio } from './grafica/teschio3d.js';
+import { ARMA_ELEMENTO, PROVE, bersagliPalude, invischiato } from './palude.js';
+import { eventoPalude, trofeoPalude } from './palude/eventi.js';
 import { interazioneVicina } from './interazioni.js';
 import { creaPartita, passo, aggiungiGiocatore, rimuoviGiocatore } from './partita.js';
 import { faiIstantanea, espandi, interpola } from './istantanea.js';
@@ -117,7 +120,7 @@ const s = {
 
 const io = { x: 0, z: 0, yaw: Math.PI, pitch: 0, pronto: false, tp: 0, colpi: 0, movimento: 0, corsa: false, inMira: false };
 const arsenale = creaArsenale();
-const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null };
+const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null, caricaTeschio: 0 };
 const cacheScatole = new Map();
 
 const collegato = () => s.coll && (s.coll.modo === 'diretto' || s.coll.modo === 'riserva');
@@ -314,9 +317,11 @@ function mostraFine(evento) {
   const secondi = String((evento.durata ?? 0) % 60).padStart(2, '0');
   const impresa = mappaAttiva === 'giungla'
     ? `Avete abbattuto il Divoratore e siete decollati dalla giungla al round ${evento.round}`
-    : `Avete suonato l'ultima campanella e abbattuto il Custode al round ${evento.round}`;
+    : mappaAttiva === 'palude'
+      ? `Avete sepolto Arachne sotto il Bayou Vermillion al round ${evento.round}`
+      : `Avete suonato l'ultima campanella e abbattuto il Custode al round ${evento.round}`;
   $('t-dettaglio').textContent = evento.vinto
-    ? `${impresa}${evento.durata ? ` dopo ${minuti}:${secondi} di battaglia` : ''}.`
+    ? `${impresa}${evento.durata ? ` dopo ${minuti}:${secondi} di battaglia` : ''}.${mappaAttiva === 'palude' ? ` ${trofeoPalude()}` : ''}`
     : evento.round > 1 ? `Siete sopravvissuti fino al round ${evento.round}.` : 'Non siete andati oltre il primo round.';
   $('t-tabella').replaceChildren(...evento.giocatori.map(g => {
     const riga = document.createElement('div');
@@ -336,6 +341,7 @@ function nomeDi(id) {
 function suEventi(eventi) {
   for (const e of eventi) {
     const perMe = e.a === s.mioId;
+    if (mappaAttiva === 'palude' && mondo && eventoPalude(e, { hud, audio, mondo, perMe, nomeDi, io })) continue;
     switch (e.k) {
       case 'round': audio.suona('round'); hud.avviso(`Round ${e.round}`); break;
       case 'fineRound': audio.suona('fineRound'); break;
@@ -419,6 +425,14 @@ function suEventi(eventi) {
       case 'scatto': audio.suona('scatto'); break;
       case 'sfera': if (!perMe) audio.suona('sfera'); break;
       case 'buco': audio.suona('buco'); break;
+      case 'implosioneTeschio': implosioneTeschio(e); break;
+      case 'altarePronto': audio.suona('segreto'); hud.avviso("L'altare è sazio: prendete il Teschio di Malakor!", 'bene'); break;
+      case 'teschio': hud.avviso(perMe ? 'Teschio di Malakor: tieni premuto per caricarlo, rilascia sullo zombie' : `${nomeDi(e.a)} ha il Teschio di Malakor`, 'bene'); break;
+      case 'elementoScelto': audio.suona('segreto'); hud.avviso(perMe ? `Il Teschio è legato al ${PROVE[e.elemento].nome}: ${PROVE[e.elemento].oggetti}` : `${nomeDi(e.a)} ha scelto il ${PROVE[e.elemento].nome}`, 'bene'); break;
+      case 'oggettoElemento': if (perMe) { audio.suona('frammento'); hud.avviso(`${PROVE[e.elemento].nome}: ${e.fatti}/3`, 'bene'); } break;
+      case 'provaElemento': if (perMe) { audio.suona('fusibile'); hud.avviso(e.passo === 1 ? `${PROVE[e.elemento].nome}: ora ${PROVE[e.elemento].anime}` : `${PROVE[e.elemento].nome} pronto: tornate al santuario ${PROVE[e.elemento].luogo}`, 'bene'); } break;
+      case 'elementoInfuso': audio.suona('potenziata'); hud.avviso(perMe ? `Il tuo Teschio ora è di ${PROVE[e.elemento].nome}!` : `${nomeDi(e.a)} ha il Teschio di ${PROVE[e.elemento].nome}`, 'bene'); break;
+      case 'radiciBruciate': audio.suona('implosione'); hud.avviso('Le radici bruciano: la passerella dello sciamano è libera', 'bene'); break;
       case 'implosione':
         mondo.effetti.esplosione({ x: e.x, y: e.y, z: e.z }, 'energia', 0xb06cff);
         mondo.effetti.esplosione({ x: e.x, y: e.y, z: e.z }, 'fuoco', 0xffb070);
@@ -686,9 +700,10 @@ function muovi(lettura, me, dt) {
     return;
   }
   io.inMira = vivo && lettura.mira && arsenale.ricarica === 0;
-  io.corsa = vivo && lettura.corsa && lettura.avanti > 0 && !io.inMira;
+  const preso = invischiato(s.vista, s.mioId);
+  io.corsa = vivo && !preso && lettura.corsa && lettura.avanti > 0 && !io.inMira;
   const lunghezza = Math.hypot(lettura.avanti, lettura.lato);
-  io.movimento = vivo && lunghezza > 0 ? 1 : 0;
+  io.movimento = vivo && !preso && lunghezza > 0 ? 1 : 0;
   if (!io.movimento) return;
   const velocita = (io.corsa ? R.VELOCITA_CORSA : R.VELOCITA) * (io.inMira ? 0.6 : 1) * fattoreBevande(me.bevande, 'velocita') * rallentamento(s.vista.teatro, s.mioId);
   const avanti = lettura.avanti / lunghezza;
@@ -891,6 +906,12 @@ function usaArmi(lettura, me, vista, dt) {
     else if (azione === 'speciale') speciale(me);
   }
   const arma = ARMI[armaAttiva(arsenale).tipo];
+  if (arma.teschio) {
+    locale.sparoForzato = false;
+    usaTeschio(lettura, me, vista, dt);
+    return;
+  }
+  locale.caricaTeschio = 0;
   const vuole = locale.sparoForzato || (arma.automatica || arma.bianca ? lettura.sparo : lettura.sparoPremuto);
   locale.sparoForzato = false;
   if (!vuole || io.corsa) return;
@@ -906,6 +927,54 @@ function usaArmi(lettura, me, vista, dt) {
   if (vista.effetti?.infinite > 0) armaAttiva(arsenale).caricatore += 1;
   sparaColpo(colpo, vista);
   if (armaAttiva(arsenale).caricatore === 0) avviaRicarica(me);
+}
+
+function implosioneTeschio(e) {
+  if (e.imploso) mondo.nascondiZombie(e.zombie);
+  const centro = { x: e.x, y: 1, z: e.z };
+  const colore = ARMI[ARMA_ELEMENTO[e.elemento] ?? 'teschio'].colore;
+  mondo.effetti.risucchio(centro, 3, 24);
+  mondo.effetti.esplosione(centro, 'energia', colore);
+  mondo.effetti.esplosione({ x: e.x, y: 1.6, z: e.z }, 'energia', 0xffffff);
+  if (e.elemento === 'ghiaccio') {
+    mondo.effetti.ghiaccio(centro);
+    audio.suona('congelato');
+  } else if (e.elemento === 'fuoco') {
+    mondo.effetti.esplosione(centro, 'fuoco', 0xff7a2a);
+    mondo.effetti.esplosione({ x: e.x, y: 0.4, z: e.z }, 'fuoco', 0xffc070);
+  } else if (e.elemento === 'vento') {
+    for (let i = 0; i < 6; i++) mondo.effetti.sangue(centro, { x: Math.cos(i), y: 0.3, z: Math.sin(i) });
+    audio.suona('scarica');
+  } else if (!e.elemento) mondo.effetti.esplosione({ x: e.x, y: 0.5, z: e.z }, 'fuoco', 0x5f8a2a);
+  mondo.effetti.ossa(centro, 18);
+  for (const [x, z] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) mondo.effetti.sangue(centro, { x, y: 0.8, z });
+  mondo.effetti.macchia(e.x, e.z);
+  audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z), Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
+  audio.suona('implosione');
+}
+
+function usaTeschio(lettura, me, vista, dt) {
+  const affamato = (me.anime ?? 0) < R.TESCHIO_COSTO;
+  if (lettura.sparo && !io.corsa && arsenale.cambio === 0 && !affamato) {
+    locale.caricaTeschio = Math.min(1, locale.caricaTeschio + dt / R.TESCHIO_CARICA);
+    return;
+  }
+  if (lettura.sparoPremuto && affamato) hud.avviso('Il Teschio ha fame: uccidi per dargli anime');
+  if (!lettura.sparo && locale.caricaTeschio >= 1) scagliaTeschio(vista);
+  if (!lettura.sparo) locale.caricaTeschio = 0;
+}
+
+function scagliaTeschio(vista) {
+  const origine = { x: io.x, y: R.ALTEZZA_OCCHI, z: io.z };
+  const colpo = colpisciZombie(origine, direzioneDa(io.yaw, io.pitch), [...mondo.bersagli(vista), ...bersagliPalude(vista)], scatole(vista.porte, true), R.TESCHIO_PORTATA);
+  if (colpo.id === null) {
+    hud.avviso('Il Teschio non trova nessuno da divorare');
+    audio.suona('vuoto');
+    return;
+  }
+  inviaAzione(typeof colpo.id === 'string' ? { tipo: 'teschio', oggetto: colpo.id } : { tipo: 'teschio', zombie: colpo.id });
+  mondo.spara();
+  audio.suona('teschio');
 }
 
 function scegliInSala(tasto, me, vista) {
@@ -1006,6 +1075,7 @@ function ciclo(ora) {
       const ferito = vista.giocatori.find(g => g.id !== s.mioId && g.stato === 'terra');
       const tipo = armaAttiva(arsenale).tipo;
       const cannocchiale = io.inMira && ARMI[tipo].mirino === true;
+      illuminaTeschio(locale.caricaTeschio);
       mondo.disegna(vista, {
         io, mioId: s.mioId, dt, arma: tipo, movimento: io.movimento, corsa: io.corsa, inMira: io.inMira, cannocchiale,
         ricarica: arsenale.ricarica > 0 ? Math.min(0.999, Math.max(0.001, 1 - arsenale.ricarica / arsenale.ricaricaTotale)) : 0,

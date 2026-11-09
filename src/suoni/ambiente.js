@@ -296,6 +296,26 @@ const SCENE = Object.freeze({
     chiuso: { taglio: 900, volume: 0.4, umido: 0.35 },
     sottoMusica: 0,
   },
+  palude: {
+    letti: [
+      { chiave: 'g_rane', volume: 0.3, bus: 'esterno', ondata: { quiete: 0.25, fondo: [0.1, 0.3], cresta: [0.6, 1], ogni: [5, 12], tau: [2.5, 5] } },
+      { chiave: 'g_grilli', volume: 0.07, bus: 'esterno', ondata: { quiete: 0.4, fondo: [0, 0.15], cresta: [0.35, 0.9], ogni: [6, 14], tau: [3, 6] } },
+      { chiave: 'g_acqua', volume: 0.24, bus: 'esterno' },
+      { chiave: 'g_vento', volume: 0.14, bus: 'esterno' },
+    ],
+    eventi: [
+      { chiave: 'a_rana', ogni: 9, spazio: [10, 30], volume: 0.34, bus: 'esterno', individui: [1, 3], richiami: [1, 4], pausa: [0.3, 0.8] },
+      { chiave: 'a_gufo', ogni: 30, spazio: [18, 40], volume: 0.36, bus: 'esterno' },
+      { chiave: 'a_corvo', ogni: 40, spazio: [25, 50], volume: 0.3, bus: 'esterno' },
+      { chiave: 'a_fruscio', ogni: 10, spazio: [5, 14], volume: 0.18, bus: 'esterno' },
+      { chiave: 'a_goccia', ogni: 8, spazio: [3, 12], volume: 0.22, bus: 'esterno' },
+      { chiave: 'a_scricchiolio', ogni: 9, spazio: [4, 14], volume: 0.3, bus: 'interno', soloChiuso: true },
+      { chiave: 'a_goccia', ogni: 4, spazio: [3, 10], volume: 0.3, bus: 'interno', soloChiuso: true },
+    ],
+    aperto: { taglio: 14000, volume: 1, umido: 0.14 },
+    chiuso: { taglio: 700, volume: 0.32, umido: 0.4 },
+    sottoMusica: 0.3,
+  },
 });
 
 export const CHIAVI_SCENA = Object.freeze(Object.fromEntries(Object.entries(SCENE).map(([m, s]) => [m, [...s.letti.map(l => l.chiave), ...s.eventi.map(e => e.chiave)]])));

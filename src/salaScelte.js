@@ -6,11 +6,13 @@ const DESCRIZIONI_MAPPA = Object.freeze({
   scuola: 'La vecchia scuola di notte: corridoi, aule, il rifugio e il Custode.',
   giungla: 'Il tempio perduto: fiume, grotta, rune, reliquie e il Divoratore.',
   teatro: "Un teatro del '66 in rovina: scalone, camerini, caldaia, sipario e la Forgia Arcana.",
+  palude: 'Il bayou di notte: passerelle, baracche, il cimitero dei relitti e il Teschio di Malakor.',
 });
 const SFONDI_MAPPA = Object.freeze({
   scuola: 'linear-gradient(180deg, #121a2e 0%, #2a2f45 60%, #3b3326 100%)',
   giungla: 'linear-gradient(180deg, #0d2418 0%, #1f4a2a 55%, #3a3a1c 100%)',
   teatro: 'linear-gradient(180deg, #14070a 0%, #3a0d14 55%, #2a1a0c 100%)',
+  palude: 'linear-gradient(180deg, #0c1712 0%, #1b3124 55%, #14211a 100%)',
 });
 const DISEGNI_MAPPA = Object.freeze({
   scuola: '<svg viewBox="0 0 120 60"><rect x="18" y="22" width="84" height="34" fill="#1b1f2c"/><polygon points="14,24 60,6 106,24" fill="#262b3d"/><rect x="54" y="38" width="12" height="18" fill="#0c0e14"/>'
@@ -20,6 +22,13 @@ const DISEGNI_MAPPA = Object.freeze({
   teatro: '<svg viewBox="0 0 120 60"><rect x="14" y="10" width="92" height="48" fill="#1c0c0e"/><rect x="24" y="16" width="72" height="34" fill="#0a0506"/>'
     + '<path d="M24 16 Q34 34 30 50 L24 50 Z" fill="#8a1424"/><path d="M96 16 Q86 34 90 50 L96 50 Z" fill="#8a1424"/><rect x="24" y="14" width="72" height="6" fill="#b08a3a"/>'
     + '<circle cx="60" cy="31" r="9" fill="#020203"/><circle cx="60" cy="31" r="11" fill="none" stroke="#ffb070" stroke-width="2" opacity="0.8"/><rect x="18" y="52" width="84" height="6" fill="#4e0c13"/></svg>',
+  palude: '<svg viewBox="0 0 120 60"><circle cx="96" cy="11" r="5" fill="#d8e4c4" opacity="0.6"/><rect y="46" width="120" height="14" fill="#0b1712"/>'
+    + '<g fill="#162619"><path d="M15 47 L19 16 L23 47 Z"/><path d="M100 47 L104 20 L108 47 Z"/></g><g fill="#21392a"><ellipse cx="19" cy="16" rx="12" ry="4"/><ellipse cx="104" cy="20" rx="10" ry="4"/></g>'
+    + '<g stroke="#3b5a3c" stroke-width="1"><path d="M11 17 v8"/><path d="M26 17 v10"/><path d="M98 21 v7"/></g>'
+    + '<g fill="#3d3122"><rect x="54" y="40" width="2" height="8"/><rect x="76" y="40" width="2" height="8"/><rect x="4" y="44" width="50" height="2"/></g>'
+    + '<rect x="50" y="27" width="30" height="14" fill="#2a2418"/><polygon points="47,28 65,18 83,28" fill="#3a3024"/><rect x="70" y="32" width="6" height="9" fill="#100c08"/>'
+    + '<rect x="57" y="31" width="7" height="6" fill="#e8b04a" opacity="0.85"/><rect x="57" y="50" width="7" height="3" fill="#e8b04a" opacity="0.2"/>'
+    + '<rect y="38" width="120" height="12" fill="#6dff8a" opacity="0.06"/></svg>',
 });
 const SOLDATO = colore => `<svg viewBox="0 0 40 60"><circle cx="20" cy="9" r="7" fill="#c9a98a"/><path d="M12 6 Q20 -1 28 6 L28 9 L12 9 Z" fill="${colore}"/>`
   + `<path d="M8 18 Q20 13 32 18 L33 40 L7 40 Z" fill="${colore}"/><rect x="9" y="40" width="9" height="18" fill="${colore}"/><rect x="22" y="40" width="9" height="18" fill="${colore}"/>`

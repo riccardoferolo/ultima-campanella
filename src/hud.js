@@ -2,8 +2,9 @@ import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseBoss, ASPETTI } from './regol
 import { NOMI_MAPPE, nomeBevanda } from './mappa.js';
 import { obiettivoGiungla, reliquieGiungla } from './storia.js';
 import { creaSalaScelte } from './salaScelte.js';
+import { obiettivo as obiettivoPalude, secondario as secondarioPalude } from './palude.js';
 
-const BOSS = Object.freeze(['divoratore', 'custode', 'guardiano', 'sciamano', 'preside']);
+const BOSS = Object.freeze(['arachne', 'divoratore', 'custode', 'guardiano', 'sciamano', 'preside']);
 const DURATA_RADIO_MS = 14000;
 
 const $ = id => document.getElementById(id);
@@ -27,6 +28,8 @@ function obiettivoTeatro(vista, mioId) {
 function obiettivo(vista, mioId) {
   if (vista.giungla) return obiettivoGiungla(vista);
   if (vista.teatro) return obiettivoTeatro(vista, mioId);
+  if (vista.palude) return obiettivoPalude(vista, mioId);
+  if (vista.mappa !== 'scuola') return '';
   const m = vista.missione;
   if (!m || vista.fase === 'attesa' || vista.fase === 'vinta' || vista.round === 0) return '';
   if (vista.fase === 'finale') return 'Uccidete il Custode';
@@ -186,9 +189,12 @@ export function creaHud() {
       const testoMissione = obiettivo(vista, mioId);
       const gas = (vista.teatro?.gas?.[mioId] ?? 0) > 0;
       if (nebbiaGas.classList.contains('attiva') !== gas) nebbiaGas.classList.toggle('attiva', gas);
-      if (missione.textContent !== testoMissione) missione.textContent = testoMissione;
-      const testoReliquie = reliquieGiungla(vista);
-      if (reliquie.textContent !== testoReliquie) reliquie.textContent = testoReliquie;
+      const testoReliquie = vista.palude ? secondarioPalude(vista, mioId) : reliquieGiungla(vista);
+      if (missione.textContent !== testoMissione || reliquie.textContent !== testoReliquie) {
+        missione.textContent = testoMissione;
+        reliquie.textContent = testoReliquie;
+        reliquie.style.top = testoMissione && testoReliquie ? `${missione.offsetTop + missione.offsetHeight + 4}px` : '';
+      }
       const bianca = ARMI[arma.tipo]?.bianca;
       carica.hidden = !bianca;
       if (bianca) {
@@ -202,8 +208,9 @@ export function creaHud() {
       disegnaPunti(vista, mioId);
       n.nomeArma.textContent = ARMI[arma.tipo].nome;
       n.nomeArma.classList.toggle('potenziata', arma.tipo.endsWith('+'));
-      n.munizioni.textContent = bianca ? '∞' : `${arma.caricatore} / ${arma.riserva}`;
-      n.munizioni.classList.toggle('poche', arma.caricatore <= Math.ceil(ARMI[arma.tipo].caricatore / 4));
+      const teschio = ARMI[arma.tipo]?.teschio;
+      n.munizioni.textContent = bianca ? '∞' : teschio ? `${io?.anime ?? 0} ${io?.anime === 1 ? 'anima' : 'anime'}` : `${arma.caricatore} / ${arma.riserva}`;
+      n.munizioni.classList.toggle('poche', teschio ? (io?.anime ?? 0) < R.TESCHIO_COSTO : arma.caricatore <= Math.ceil(ARMI[arma.tipo].caricatore / 4));
       const bevande = io?.bevande ?? [];
       if (n.bibite.dataset.chiave !== bevande.join()) {
         n.bibite.dataset.chiave = bevande.join();

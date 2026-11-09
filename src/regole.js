@@ -37,6 +37,8 @@ export const R = Object.freeze({
   DISTANZA_ACQUISTO: 2,
 
   COSTO_CASSA: 950,
+  COSTO_MUNIZIONI: 1000,
+  COSTO_MUNIZIONI_POTENZIATE: 2500,
   DURATA_CASSA: 8,
   COSTO_POTENZIA: 5000,
   DURATA_POTENZIA: 3,
@@ -106,11 +108,40 @@ export const R = Object.freeze({
   ARCO_SALTO: 6.5,
   ARCO_CALO: 0.88,
   ARCO_SCOSSA: 0.8,
+
+  ANIME_ALTARE: 30,
+  RAGGIO_ALTARE: 4,
+  TESCHIO_COSTO: 3,
+  TESCHIO_ANIME_MAX: 12,
+  TESCHIO_ANIME_INIZIALI: 6,
+  TESCHIO_PORTATA: 40,
+  TESCHIO_RAGGIO: 3.6,
+  TESCHIO_DANNO_AREA: 1.8,
+  TESCHIO_DANNO_BOSS: 3000,
+  TESCHIO_CARICA: 0.6,
+  TESCHIO_COSTO_RADICI: 3,
+
+  ELEMENTO_UCCISIONI: 15,
+  ELEMENTO_COSTO_OGGETTO: 1,
+  GHIACCIO_RAGGIO: 5,
+  FUOCO_RAGGIO: 4.5,
+  FUOCO_DANNO_AREA: 1.2,
+  FUOCO_ARDORE: 4,
+  FUOCO_DANNO_ARDORE: 0.35,
+  FUOCO_OGNI: 0.5,
+  FUOCO_CHIAZZA: 6,
+  FUOCO_CHIAZZA_RAGGIO: 2.5,
+  VUOTO_RAGGIO: 7,
+  VENTO_RAGGIO: 7,
+  VENTO_SPINTA: 5,
+  VENTO_STORDIMENTO: 1.6,
+  VENTO_DANNO_AREA: 0.9,
 });
 
 const arma = dati => Object.freeze({ pallini: 1, dispersione: 0.02, automatica: false, ...dati });
 const esplode = (raggio, danno, tipo, colore = null) => Object.freeze({ raggio, danno, tipo, colore });
 const aliena = dati => arma({ famiglia: 'aliena', aliena: true, ...dati });
+const teschio = dati => arma({ famiglia: 'teschio', modello: 'teschio', teschio: true, segreta: true, danno: 0, cadenza: 0.3, caricatore: 1, riserva: 0, ricarica: 0, dispersione: 0, ...dati });
 const reliquia = dati => arma({ famiglia: 'reliquia', bianca: true, segreta: true, caricatore: Infinity, riserva: Infinity, ricarica: 0, dispersione: 0, ...dati });
 
 const ARMI_BASE = Object.freeze({
@@ -138,6 +169,11 @@ const ARMI_BASE = Object.freeze({
   machete: reliquia({ nome: 'Machete di Giada', reliquia: 'giada', speciale: 'turbine', colore: 0x3ddc84, danno: 900, cadenza: 0.42, portata: 2.6, arco: 1.25 }),
   bastone: reliquia({ nome: 'Bastone del Serpente', reliquia: 'serpente', speciale: 'veleno', colore: 0x9be15d, danno: 700, cadenza: 0.55, portata: 3.1, arco: 0.9 }),
   spada: reliquia({ nome: 'Spada del Sole', reliquia: 'sole', speciale: 'onda', colore: 0xffb238, danno: 1150, cadenza: 0.5, portata: 2.8, arco: 1.05 }),
+  teschio: teschio({ nome: 'Teschio di Malakor', colore: 0x6dff8a }),
+  teschioGhiaccio: teschio({ nome: 'Teschio di Ghiaccio', elemento: 'ghiaccio', colore: 0x7fd8ff }),
+  teschioFuoco: teschio({ nome: 'Teschio di Fuoco', elemento: 'fuoco', colore: 0xff7a2a }),
+  teschioVuoto: teschio({ nome: 'Teschio del Vuoto', elemento: 'vuoto', colore: 0xb06cff }),
+  teschioVento: teschio({ nome: 'Teschio del Vento', elemento: 'vento', colore: 0xc8ffd8 }),
   singolarita: aliena({ nome: 'Singolarità', modello: 'Gun_Sniper', colore: 0x8a3dff, danno: 0, cadenza: 1.3, caricatore: 2, riserva: 14, ricarica: 3.2, dispersione: 0, proiettile: 'buco', suono: 'buco' }),
   criogeno: aliena({ nome: 'Criogeno', modello: 'Gun_Rifle', colore: 0x7fd8ff, danno: 22, cadenza: 0.09, automatica: true, caricatore: 60, riserva: 300, ricarica: 3, pallini: 3, dispersione: 0.07, portata: 11, gelo: 0.11, suono: 'gelo' }),
   arco: aliena({ nome: 'Arco Voltaico', modello: 'Gun_Revolver', colore: 0x66e6ff, danno: 900, cadenza: 0.55, caricatore: 10, riserva: 70, ricarica: 2.6, dispersione: 0.004, catena: 6, suono: 'arco' }),
@@ -226,6 +262,9 @@ export const TIPI_ZOMBIE = Object.freeze({
   divoratore: Object.freeze({ nome: 'Il Divoratore', vita: 1, velocita: 0.95, danno: 2.2, portata: 1.8, punti: 30, boss: true, finale: true, fasi: 4, carica: 1.5, attesa: 0.85 }),
   ardente: Object.freeze({ nome: 'Corrotto in fiamme', vita: 0.55, velocita: 1.2, danno: 0.8, portata: 1, punti: 1.2, corre: true }),
   tossico: Object.freeze({ nome: 'Mutante tossico', vita: 0.85, velocita: 0.95, danno: 1, portata: 1, punti: 1.3 }),
+  ragno: Object.freeze({ mappa: 'palude', nome: 'Zombi ragno', vita: 0.55, velocita: 1.25, danno: 0.7, portata: 0.95, punti: 1.2, corre: true, carica: 0.8 }),
+  bruto: Object.freeze({ mappa: 'palude', nome: 'Bruto corazzato', vita: 4.5, velocita: 0.8, danno: 1.8, portata: 1.25, punti: 4, rompe: 2.5, carica: 1.3, corazza: 0.3 }),
+  arachne: Object.freeze({ nome: 'Arachne, la Tessitrice', vita: 1, velocita: 1, danno: 2.2, portata: 2.2, punti: 40, boss: true, finale: true, soglie: Object.freeze([0.5, 0.2]) }),
 });
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 
@@ -301,6 +340,7 @@ export function faseDivoratore(vitaRelativa) {
 }
 
 export function faseBoss(dati, vitaRelativa) {
+  if (dati.soglie) return 1 + dati.soglie.filter(s => vitaRelativa <= s + 1e-9).length;
   return dati.fasi === 4 ? faseDivoratore(vitaRelativa) : faseCustode(vitaRelativa);
 }
 

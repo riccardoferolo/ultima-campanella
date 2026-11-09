@@ -1,10 +1,11 @@
 import * as scuola from './mappe/scuola.js';
 import * as giungla from './mappe/giungla.js';
 import * as teatro from './mappe/teatro.js';
+import * as palude from './mappe/palude.js';
 
-export const MAPPE = Object.freeze({ scuola, giungla, teatro });
+export const MAPPE = Object.freeze({ scuola, giungla, teatro, palude });
 export const ELENCO_MAPPE = Object.freeze(Object.keys(MAPPE));
-export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla', teatro: "Il Teatro dell'Eclissi" });
+export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla', teatro: "Il Teatro dell'Eclissi", palude: 'Bayou Vermillion' });
 const PIANO = () => 0;
 const NESSUN_NOME = Object.freeze({});
 
@@ -67,7 +68,15 @@ export function zoneAperte(porteAperte) {
   return aperte;
 }
 
+const cacheOstacoli = new Map();
+
 export function ostacoliPerGiocatori(porteAperte) {
+  const chiave = `${mappaAttiva}|${[...porteAperte].sort().join(',')}`;
+  if (!cacheOstacoli.has(chiave)) cacheOstacoli.set(chiave, Object.freeze(elencaOstacoli(porteAperte)));
+  return cacheOstacoli.get(chiave);
+}
+
+function elencaOstacoli(porteAperte) {
   return [
     ...MURI,
     ...RECINZIONI,

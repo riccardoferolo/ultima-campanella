@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { TESTA } from '../colpi.js';
 import { quota } from '../mappa.js';
+import { PROCEDURALI, decoraBruto } from './palude/ragni3d.js';
 
 const DISSOLVENZA = 0.25;
 const AFFONDA_DOPO = 2.6;
@@ -57,6 +58,11 @@ const MODELLI = Object.freeze({
     url: './modelli/zombi_magro.glb', scala: 0.25, tinta: 0xc9d6b4, nebbia: true,
     clip: { cammina: 'walk', cammina2: 'walk2', corre: 'run', attacco: 'attack2', attacco2: 'attack1_r', muore: 'dead1', fermo: 'idle' }, velocita: { cammina: 0.85, cammina2: 0.85 },
     riserva: { tinta: 0xc9d6b4, scala: 0.94 },
+  },
+  bruto: {
+    url: './modelli/zombie.glb', scala: 0.0148, tinta: 0x7d8288, alto: 2.05, raggio: 0.55, raggioTesta: 0.24, reazione: 0.3, decora: decoraBruto,
+    clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.8, corre: 0.85, attacco: 1.1, attacco2: 1.05, muore: 0.9, fermo: 0.8 },
   },
 });
 const MATERIALE_FIAMMA = new THREE.SpriteMaterial({ map: texturaFiamma(), color: 0xff8a3a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -141,6 +147,7 @@ export async function caricaZombi() {
       materialiVariante: tinte[0] === null ? null : materialiTinti(gltf.scene, tinte),
     });
   }));
+  for (const [tipo, risorsa] of Object.entries(PROCEDURALI)) risorse.set(tipo, { dati: risorsa.dati, modello: risorsa.modello, costruisci: risorsa.costruisci });
   return risorse;
 }
 
@@ -157,8 +164,22 @@ function logica(z, siMuove) {
 export function creaGestoreZombi(scena, risorse) {
   const zombi = new Map();
 
+  function creaProcedurale(z, risorsa) {
+    const radice = new THREE.Group();
+    scena.add(radice);
+    const parti = risorsa.costruisci(z, radice, scena);
+    const voce = {
+      radice, corpo: parti.corpo, testa: parti.testa, busto: null, mixer: parti.mixer, azioni: new Map(), dati: risorsa.dati, aloni: [], attuale: null,
+      ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: 0, vitaPrima: z.vita, sussulto: 0, senzaTesta: false, gelo: null, sollevato: 0, giro: 0,
+      anima: parti.anima, chiudi: parti.chiudi,
+    };
+    zombi.set(z.id, voce);
+    return voce;
+  }
+
   function crea(z) {
     const risorsa = risorse.get(z.tipo) ?? risorse.get('normale');
+    if (risorsa.costruisci) return creaProcedurale(z, risorsa);
     const { dati } = risorsa;
     const radice = new THREE.Group();
     const corpo = clonaScheletro(risorsa.modello);
@@ -189,6 +210,7 @@ export function creaGestoreZombi(scena, risorse) {
       if (!testa && /head$/i.test(o.name)) testa = o;
       if (/spine2?$/i.test(o.name)) busto = o;
     });
+    dati.decora?.(corpo, { testa, busto });
     const mixer = new THREE.AnimationMixer(corpo);
     const azioni = new Map();
     for (const [logico, nome] of Object.entries(dati.clip)) {
@@ -260,7 +282,7 @@ export function creaGestoreZombi(scena, risorse) {
 
   function sospendi(voce, z, buchi, dt) {
     let voluto = 0;
-    if (!voce.dati.alto && z.stato !== 'morto') {
+    if ((!voce.dati.alto || voce.dati.sollevabile) && z.stato !== 'morto') {
       for (const b of buchi) {
         const d = Math.hypot(z.x - b.x, z.z - b.z);
         if (d < b.raggio) voluto = Math.max(voluto, SOLLEVA * (1 - d / b.raggio) + 0.2);
@@ -275,6 +297,7 @@ export function creaGestoreZombi(scena, risorse) {
     const voce = zombi.get(id);
     if (!voce) return;
     scena.remove(voce.radice);
+    voce.chiudi?.();
     voce.mixer.stopAllAction();
     voce.mixer.uncacheRoot(voce.corpo);
     voce.corpo.traverse(o => o.skeleton?.dispose());
@@ -310,6 +333,7 @@ export function creaGestoreZombi(scena, risorse) {
         voce.vitaPrima = z.vita;
         voce.mixer.update(dt);
         postura(voce, dt);
+        voce.anima?.(z, dt, vista);
       }
       for (const id of [...zombi.keys()]) if (!vivi.has(id)) rimuovi(id);
     },
@@ -317,7 +341,7 @@ export function creaGestoreZombi(scena, risorse) {
       const punto = new THREE.Vector3();
       return vista.zombie.filter(z => z.stato !== 'morto').map(z => {
         const voce = zombi.get(z.id);
-        const dati = MODELLI[z.tipo] ?? MODELLI.normale;
+        const dati = risorse.get(z.tipo)?.dati ?? MODELLI.normale;
         const base = quota(z.x, z.z);
         const forma = { id: z.id, x: z.x, z: z.z, base, alto: dati.alto, raggio: dati.raggio, raggioTesta: dati.raggioTesta };
         if (voce?.testa) {
