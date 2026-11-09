@@ -1,12 +1,13 @@
 import {
-  R, ARMI, ARMI_CASSA, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
-  dannoGranata, moltiplicatoreBoss, faseCustode, saltiArco, fattoreOrda, armiPortate,
+  R, ARMI, ARMI_CASSA, PISTOLE_INIZIALI, ASPETTI, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
+  dannoGranata, moltiplicatoreBoss, faseCustode, faseBoss, saltiArco, fattoreOrda, armiPortate,
 } from './regole.js';
 import { passoCaso } from './caso.js';
 import {
   FINESTRE, PORTE, ACQUISTI, PARTENZE, PARTENZE_SALA, FRAMMENTI, ZONE, ALTEZZA_SOFFITTO, POSTI_FUSIBILE, FUSIBILE_GENERATORE, GENERATORE, COMPARSA_CUSTODE,
-  SOGLIA_RIFUGIO, FINESTRE_RIFUGIO, zonaDi, zoneAperte, ostacoliPerGiocatori,
+  SOGLIA_RIFUGIO, FINESTRE_RIFUGIO, zonaDi, zoneAperte, ostacoliPerGiocatori, usaMappa, ELENCO_MAPPE,
 } from './mappa.js';
+import * as giungla from './giungla.js';
 import { muoviCerchio, vistaLibera } from './fisica.js';
 import { direzioneDa } from './colpi.js';
 import { griglia, campoVerso, direzione } from './navigazione.js';
@@ -49,8 +50,12 @@ function caso(stato) {
   return valore;
 }
 
-export function creaPartita({ seme, giocatori = [], sala = false }) {
+export function creaPartita({ seme, giocatori = [], sala = false, mappa = 'scuola' }) {
+  const nomeMappa = usaMappa(mappa);
+  const scuola = nomeMappa === 'scuola';
   const stato = {
+    mappa: nomeMappa,
+    mappaScelta: nomeMappa,
     seme: seme >>> 0,
     rng: (seme ^ 0x5bd1e995) >>> 0,
     tempo: 0,
@@ -83,21 +88,25 @@ export function creaPartita({ seme, giocatori = [], sala = false }) {
     buchi: [],
     prossimoProiettile: 1,
     presideTra: null,
-    missione: {
+    missione: scuola ? {
       fusibili: 0,
       messi: 0,
       aTerra: [{ id: 0, ...POSTI_FUSIBILE[(seme >>> 0) % POSTI_FUSIBILE.length] }],
       presideFusibile: true,
       generatore: 'fermo',
       progresso: 0,
-    },
+    } : null,
+    giungla: nomeMappa === 'giungla' ? giungla.statoIniziale(seme) : null,
     finale: null,
   };
   giocatori.forEach(g => aggiungiGiocatore(stato, g));
   return stato;
 }
 
-export function aggiungiGiocatore(stato, { id, nome }) {
+const pistolaValida = p => (PISTOLE_INIZIALI.includes(p) ? p : PISTOLE_INIZIALI[0]);
+const aspettoValido = a => (Number.isInteger(a) && a >= 0 && a < ASPETTI.length ? a : 0);
+
+export function aggiungiGiocatore(stato, { id, nome, pistola, aspetto }) {
   const esistente = stato.giocatori.find(g => g.id === id);
   if (esistente) {
     esistente.nome = nome;
@@ -108,8 +117,8 @@ export function aggiungiGiocatore(stato, { id, nome }) {
   const giocatore = {
     id, nome, x: partenza.x, z: partenza.z, yaw: stato.fase === 'attesa' ? Math.PI / 2 : Math.PI, pitch: 0, pronto: false,
     stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, ultimoDanno: -Infinity, timerTerra: 0,
-    punti: R.PUNTI_INIZIALI, armi: ['pistola'], armaAttiva: 'pistola', bevande: [],
-    rianimando: false, progressoRianimazione: 0, attesaAssa: 0, colpi: 0, uccisioni: 0, teletrasporto: 0, granate: R.GRANATE_INIZIALI,
+    punti: R.PUNTI_INIZIALI, armi: [pistolaValida(pistola)], armaAttiva: pistolaValida(pistola), bevande: [], pistola: pistolaValida(pistola), aspetto: aspettoValido(aspetto),
+    rianimando: false, progressoRianimazione: 0, attesaAssa: 0, colpi: 0, uccisioni: 0, teletrasporto: 0, granate: R.GRANATE_INIZIALI, carica: 0,
   };
   stato.giocatori.push(giocatore);
   return giocatore;
@@ -147,6 +156,10 @@ function prendiArma(stato, giocatore, arma, eventi, extra = {}) {
 function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   if (giocatore.armi.includes(armaInMano)) giocatore.armaAttiva = armaInMano;
   const aperte = zoneAperte(new Set(stato.porte));
+  if (idAcquisto.startsWith('oggetto:')) {
+    if (stato.giungla) giungla.raccogli(stato, giocatore, Number(idAcquisto.slice('oggetto:'.length)), eventi, S);
+    return;
+  }
   if (idAcquisto.startsWith('fusibile:')) {
     raccogliFusibile(stato, giocatore, Number(idAcquisto.slice('fusibile:'.length)), aperte, eventi);
     return;
@@ -163,6 +176,7 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   const acquisto = ACQUISTI.find(a => a.id === idAcquisto);
   if (!acquisto || !aperte.has(acquisto.zona)) return;
   if (distanza(giocatore, acquisto.posizione) > R.DISTANZA_ACQUISTO + TOLLERANZA_DISTANZA) return;
+  if (stato.giungla && giungla.compra(stato, giocatore, acquisto, eventi, S)) return;
 
   if (acquisto.tipo === 'arma') {
     const posseduta = giocatore.armi.find(a => armaBase(a) === acquisto.arma);
@@ -283,7 +297,7 @@ function colpisci(stato, giocatore, azione, eventi) {
   const gelo = azione.gelo && arma?.gelo ? Math.min(Number(azione.gelo) || 0, arma.gelo * arma.pallini) * (arma.potenziata ? 1.7 : 1) : 0;
   if (gelo > 0 && zombie.gelato > 0) return;
   const richiesto = Math.min(DANNO_MASSIMO_COLPO, Math.max(0, Number(azione.danno) || 0));
-  ferisciZombie(stato, giocatore, zombie, richiesto, { testa: !!azione.testa, coltello: !!azione.coltello }, eventi);
+  ferisciZombie(stato, giocatore, zombie, richiesto, { testa: !!azione.testa, coltello: !!azione.coltello, arma: arma === ARMI[azione.arma] ? azione.arma : null }, eventi);
   if (gelo > 0 && zombie.stato !== 'morto') congela(zombie, giocatore, gelo, eventi);
 }
 
@@ -399,8 +413,10 @@ function aggiornaBuchi(stato, dt, eventi) {
   });
 }
 
-function danneggia(stato, giocatore, zombie, danno, { testa = false, coltello = false, frantumato = false }, eventi) {
+function danneggia(stato, giocatore, zombie, dannoRichiesto, opzioni, eventi) {
+  const { testa = false, coltello = false, frantumato = false } = opzioni;
   const dati = tipoDi(zombie);
+  const danno = stato.giungla ? giungla.dannoEffettivo(stato, zombie, dannoRichiesto, opzioni) : dannoRichiesto;
   zombie.vita -= danno;
   if (zombie.vita > 0) {
     aggiungiPunti(stato, giocatore, R.PUNTI_COLPO);
@@ -409,11 +425,11 @@ function danneggia(stato, giocatore, zombie, danno, { testa = false, coltello = 
       eventi.push({ k: 'infuriato', zombie: zombie.id, tipo: zombie.tipo });
     }
     if (dati.finale) {
-      const fase = faseCustode(zombie.vita / zombie.vitaMax);
+      const fase = faseBoss(dati, zombie.vita / zombie.vitaMax);
       if (fase > (zombie.faseBoss ?? 1)) {
         zombie.faseBoss = fase;
         zombie.corre = true;
-        eventi.push({ k: 'faseBoss', fase });
+        eventi.push({ k: 'faseBoss', fase, tipo: zombie.tipo });
       }
     }
     eventi.push({ k: 'colpito', zombie: zombie.id, testa, da: giocatore.id });
@@ -424,6 +440,7 @@ function danneggia(stato, giocatore, zombie, danno, { testa = false, coltello = 
   eventi.push({ k: 'ucciso', zombie: zombie.id, testa, da: giocatore.id, x: zombie.x, z: zombie.z, tipo: zombie.tipo, ...(frantumato ? { frantumato: true } : {}) });
   giocatore.uccisioni += 1;
   aggiungiPunti(stato, giocatore, (coltello ? R.PUNTI_COLTELLO : testa ? R.PUNTI_TESTA : R.PUNTI_UCCISIONE) * dati.punti);
+  if (stato.giungla) giungla.suUccisione(stato, zombie, giocatore, opzioni, eventi);
   if (dati.boss) bossUcciso(stato, zombie, eventi);
   else forseBonus(stato, zombie, eventi);
 }
@@ -443,7 +460,8 @@ function forseBonus(stato, zombie, eventi) {
 function bossUcciso(stato, zombie, eventi) {
   for (const g of vivi(stato)) aggiungiPunti(stato, g, R.PUNTI_BOSS);
   eventi.push({ k: 'bossUcciso', tipo: zombie.tipo });
-  if (zombie.tipo !== 'preside') return;
+  if (stato.giungla) giungla.suBossUcciso(stato, zombie, puntoCaduta(zombie), eventi, S);
+  if (zombie.tipo !== 'preside' || !stato.missione) return;
   const punto = puntoCaduta(zombie);
   creaBonus(stato, punto.x + 0.9, punto.z, ELENCO_BONUS[Math.floor(caso(stato) * ELENCO_BONUS.length)], eventi);
   if (!stato.missione.presideFusibile) return;
@@ -485,7 +503,7 @@ function avviaGeneratore(stato, giocatore, eventi) {
 
 function aggiornaGeneratore(stato, dt, eventi) {
   const missione = stato.missione;
-  if (missione.generatore !== 'acceso') return;
+  if (!missione || missione.generatore !== 'acceso') return;
   if (vivi(stato).some(g => distanza(g, GENERATORE) <= R.DISTANZA_GENERATORE)) missione.progresso = Math.min(1, missione.progresso + dt / R.DURATA_GENERATORE);
   if (missione.progresso < 1) return;
   missione.generatore = 'finito';
@@ -530,7 +548,7 @@ function aggiornaFinale(stato, dt, eventi) {
   eventi.push({ k: 'urlo' });
 }
 
-function vittoria(stato, eventi) {
+function vittoria(stato, eventi, portaDaRiaprire = 'rifugio') {
   stato.fase = 'vinta';
   for (const z of stato.zombie) {
     if (z.stato === 'morto') continue;
@@ -538,7 +556,7 @@ function vittoria(stato, eventi) {
     z.timer = RESTA_A_TERRA_DA_MORTO;
     eventi.push({ k: 'ucciso', zombie: z.id, testa: false, da: null, x: z.x, z: z.z, bomba: true });
   }
-  if (!stato.porte.includes('rifugio')) stato.porte.push('rifugio');
+  if (portaDaRiaprire && !stato.porte.includes(portaDaRiaprire)) stato.porte.push(portaDaRiaprire);
   for (const g of stato.giocatori) aggiungiPunti(stato, g, R.PUNTI_VITTORIA);
   eventi.push({
     k: 'vittoria', round: stato.round, durata: Math.round(stato.finale?.tempo ?? 0),
@@ -673,7 +691,7 @@ function avvia(stato, eventi) {
     const partenza = PARTENZE[i % PARTENZE.length];
     Object.assign(g, {
       x: partenza.x, z: partenza.z, yaw: Math.PI, stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, punti: R.PUNTI_INIZIALI,
-      armi: ['pistola'], armaAttiva: 'pistola', bevande: [], pronto: false, uccisioni: 0, teletrasporto: g.teletrasporto + 1, granate: R.GRANATE_INIZIALI,
+      armi: [g.pistola], armaAttiva: g.pistola, bevande: [], pronto: false, uccisioni: 0, teletrasporto: g.teletrasporto + 1, granate: R.GRANATE_INIZIALI, carica: 0,
     });
   });
   eventi.push({ k: 'via' });
@@ -718,6 +736,7 @@ function eseguiAzioni(stato, azioni, eventi) {
     if (giocatore.stato !== 'vivo' || stato.fase === 'fine' || stato.fase === 'vinta') continue;
     if (azione.tipo === 'colpo') colpisci(stato, giocatore, azione, eventi);
     else if (azione.tipo === 'pronto') giocatore.pronto = stato.fase === 'attesa' && !!azione.attivo;
+    else if (azione.tipo === 'scegli' && stato.fase === 'attesa') scegli(stato, giocatore, azione, eventi);
     else if (stato.fase === 'attesa') continue;
     else if (azione.tipo === 'compra') compra(stato, giocatore, String(azione.acquisto), azione.arma, eventi);
     else if (azione.tipo === 'assa') ricostruisci(stato, giocatore, azione.finestra, eventi);
@@ -725,17 +744,42 @@ function eseguiAzioni(stato, azioni, eventi) {
     else if (azione.tipo === 'granata') lancia(stato, giocatore, azione, eventi);
     else if (azione.tipo === 'sparo') sparaProiettile(stato, giocatore, azione, eventi);
     else if (azione.tipo === 'catena') catena(stato, giocatore, azione, eventi);
+    else if (azione.tipo === 'speciale' && stato.giungla) giungla.speciale(stato, giocatore, azione, eventi, S);
   }
 }
 
-function generaZombie(stato, { tipo: tipoVoluto = null, finestre: soloFinestre = null, corre: correVoluto } = {}) {
+function scegli(stato, giocatore, { cosa, valore }, eventi) {
+  if (cosa === 'pistola' && PISTOLE_INIZIALI.includes(valore)) {
+    Object.assign(giocatore, { pistola: valore, armi: [valore], armaAttiva: valore });
+    eventi.push({ k: 'armi', a: giocatore.id, armi: [valore], arma: valore });
+  } else if (cosa === 'aspetto' && aspettoValido(valore) === valore) {
+    giocatore.aspetto = valore;
+  } else if (cosa === 'mappa' && ELENCO_MAPPE.includes(valore) && valore !== stato.mappaScelta) {
+    stato.mappaScelta = valore;
+    for (const g of stato.giocatori) g.pronto = false;
+    eventi.push({ k: 'mappaScelta', mappa: valore });
+  }
+}
+
+function generaZombie(stato, { tipo: tipoVoluto = null, finestre: soloFinestre = null, corre: correVoluto, punto = null, vita: vitaVoluta = null, attesa = 0 } = {}) {
+  const inGiungla = stato.mappa === 'giungla';
   const aperte = zoneAperte(new Set(stato.porte));
   const finestre = soloFinestre ? FINESTRE.filter(f => soloFinestre.includes(f.id)) : FINESTRE.filter(f => aperte.has(f.zona));
-  const finestra = finestre[Math.floor(caso(stato) * finestre.length)];
+  const finestra = punto ? null : finestre[Math.floor(caso(stato) * finestre.length)];
   const tipo = tipoVoluto ?? tipoZombie(stato.round, caso(stato));
   const dati = TIPI_ZOMBIE[tipo];
-  const corre = dati.boss ? false : correVoluto ?? (!!dati.corre || caso(stato) < quotaCorridori(stato.round));
-  const vita = Math.round(vitaZombie(Math.max(1, stato.round)) * dati.vita * (dati.boss ? moltiplicatoreBoss(stato.giocatori.length) : 1));
+  const anticipo = inGiungla ? R.GIUNGLA_ANTICIPO_CORRIDORI : 0;
+  const corre = dati.boss ? false : correVoluto ?? (!!dati.corre || caso(stato) < quotaCorridori(stato.round + anticipo));
+  const vita = vitaVoluta ?? Math.round(vitaZombie(Math.max(1, stato.round)) * dati.vita * (dati.boss ? moltiplicatoreBoss(stato.giocatori.length) : 1) * (inGiungla ? R.GIUNGLA_VITA : 1));
+  const sorgente = punto ?? (finestra.tana ? finestra.interno : null);
+  if (sorgente) {
+    stato.zombie.push({
+      id: stato.prossimoId++, x: sorgente.x + (punto ? 0 : (caso(stato) - 0.5) * 1.2), z: sorgente.z + (punto ? 0 : (caso(stato) - 0.5) * 1.2),
+      yaw: caso(stato) * Math.PI * 2, stato: 'emerge', finestra: (finestra ?? finestre[0] ?? FINESTRE[0]).id, vita, vitaMax: vita, tipo,
+      corre, variante: Math.floor(caso(stato) * 4), timer: R.EMERGE, attesa, bersaglio: null,
+    });
+    return;
+  }
   stato.zombie.push({
     id: stato.prossimoId++, x: finestra.comparsa.x + (caso(stato) - 0.5) * 2, z: finestra.comparsa.z + (caso(stato) - 0.5) * 2,
     yaw: Math.atan2(-finestra.fuori.x, -finestra.fuori.z), stato: 'arriva', finestra: finestra.id, vita, vitaMax: vita, tipo,
@@ -749,7 +793,12 @@ function avanzaFase(stato, dt, eventi) {
     return;
   }
   if (stato.fase === 'finale') {
-    aggiornaFinale(stato, dt, eventi);
+    if (stato.giungla) giungla.aggiornaFinale(stato, dt, eventi, S);
+    else aggiornaFinale(stato, dt, eventi);
+    return;
+  }
+  if (stato.fase === 'fuga') {
+    giungla.aggiornaFuga(stato, dt, eventi, S);
     return;
   }
   if (stato.fase === 'intervallo') {
@@ -758,14 +807,15 @@ function avanzaFase(stato, dt, eventi) {
     stato.round += 1;
     stato.bonusRound = 0;
     stato.fase = 'gioco';
-    stato.daGenerare = Math.round(zombieDelRound(stato.round) * fattoreOrda(stato.giocatori.length));
+    stato.daGenerare = Math.round(zombieDelRound(stato.round) * fattoreOrda(stato.giocatori.length) * (stato.giungla ? R.GIUNGLA_ORDA : 1));
     stato.attesaComparsa = 1;
-    stato.presideTra = stato.round % R.OGNI_PRESIDE === 0 ? R.PRESIDE_DOPO : null;
+    stato.presideTra = stato.missione && stato.round % R.OGNI_PRESIDE === 0 ? R.PRESIDE_DOPO : null;
+    if (stato.giungla) giungla.inizioRound(stato, eventi);
     for (const g of stato.giocatori) {
       if (g.stato === 'vivo' && stato.round > 1) g.granate = Math.min(R.GRANATE_MASSIME, g.granate + R.GRANATE_PER_ROUND);
       if (g.stato !== 'morto') continue;
       const partenza = PARTENZE[0];
-      Object.assign(g, { stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, x: partenza.x, z: partenza.z, armi: ['pistola'], armaAttiva: 'pistola', bevande: [], rianimando: false, teletrasporto: g.teletrasporto + 1, granate: R.GRANATE_INIZIALI });
+      Object.assign(g, { stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, x: partenza.x, z: partenza.z, armi: [g.pistola], armaAttiva: g.pistola, bevande: [], rianimando: false, teletrasporto: g.teletrasporto + 1, granate: R.GRANATE_INIZIALI });
       eventi.push({ k: 'rinato', a: g.id });
     }
     eventi.push({ k: 'round', round: stato.round });
@@ -780,20 +830,22 @@ function avanzaFase(stato, dt, eventi) {
       eventi.push({ k: 'boss', tipo: 'preside', fusibile: stato.missione.presideFusibile });
     }
   }
-  const generatore = stato.missione.generatore === 'acceso';
+  const generatore = stato.missione?.generatore === 'acceso' || (!!stato.giungla && giungla.difesaAttiva(stato));
   if (generatore && stato.daGenerare < 2) stato.daGenerare = 2;
   stato.attesaComparsa -= dt;
   const presenti = stato.zombie.filter(z => z.stato !== 'morto').length;
-  if (stato.attesaComparsa <= 0 && stato.daGenerare > 0 && presenti < R.ZOMBIE_VIVI_MAX) {
+  const limite = stato.giungla ? R.GIUNGLA_VIVI_MAX : R.ZOMBIE_VIVI_MAX;
+  if (stato.attesaComparsa <= 0 && stato.daGenerare > 0 && presenti < limite) {
     generaZombie(stato);
     stato.daGenerare -= 1;
     stato.attesaComparsa = attesaComparsa(stato.round) * (generatore ? 0.6 : 1);
     return;
   }
-  if (stato.daGenerare === 0 && presenti === 0 && stato.presideTra === null) {
+  if (stato.daGenerare === 0 && presenti === 0 && stato.presideTra === null && !(stato.giungla && giungla.bossInAttesa(stato))) {
     stato.fase = 'intervallo';
     stato.timerFase = R.INTERVALLO;
     eventi.push({ k: 'fineRound', round: stato.round });
+    if (stato.giungla) giungla.fineRound(stato, eventi);
   }
 }
 
@@ -841,6 +893,11 @@ function muoviZombie(stato, dt, eventi) {
       z.timer -= dt;
       continue;
     }
+    if (z.stato === 'emerge') {
+      z.timer -= dt;
+      if (z.timer <= 0) z.stato = 'dentro';
+      continue;
+    }
     if (z.stato === 'arriva') {
       const dx = finestra.esterno.x - z.x;
       const dz = finestra.esterno.z - z.z;
@@ -886,7 +943,7 @@ function muoviZombie(stato, dt, eventi) {
       if (vicino) z.yaw = Math.atan2(vicino.g.x - z.x, vicino.g.z - z.z);
       if (z.timer > 0) continue;
       const bersaglio = stato.giocatori.find(g => g.id === z.bersaglio && g.stato === 'vivo');
-      if (bersaglio && distanza(bersaglio, z) <= portata + 0.4) ferisci(stato, bersaglio, eventi, R.DANNO_ZOMBIE * dati.danno);
+      if (bersaglio && distanza(bersaglio, z) <= portata + 0.4) ferisci(stato, bersaglio, eventi, R.DANNO_ZOMBIE * dati.danno * (stato.giungla ? R.GIUNGLA_DANNO : 1));
       z.stato = 'dentro';
       z.attesa = R.ATTESA_ATTACCO * (dati.attesa ?? 1) * (furia ? 0.7 : 1);
       continue;
@@ -930,6 +987,12 @@ function scatto(stato, z, dt, ostacoli, eventi) {
   eventi.push({ k: 'scatto', zombie: z.id });
   return prede[0].g;
 }
+
+const S = Object.freeze({
+  caso, vivi, distanza, generaZombie, ferisciZombie, prendiArma, aggiungiPunti, creaBonus, tipoDi,
+  ferisciGiocatore: ferisci,
+  vittoria: (stato, eventi) => vittoria(stato, eventi, null),
+});
 
 function separa(zombie) {
   for (let i = 0; i < zombie.length; i++) {
@@ -985,6 +1048,7 @@ function aggiornaGiocatori(stato, dt, eventi) {
       g.stato = 'morto';
       g.rianimando = false;
       eventi.push({ k: 'morto', a: g.id });
+      if (stato.giungla) giungla.suMorte(stato, g, eventi);
     }
   }
 }
@@ -1014,6 +1078,7 @@ export function passo(stato, dt, { posizioni = {}, azioni = [] } = {}) {
   aggiornaProiettili(stato, dt, eventi);
   aggiornaBuchi(stato, dt, eventi);
   aggiornaGeneratore(stato, dt, eventi);
+  if (stato.giungla) giungla.aggiorna(stato, dt, eventi, S);
   if (stato.fase === 'vinta') return eventi;
   if (stato.giocatori.length > 0 && vivi(stato).length === 0) {
     stato.fase = 'fine';

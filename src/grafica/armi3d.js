@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ARMI, armaBase } from '../regole.js';
 import { costruisciAliena, haFormaAliena } from './armiAliene3d.js';
+import { creaReliquia } from './reliquie3d.js';
 
 const URL_ARMI = './modelli/armi.glb';
 const URL_ALIENE = './modelli/aliene.glb';
@@ -97,6 +98,7 @@ function vestiArma(gruppo, dati, materiali) {
 
 export function modelloArma(tipo, materiali) {
   const dati = tipo === 'coltello' ? { modello: MODELLO_COLTELLO } : ARMI[tipo] ?? ARMI[armaBase(tipo)];
+  if (dati.bianca) return creaReliquia(armaBase(tipo), dati);
   const modello = materiali.libreria.get(dati.modello);
   const extra = modello.userData;
   const bocca = new THREE.Vector3().fromArray(extra.bocca ?? [0, 0.03, -0.3]);

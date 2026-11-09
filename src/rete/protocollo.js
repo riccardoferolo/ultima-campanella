@@ -1,4 +1,6 @@
 import { ARMI, BEVANDE } from '../regole.js';
+import { ELENCO_MAPPE } from '../mappa.js';
+import { LUNGHEZZA_STATO } from '../giungla.js';
 
 const LETTERE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const NOME_MASSIMO = 16;
@@ -25,8 +27,8 @@ const elencoNumeri = (x, lunghezza) => Array.isArray(x) && x.every(e => Array.is
 
 function eGiocatore(g) {
   return !!g && typeof g === 'object' && testo(g.id) && typeof g.n === 'string'
-    && [g.x, g.z, g.y, g.p, g.s, g.v, g.vm, g.pt, g.c, g.tt, g.pr, g.ri, g.u, g.tp, g.gn].every(numero)
-    && arma(g.a) && Array.isArray(g.ar) && g.ar.every(arma)
+    && [g.x, g.z, g.y, g.p, g.s, g.v, g.vm, g.pt, g.c, g.tt, g.pr, g.ri, g.u, g.tp, g.gn, g.rc].every(numero)
+    && arma(g.a) && Array.isArray(g.ar) && g.ar.every(arma) && arma(g.ps) && numero(g.as)
     && Array.isArray(g.b) && g.b.every(b => Object.hasOwn(BEVANDE, b));
 }
 
@@ -48,12 +50,17 @@ function eIstantanea(ist) {
     && Array.isArray(ist.m) && ist.m.length === 5 && ist.m.every(numero)
     && elencoNumeri(ist.fo, 4)
     && elencoNumeri(ist.pj, 4)
-    && elencoNumeri(ist.bh, 6);
+    && elencoNumeri(ist.bh, 6)
+    && numero(ist.mp) && numero(ist.ms)
+    && Array.isArray(ist.gq) && (ist.gq.length === 0 || ist.gq.length === LUNGHEZZA_STATO) && ist.gq.every(numero)
+    && elencoNumeri(ist.go, 4) && elencoNumeri(ist.nb, 5) && elencoNumeri(ist.pt, 4);
 }
 
 function eAzione(a) {
   if (!a || typeof a !== 'object') return false;
   if (a.tipo === 'colpo') return numero(a.zombie) && numero(a.danno) && (a.gelo === undefined || numero(a.gelo)) && (a.arma === undefined || arma(a.arma));
+  if (a.tipo === 'scegli') return ['pistola', 'aspetto', 'mappa'].includes(a.cosa) && (typeof a.valore === 'string' || numero(a.valore));
+  if (a.tipo === 'speciale') return numero(a.yaw) && numero(a.pitch);
   if (a.tipo === 'sparo') return numero(a.yaw) && numero(a.pitch) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'catena') return Array.isArray(a.zombie) && a.zombie.length > 0 && a.zombie.length <= 13 && a.zombie.every(numero) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'compra') return testo(a.acquisto) && (a.arma === undefined || arma(a.arma));
@@ -66,8 +73,8 @@ function eAzione(a) {
 
 const CONTROLLI = {
   ciao: m => pulisciNome(m.nome) !== null && testo(m.id),
-  lobby: m => pulisciNome(m.nomeHost) !== null && (m.giocatori === undefined || (Array.isArray(m.giocatori) && m.giocatori.length <= 4 && m.giocatori.every(n => typeof n === 'string'))),
-  inizia: m => numero(m.seme),
+  lobby: m => pulisciNome(m.nomeHost) !== null && (m.mappa === undefined || ELENCO_MAPPE.includes(m.mappa)) && (m.giocatori === undefined || (Array.isArray(m.giocatori) && m.giocatori.length <= 4 && m.giocatori.every(n => typeof n === 'string'))),
+  inizia: m => numero(m.seme) && (m.mappa === undefined || ELENCO_MAPPE.includes(m.mappa)),
   g: m => [m.x, m.z, m.yaw, m.pitch, m.colpi, m.tp].every(numero) && arma(m.arma),
   az: m => eAzione(m.a),
   st: m => numero(m.g) && eIstantanea(m.ist),

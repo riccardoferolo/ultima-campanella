@@ -26,11 +26,24 @@ export async function caricaPersonaggi() {
   }));
 }
 
+export const TINTE_ASPETTO = Object.freeze([[0x9cc28a, 0x000000], [0xffffff, 0x000000], [0x6a7590, 0x000000], [0xffffff, 0x2a2a2a], [0xff8a6a, 0x1a0500], [0x8a9a5a, 0x000000]]);
+
 export function creaCompagno(scena, nome, materialiArmi, personaggio) {
   const radice = new THREE.Group();
   const postura = new THREE.Group();
   const corpo = clonaScheletro(personaggio.modello);
   corpo.rotation.y = Math.PI;
+  const divise = [];
+  corpo.traverse(o => {
+    if (!o.isMesh) return;
+    o.material = [].concat(o.material).map(m => {
+      const copia = m.clone();
+      divise.push(copia);
+      return copia;
+    });
+    if (o.material.length === 1) o.material = o.material[0];
+  });
+  let aspetto = -1;
   let mano = null;
   corpo.traverse(o => {
     if (!mano && o.isBone && /RightHand$/.test(o.name)) mano = o;
@@ -68,6 +81,14 @@ export function creaCompagno(scena, nome, materialiArmi, personaggio) {
 
   return {
     aggiorna(g, dt) {
+      if (g.aspetto !== aspetto) {
+        aspetto = g.aspetto ?? 0;
+        const [tinta, luce] = TINTE_ASPETTO[aspetto] ?? TINTE_ASPETTO[0];
+        for (const m of divise) {
+          m.color.setHex(tinta);
+          if (m.emissive) m.emissive.setHex(luce);
+        }
+      }
       radice.visible = g.stato !== 'morto';
       radice.position.set(g.x, 0, g.z);
       radice.rotation.y = g.yaw;

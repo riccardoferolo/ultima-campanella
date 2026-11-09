@@ -28,7 +28,7 @@ test('ogni arma ha la sua versione potenziata, più forte', () => {
   for (const [chiave, arma] of Object.entries(ARMI)) {
     if (arma.potenziata) continue;
     const forte = ARMI[`${chiave}+`];
-    assert.ok(forte && forte.danno === arma.danno * 2 && forte.caricatore > arma.caricatore, chiave);
+    assert.ok(forte && forte.danno === arma.danno * 2 && (arma.bianca || forte.caricatore > arma.caricatore), chiave);
     assert.equal(versionePotenziata(chiave), `${chiave}+`);
     assert.equal(armaBase(`${chiave}+`), chiave);
   }

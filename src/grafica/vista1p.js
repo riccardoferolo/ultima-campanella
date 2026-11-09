@@ -8,6 +8,7 @@ const MIRA = new THREE.Vector3(0, -0.068, -0.24);
 const DURATA_LAMPO = 0.05;
 const SOSTEGNO_PISTOLA = new THREE.Vector3(-0.018, -0.05, 0.04);
 const COLORE_LAMPO = 0xfff3c4;
+const DURATA_FENDENTE = 0.32;
 export const DURATA_BEVUTA = 1.7;
 const BEVUTA_SALE = new THREE.Vector3(0.08, -0.4, -0.28);
 const BEVUTA_PRONTA = new THREE.Vector3(0.05, -0.07, -0.24);
@@ -118,6 +119,7 @@ export function creaVista1p(materialiArmi) {
   let attuale = null;
   let rinculo = 0;
   let tempoLampo = 0;
+  let fendente = 0;
   let passo = 0;
   let tempo = 0;
   const posizione = RIPOSO.clone();
@@ -135,7 +137,7 @@ export function creaVista1p(materialiArmi) {
     lampo.position.copy(m.bocca);
     lampo.material.color.setHex(m.colore ?? COLORE_LAMPO);
     lampo.scale.setScalar(m.colore ? 0.24 : 0.18);
-    manoSinistra.visible = true;
+    manoSinistra.visible = !ARMI[tipo]?.bianca;
     manoSinistra.position.copy(m.presa ?? SOSTEGNO_PISTOLA);
     if (ARMI[tipo]?.colore !== undefined) ricambi.capsula.material.emissive.setHex(ARMI[tipo].colore);
     attuale = tipo;
@@ -146,6 +148,10 @@ export function creaVista1p(materialiArmi) {
     camera,
     mostra,
     spara() {
+      if (ARMI[attuale]?.bianca) {
+        fendente = 1;
+        return;
+      }
       rinculo = 1;
       tempoLampo = DURATA_LAMPO;
       lampo.material.rotation = Math.random() * Math.PI;
@@ -263,7 +269,11 @@ export function creaVista1p(materialiArmi) {
         posizione.y + Math.abs(Math.sin(passo)) * 0.014 * movimento * bob - cambio * 0.3 - (corsa ? 0.04 : 0) + (posa?.spinta.y ?? 0),
         posizione.z + rinculo * 0.05 + (posa?.spinta.z ?? 0),
       );
-      supporto.rotation.set(rinculo * 0.12 + (posa?.beccheggio ?? 0), (corsa ? 0.5 : 0) + (mira ? 0 : 0.06), posa?.rollio ?? 0);
+      fendente = Math.max(0, fendente - dt / DURATA_FENDENTE);
+      const arco = fendente > 0 ? Math.sin((1 - fendente) * Math.PI) : 0;
+      const verso = fendente > 0 ? 0.9 - (1 - fendente) * 1.8 : 0;
+      supporto.rotation.set(rinculo * 0.12 + (posa?.beccheggio ?? 0) - arco * 0.35, (corsa ? 0.5 : 0) + (mira ? 0 : 0.06) + verso * arco, (posa?.rollio ?? 0) - arco * 0.6);
+      supporto.position.x -= arco * 0.08;
       supporto.scale.setScalar(posa?.scala ?? 1);
       const modello = modelli.get(attuale);
       const riposoMano = modello?.presa ?? SOSTEGNO_PISTOLA;

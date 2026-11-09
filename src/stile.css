@@ -165,6 +165,23 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 .obiettivo { position: absolute; top: 12px; left: 16px; font-size: 18px; color: #e9e2cc; max-width: 46vw; }
 .obiettivo::before { content: '\25B8  '; color: var(--oro); }
 .obiettivo:empty { display: none; }
+.obiettivo.secondario { top: 36px; font-size: 15px; color: #b9d8a8; }
+.obiettivo.secondario::before { content: '\25C6  '; color: #6fd08c; }
+.radio { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); width: min(760px, 86vw); background: rgba(8, 12, 9, 0.82); border: 1px solid #3c5a43; border-left: 4px solid #6fd08c; padding: 10px 16px; font-size: 18px; color: #e8f1e0; text-shadow: none; }
+.radio[hidden] { display: none; }
+.radio p { margin: 4px 0; }
+.radio p.intestazione { color: #8fe0a4; font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; }
+.carica { width: 180px; height: 8px; border: 1px solid rgba(255, 255, 255, 0.6); background: rgba(0, 0, 0, 0.5); position: relative; margin-bottom: 4px; }
+.carica[hidden] { display: none; }
+.carica i { display: block; height: 100%; background: linear-gradient(90deg, #2a7a4a, #7dffb0); }
+.carica.piena i { background: linear-gradient(90deg, #ffd34a, #fff6c2); }
+.carica::after { content: attr(data-testo); position: absolute; right: 0; top: -18px; font-size: 13px; color: #e8f1e0; }
+#sala .scelte { display: grid; gap: 4px; margin: 6px 0 10px; }
+#sala .scelte div { display: flex; gap: 8px; align-items: center; }
+#sala .scelte div.spenta { opacity: 0.45; }
+#sala .scelte kbd { min-width: 22px; text-align: center; border: 1px solid #c9c2a8; border-radius: 4px; padding: 0 4px; font-size: 14px; }
+#sala .scelte span { color: #b9b2a0; min-width: 64px; }
+#sala .scelte b { color: #ffe08a; font-weight: 600; }
 .bibite i { width: 22px; height: 22px; border-radius: 3px; border: 1px solid #000; display: block; }
 
 .avviso {
@@ -177,8 +194,11 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
   color: var(--sangue-chiaro);
   opacity: 0;
   transition: opacity 0.3s;
-  white-space: nowrap;
+  width: min(92vw, 1100px);
+  text-align: center;
+  line-height: 1.05;
 }
+.avviso.lungo { font-size: clamp(22px, 3.4vw, 38px); }
 .avviso.visibile { opacity: 1; }
 .avviso.bene { color: var(--oro); }
 .suggerimento { position: absolute; top: 62%; left: 50%; transform: translateX(-50%); font-size: 24px; white-space: nowrap; color: #f6f1e4; }

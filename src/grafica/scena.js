@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { R } from '../regole.js';
-import { ZONE } from '../mappa.js';
+import { ZONE, ATMOSFERA, mappaAttiva, usaMappa } from '../mappa.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { creaTexture, caricaTextureReali } from './texture.js';
+import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA } from './texture.js';
+import { caricaGiungla, costruisciGiungla } from './giungla3d.js';
+import { TINTE_ASPETTO } from './compagno3d.js';
 import { caricaArmi, creaMaterialiArmi } from './armi3d.js';
 import { costruisciScuola } from './scuola3d.js';
 import { caricaZombi, creaGestoreZombi } from './zombi3d.js';
@@ -17,13 +19,9 @@ const PASSO_SCALA = 0.1;
 const FPS_BASSI = 50;
 const FPS_ALTI = 58;
 const VERIFICA_OGNI_S = 1.5;
-const BUIO = 0x06080b;
 const FOV = 72;
 const FOV_MIRA = 52;
 const FOV_CANNOCCHIALE = 20;
-const CIELO_APERTO = 0x0b1322;
-const NEBBIA_DENTRO = 24;
-const NEBBIA_FUORI = 40;
 const ONDEGGIO = 0.01;
 const RAGGIO_BOMBA = 0.034;
 const SU = new THREE.Vector3(0, 1, 0);
@@ -191,7 +189,7 @@ function precompila(renderer, scena, camera, extra) {
 
 const aperta = (x, z) => ZONE.some(zona => zona.aperto && x >= zona.x0 && x <= zona.x1 && z >= zona.z0 && z <= zona.z1);
 
-export async function creaMondo(contenitore) {
+export async function creaMondo(contenitore, mappa = mappaAttiva) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -200,10 +198,13 @@ export async function creaMondo(contenitore) {
   renderer.autoClear = false;
   contenitore.appendChild(renderer.domElement);
 
+  usaMappa(mappa);
+  const giungla = mappa === 'giungla';
+  const atmosfera = ATMOSFERA;
   const scena = new THREE.Scene();
-  scena.background = new THREE.Color(BUIO);
-  scena.fog = new THREE.Fog(BUIO, 3, 24);
-  scena.add(new THREE.HemisphereLight(0x7f8ea3, 0x1b150f, 0.55));
+  scena.background = new THREE.Color(atmosfera.buio);
+  scena.fog = new THREE.Fog(atmosfera.buio, atmosfera.nebbiaVicino, atmosfera.nebbiaDentro);
+  scena.add(new THREE.HemisphereLight(giungla ? 0x7fa392 : 0x7f8ea3, giungla ? 0x15200f : 0x1b150f, giungla ? 0.6 : 0.55));
   const luna = new THREE.DirectionalLight(0x7088b8, 0.6);
   luna.position.set(-20, 30, -30);
   scena.add(luna);
@@ -223,13 +224,23 @@ export async function creaMondo(contenitore) {
   scena.environment = ambiente;
   scena.environmentIntensity = 0.12;
   const texture = creaTexture();
-  const [libreria, risorseZombi, personaggi, oggetti, reali] = await Promise.all([caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(), caricaTextureReali()]);
+  const [libreria, risorseZombi, personaggi, oggetti, reali, modelliGiungla] = await Promise.all([
+    caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(), caricaTextureReali(giungla ? TEXTURE_GIUNGLA : TEXTURE_SCUOLA), giungla ? caricaGiungla() : null,
+  ]);
+  const mappaPrima = mappaAttiva;
+  usaMappa(mappa);
   const materialiArmi = creaMaterialiArmi(texture, libreria);
-  const scuola = costruisciScuola(scena, texture, materialiArmi, oggetti, reali);
-  costruisciArredi(scena, oggetti);
-  costruisciSala(scena);
+  const vuoto = { aggiorna() {}, suona() {} };
+  const mondoMappa = giungla
+    ? costruisciGiungla(scena, { reali, materialiArmi, oggetti, modelli: modelliGiungla })
+    : costruisciScuola(scena, texture, materialiArmi, oggetti, reali);
+  if (!giungla) {
+    costruisciArredi(scena, oggetti);
+    costruisciSala(scena);
+  }
   const bonus3d = creaBonus3d(scena);
-  const segreti = creaSegreti(scena);
+  const segreti = giungla ? vuoto : creaSegreti(scena);
+  usaMappa(mappaPrima);
   const zombi = creaGestoreZombi(scena, risorseZombi);
   const effetti = creaEffetti(scena);
   const granate3d = creaGranate3d(scena);
@@ -309,10 +320,10 @@ export async function creaMondo(contenitore) {
     if (vista1p.lampoAcceso) lampo.color.setHex(vista1p.coloreLampo);
     const fuori = aperta(io.x, io.z);
     const fattore = Math.min(1, dt * 2);
-    scena.fog.far += ((fuori ? NEBBIA_FUORI : NEBBIA_DENTRO) - scena.fog.far) * fattore;
-    scena.fog.color.lerp(new THREE.Color(fuori ? CIELO_APERTO : BUIO), fattore);
+    scena.fog.far += ((fuori ? atmosfera.nebbiaFuori : atmosfera.nebbiaDentro) - scena.fog.far) * fattore;
+    scena.fog.color.lerp(new THREE.Color(fuori ? atmosfera.cielo : atmosfera.buio), fattore);
     scena.background.copy(scena.fog.color);
-    scuola.aggiorna(vista, dt, tempo);
+    mondoMappa.aggiorna(vista, dt, tempo);
     zombi.aggiorna(vista, dt);
     granate3d.aggiorna(vista.granate, dt);
     vuoto3d.aggiorna(vista, dt);
@@ -341,7 +352,29 @@ export async function creaMondo(contenitore) {
       const bocca = new THREE.Vector3(0.12, -0.08, -0.4).applyQuaternion(camera.quaternion).add(camera.position);
       effetti.raggio(bocca, new THREE.Vector3(punto.x, punto.y, punto.z), colore);
     },
+    mappa,
+    tela: renderer.domElement,
     campanella: () => segreti.suona(),
+    tingiManica(aspetto) {
+      materialiArmi.manica.color.setHex((TINTE_ASPETTO[aspetto] ?? TINTE_ASPETTO[0])[0]);
+    },
+    speciale(e) {
+      const centro = new THREE.Vector3(e.x, 1, e.z);
+      if (e.tipo === 'turbine') {
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          effetti.esplosione(new THREE.Vector3(e.x + Math.cos(a) * 3, 1, e.z + Math.sin(a) * 3), 'energia', 0x3ddc84);
+        }
+      } else if (e.tipo === 'onda') {
+        for (let d = 1.5; d <= 14; d += 1.5) effetti.esplosione(new THREE.Vector3(e.x + Math.sin(e.yaw) * d, 1, e.z + Math.cos(e.yaw) * d), 'fuoco', 0xffb238);
+      } else effetti.esplosione(centro, 'energia', 0x7dff6a);
+    },
+    anima(e) {
+      effetti.esplosione(new THREE.Vector3(e.x, 1.2, e.z), 'energia', 0x9be15d);
+    },
+    pietra(e) {
+      effetti.esplosione(new THREE.Vector3(e.x, 0.4, e.z), 'fuoco', 0x8a6a4a);
+    },
     bevi: tipo => vista1p.bevi(tipo),
     bersagli: vista => zombi.bersagli(vista),
     colpito: (id, testa) => zombi.colpito(id, testa),

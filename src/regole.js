@@ -80,6 +80,16 @@ export const R = Object.freeze({
   RINFORZI_FINALE_MAX: 10,
   PUNTI_VITTORIA: 5000,
 
+  GIUNGLA_VITA: 1.35,
+  GIUNGLA_ORDA: 1.3,
+  GIUNGLA_ANTICIPO_CORRIDORI: 3,
+  GIUNGLA_VIVI_MAX: 24,
+  GIUNGLA_DANNO: 1.15,
+  ZOMBIE_VIVI_MAX_SCUOLA: 20,
+  EMERGE: 1.6,
+  CARICA_RELIQUIA: 12,
+  VITA_DIVORATORE: 60000,
+
   BUCO_VELOCITA: 11,
   BUCO_VOLO: 3,
   BUCO_DURATA: 3,
@@ -99,6 +109,7 @@ export const R = Object.freeze({
 const arma = dati => Object.freeze({ pallini: 1, dispersione: 0.02, automatica: false, ...dati });
 const esplode = (raggio, danno, tipo, colore = null) => Object.freeze({ raggio, danno, tipo, colore });
 const aliena = dati => arma({ famiglia: 'aliena', aliena: true, ...dati });
+const reliquia = dati => arma({ famiglia: 'reliquia', bianca: true, segreta: true, caricatore: Infinity, riserva: Infinity, ricarica: 0, dispersione: 0, ...dati });
 
 const ARMI_BASE = Object.freeze({
   pistola: arma({ nome: 'Pistola P9', famiglia: 'pistola', modello: 'Pistol_1', danno: 40, cadenza: 0.22, caricatore: 8, riserva: 48, ricarica: 1.4, dispersione: 0.004 }),
@@ -122,6 +133,9 @@ const ARMI_BASE = Object.freeze({
   precisione: arma({ nome: 'Precisione L-96', famiglia: 'precisione', modello: 'SniperRifle_1', danno: 500, cadenza: 1.2, caricatore: 5, riserva: 30, ricarica: 3, dispersione: 0, mirino: true }),
   dsv: arma({ nome: 'Precisione semiauto D-SV', famiglia: 'precisione', modello: 'SniperRifle_2', danno: 300, cadenza: 0.4, caricatore: 10, riserva: 50, ricarica: 2.8, dispersione: 0, mirino: true }),
   anticarro: arma({ nome: 'Anticarro .50 B-82', famiglia: 'precisione', modello: 'SniperRifle_3', danno: 900, cadenza: 1, caricatore: 10, riserva: 40, ricarica: 3.6, dispersione: 0, mirino: true }),
+  machete: reliquia({ nome: 'Machete di Giada', reliquia: 'giada', speciale: 'turbine', colore: 0x3ddc84, danno: 900, cadenza: 0.42, portata: 2.6, arco: 1.25 }),
+  bastone: reliquia({ nome: 'Bastone del Serpente', reliquia: 'serpente', speciale: 'veleno', colore: 0x9be15d, danno: 700, cadenza: 0.55, portata: 3.1, arco: 0.9 }),
+  spada: reliquia({ nome: 'Spada del Sole', reliquia: 'sole', speciale: 'onda', colore: 0xffb238, danno: 1150, cadenza: 0.5, portata: 2.8, arco: 1.05 }),
   singolarita: aliena({ nome: 'Singolarità', modello: 'Gun_Sniper', colore: 0x8a3dff, danno: 0, cadenza: 1.3, caricatore: 2, riserva: 14, ricarica: 3.2, dispersione: 0, proiettile: 'buco', suono: 'buco' }),
   criogeno: aliena({ nome: 'Criogeno', modello: 'Gun_Rifle', colore: 0x7fd8ff, danno: 22, cadenza: 0.09, automatica: true, caricatore: 60, riserva: 300, ricarica: 3, pallini: 3, dispersione: 0.07, portata: 11, gelo: 0.11, suono: 'gelo' }),
   arco: aliena({ nome: 'Arco Voltaico', modello: 'Gun_Revolver', colore: 0x66e6ff, danno: 900, cadenza: 0.55, caricatore: 10, riserva: 70, ricarica: 2.6, dispersione: 0.004, catena: 6, suono: 'arco' }),
@@ -169,7 +183,11 @@ export const MODI_RICARICA = Object.freeze({
 });
 export const modoRicarica = tipo => MODI_RICARICA[ARMI[tipo]?.famiglia] ?? 'caricatore';
 
-export const COLTELLO = Object.freeze({ danno: 150, attesa: 0.6, portata: 1.6 });
+export const COLTELLO = Object.freeze({ danno: 250, attesa: 0.42, portata: 2.1, arco: 0.85, affondo: 3.4, quotaVita: 0.34 });
+export const dannoColtello = round => Math.round(Math.max(COLTELLO.danno, vitaZombie(Math.max(1, round)) * COLTELLO.quotaVita));
+
+export const PISTOLE_INIZIALI = Object.freeze(['pistola', 'magnum', 'aquila', 'raffica']);
+export const ASPETTI = Object.freeze(['Bosco', 'Deserto', 'Notte', 'Neve', 'Fiamma', 'Palude']);
 
 const PESO_FAMIGLIA = Object.freeze({
   pistola: 1, revolver: 0.9, mitra: 1, assalto: 1, battaglia: 0.8, mitragliatrice: 0.6, pompa: 0.9, precisione: 0.7, aliena: 0.35,
@@ -201,6 +219,9 @@ export const TIPI_ZOMBIE = Object.freeze({
   magro: Object.freeze({ nome: 'Scuoiato', vita: 0.7, velocita: 1.15, danno: 1.1, portata: 1.05, punti: 1.2, corre: true }),
   preside: Object.freeze({ nome: 'Il Preside', vita: 12, velocita: 0.85, danno: 1.6, portata: 1.3, punti: 8, boss: true, carica: 1.4, rompe: 3, infuria: 0.5 }),
   custode: Object.freeze({ nome: 'Il Custode', vita: 1, velocita: 0.9, danno: 1.9, portata: 1.6, punti: 20, boss: true, finale: true, carica: 1.6, attesa: 0.9 }),
+  sciamano: Object.freeze({ nome: 'Lo Sciamano', vita: 16, velocita: 0.95, danno: 1.6, portata: 1.3, punti: 10, boss: true, carica: 1.3, infuria: 0.5, evoca: true }),
+  guardiano: Object.freeze({ nome: 'Il Guardiano del Sole', vita: 22, velocita: 1, danno: 2, portata: 1.4, punti: 12, boss: true, carica: 1.5, infuria: 0.5 }),
+  divoratore: Object.freeze({ nome: 'Il Divoratore', vita: 1, velocita: 0.95, danno: 2.2, portata: 1.8, punti: 30, boss: true, finale: true, fasi: 4, carica: 1.5, attesa: 0.85 }),
 });
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 
@@ -261,6 +282,17 @@ export function moltiplicatoreBoss(giocatori) {
 
 export function fattoreOrda(giocatori) {
   return giocatori <= 2 ? 1 : 1 + 0.35 * (giocatori - 2);
+}
+
+export function faseDivoratore(vitaRelativa) {
+  if (vitaRelativa > 0.75) return 1;
+  if (vitaRelativa > 0.5) return 2;
+  if (vitaRelativa > 0.25) return 3;
+  return 4;
+}
+
+export function faseBoss(dati, vitaRelativa) {
+  return dati.fasi === 4 ? faseDivoratore(vitaRelativa) : faseCustode(vitaRelativa);
 }
 
 export function faseCustode(vitaRelativa) {

@@ -18,7 +18,10 @@ function disegna(larghezza, altezza, pittore, ripeti = true) {
 
 const REALI = Object.freeze(['muro', 'piastrelle', 'parquet', 'soffitto', 'legno', 'legnoChiaro', 'porta', 'terra', 'linoleum', 'cemento', 'asfalto', 'metallo']);
 
-export async function caricaTextureReali(base = './texture/') {
+export const TEXTURE_SCUOLA = REALI;
+export const TEXTURE_GIUNGLA = Object.freeze(['suoloGiungla', 'foglieTerra', 'pietraMuschio', 'pietraTempio', 'roccia', 'paglia', 'assiVecchie', 'fango', 'cortecciaPalma', 'corteccia', 'metallo', 'legno']);
+
+export async function caricaTextureReali(chiavi = REALI, base = './texture/') {
   const loader = new THREE.TextureLoader();
   const carica = async (nome, colore) => {
     const t = await loader.loadAsync(`${base}${nome}.jpg`);
@@ -27,7 +30,7 @@ export async function caricaTextureReali(base = './texture/') {
     if (colore) t.colorSpace = THREE.SRGBColorSpace;
     return t;
   };
-  const voci = await Promise.all(REALI.map(async chiave => {
+  const voci = await Promise.all(chiavi.map(async chiave => {
     const [map, normalMap, roughnessMap] = await Promise.all([carica(`${chiave}_diff`, true), carica(`${chiave}_nor`, false), carica(`${chiave}_rough`, false)]);
     return [chiave, { map, normalMap, roughnessMap }];
   }));

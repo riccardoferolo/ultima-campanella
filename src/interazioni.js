@@ -1,5 +1,82 @@
 import { R, ARMI, BEVANDE, armaBase, versionePotenziata } from './regole.js';
 import { FINESTRE, PORTE, ACQUISTI, FRAMMENTI, SOGLIA_RIFUGIO, zoneAperte, zonaDi } from './mappa.js';
+import { OGGETTI } from './mappe/giungla.js';
+import { ID_ASSI, ID_SCHEGGIA_GROTTA, ID_SCHEGGIA_FIUME, ID_MASCHERA, RELIQUIE, ASSI, SCHEGGE, ANIME_PER_IDOLO } from './giungla.js';
+import { RUNE } from './storia.js';
+
+const DISTANZA_OGGETTO = 1.8;
+const PORTE_CHIUSE = Object.freeze({
+  ponte: 'Il ponte è crollato: servono le assi del villaggio, da portare al cantiere',
+  tempio: "La porta del tempio: si apre con la maschera dello Sciamano",
+  sigillo: "Il sigillo del cuore: cede solo al colpo speciale di una reliquia",
+});
+const NOMI_OGGETTI = Object.freeze({ [ID_SCHEGGIA_GROTTA]: 'la scheggia di giada', [ID_MASCHERA]: 'la maschera dello Sciamano' });
+
+function testoOggetto(id) {
+  if (ID_ASSI.includes(id)) return 'Premi F per prendere il fascio di assi';
+  const reliquia = Object.entries(RELIQUIE).find(([, n]) => n === id)?.[0];
+  if (reliquia) return `Premi F per prendere: ${ARMI[reliquia].nome}`;
+  return `Premi F per prendere ${NOMI_OGGETTI[id] ?? "l'oggetto"}`;
+}
+
+function candidatiGiungla(io, vista, candidati) {
+  const g = vista.giungla;
+  for (const o of g.oggetti) {
+    const d = distanza(o, io);
+    if (d <= DISTANZA_OGGETTO) candidati.push({ d: d - 1, tipo: 'compra', acquisto: `oggetto:${o.id}`, costo: 0, testo: testoOggetto(o.id) });
+  }
+  if (g.ponte === 2 && !g.scheggiaFiume && distanza(g.cassaFiume, io) <= DISTANZA_OGGETTO) {
+    candidati.push({ d: -2, tipo: 'compra', acquisto: `oggetto:${ID_SCHEGGIA_FIUME}`, costo: 0, testo: 'Premi F per afferrare la cassa che galleggia!' });
+  }
+}
+
+function descriviGiungla(a, io, vista) {
+  const g = vista.giungla;
+  const nessuno = testo => ({ costo: Infinity, testo });
+  switch (a.tipo) {
+    case 'generatoreG': {
+      const gen = g.generatori[a.generatore];
+      if (gen.stato === 2) return nessuno('Il generatore gira da solo');
+      if (gen.stato === 1) return nessuno(`Generatore ${Math.round(gen.progresso * 100)}% — restate vicini!`);
+      return vista.fase === 'gioco' ? { costo: 0, testo: 'Premi F per avviare il generatore (dovrete difenderlo)' } : nessuno('Il generatore si avvia solo durante un round');
+    }
+    case 'radio':
+      if (!vista.corrente) return nessuno('La radio è muta: servono i due generatori');
+      return { costo: 0, testo: g.radioAscoltati < g.radioLivello ? 'Premi F per ascoltare un nuovo messaggio' : 'Premi F per riascoltare la radio' };
+    case 'cantiere':
+      if (g.ponte === 2) return nessuno('Il ponte regge');
+      if (g.ponte === 1) return nessuno(`Il ponte è a metà: ${Math.round(g.progressoPonte * 100)}% — difendetelo!`);
+      if (g.assiRaccolte > 0) return { costo: 0, testo: `Premi F per posare le assi (${g.assiPortate + g.assiRaccolte}/${ASSI})` };
+      if (g.assiPortate >= ASSI) return vista.fase === 'gioco' ? { costo: 0, testo: 'Premi F per costruire il ponte (dovrete difenderlo)' } : nessuno('Si costruisce solo durante un round');
+      return nessuno(`Cantiere del ponte: assi ${g.assiPortate}/${ASSI}, le trovate nel villaggio`);
+    case 'cabina':
+      if (g.scheggiaAereo) return nessuno('La cabina è vuota');
+      return vista.corrente ? { costo: 0, testo: 'Premi F per aprire il vano della cabina' } : nessuno('La cabina è al buio: serve la corrente');
+    case 'altare':
+      if (g.altare === 1) return nessuno("L'altare sta forgiando: finite il round");
+      if (g.altare >= 2) return nessuno("L'altare ha dato il suo dono");
+      return g.schegge > 0 ? { costo: 0, testo: `Premi F per posare le schegge di giada (${g.scheggeAltare + g.schegge}/${SCHEGGE})` } : nessuno(`Altare di giada: schegge ${g.scheggeAltare}/${SCHEGGE}`);
+    case 'pietraSole':
+      return g.sole === 0 ? { costo: 0, testo: 'Premi F per girare la pietra del sole' } : nessuno('Le pietre sono allineate');
+    case 'portaTempio':
+      if (g.porta === 2) return nessuno('La porta è aperta');
+      if (g.porta === 1) return nessuno(`La porta sale: ${Math.round(g.progressoPorta * 100)}% — tenete la posizione!`);
+      if (g.sciamano === 3) return { costo: 0, testo: 'Premi F per mettere la maschera sulla porta' };
+      if (g.sciamano === 4) return vista.fase === 'gioco' ? { costo: 0, testo: 'Premi F per risvegliare la porta (dovrete difenderla)' } : nessuno('La porta si risveglia solo durante un round');
+      return nessuno('Sulla porta c’è l’impronta di una maschera');
+    case 'runa':
+      if (g.rune === 1) return nessuno('Le rune brillano');
+      return { costo: 0, testo: `Premi F per toccare la runa del ${RUNE[a.runa]}` };
+    case 'cuoreAltare':
+      if (vista.fase === 'finale') return nessuno('');
+      if (vista.giocatori.filter(x => x.stato !== 'morto').some(x => zonaDi(x.x, x.z) !== 'cuore' || x.z <= OGGETTI.SOGLIA_CUORE)) return nessuno("Entrate tutti nella camera del cuore per toccare l'altare");
+      return { costo: 0, testo: "Premi F per svegliare il Divoratore (non si torna indietro)" };
+    case 'idolo':
+      return nessuno(g.idoli[a.idolo] >= ANIME_PER_IDOLO ? "L'idolo è sazio" : `Idolo del serpente: anime ${g.idoli[a.idolo]}/${ANIME_PER_IDOLO}`);
+    default:
+      return null;
+  }
+}
 
 const distanza = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
@@ -18,11 +95,13 @@ export function interazioneVicina(io, vista) {
     const d = distanza(f, io);
     if (d <= R.DISTANZA_FUSIBILE) candidati.push({ d: d - 1, tipo: 'compra', acquisto: `fusibile:${f.id}`, costo: 0, testo: 'Premi F per prendere il fusibile' });
   }
+  if (vista.giungla) candidatiGiungla(io, vista, candidati);
   for (const porta of PORTE) {
     if (vista.porte.has(porta.id)) continue;
     if (porta.chiusa) {
       const d = distanza(porta.centro, io);
-      if (d <= R.DISTANZA_ACQUISTO) candidati.push({ d: d + 0.3, tipo: 'info', testo: vista.fase === 'finale' ? 'Il cancello è sbarrato: uccidete il Custode!' : 'Cancello del rifugio: si apre col quadro qui accanto' });
+      const testo = vista.fase === 'finale' ? 'È sbarrato: prima vincete lo scontro!' : PORTE_CHIUSE[porta.id] ?? 'Cancello del rifugio: si apre col quadro qui accanto';
+      if (d <= R.DISTANZA_ACQUISTO) candidati.push({ d: d + 0.3, tipo: 'info', testo });
       continue;
     }
     const d = distanza(porta.centro, io);
@@ -78,6 +157,8 @@ function descriviAllarme(vista) {
 }
 
 function descrivi(a, io, vista) {
+  const giungla = vista.giungla ? descriviGiungla(a, io, vista) : null;
+  if (giungla) return giungla;
   if (a.tipo === 'arma') {
     const possiede = io.armi.some(x => armaBase(x) === a.arma);
     const costo = possiede ? a.munizioni : a.costo;

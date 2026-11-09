@@ -35,7 +35,7 @@ test('ogni arma ha un modello, un nome e la sua versione potenziata', () => {
   assert.ok(ARMI_DI_BASE.length >= 20, `solo ${ARMI_DI_BASE.length} armi`);
   assert.deepEqual(ARMI_DI_BASE.filter(a => ARMI[a].aliena).sort(), ['arco', 'criogeno', 'singolarita']);
   for (const chiave of ARMI_DI_BASE) {
-    assert.ok(ARMI[chiave].modello, chiave);
+    assert.ok(ARMI[chiave].modello || ARMI[chiave].bianca, chiave);
     assert.ok(ARMI[`${chiave}+`], `${chiave}+`);
     assert.notEqual(ARMI[`${chiave}+`].nome, ARMI[chiave].nome);
   }

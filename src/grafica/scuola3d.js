@@ -4,7 +4,7 @@ import { ALTEZZA_SOFFITTO, ZONE, MURI, RECINZIONI, ALTEZZA_RECINZIONE, OSTACOLI,
 import { texturaTesto } from './texture.js';
 import { modelloArma } from './armi3d.js';
 import { creaCaso } from './caso-grafica.js';
-import { creaDistributore } from './bibite3d.js';
+import { creaMacchine } from './macchine3d.js';
 
 const H = ALTEZZA_SOFFITTO;
 const DAVANZALE = 0.9;
@@ -21,7 +21,7 @@ const LAMPIONI = Object.freeze([[17, 20, 0xbcd4ff], [10.5, 27.5, 0xc8dcff], [23,
 const PROFILO_CAMPANA = Object.freeze([[0, 0.02], [0.05, 0.03], [0.07, 0.08], [0.085, 0.16], [0.13, 0.22], [0.14, 0.24], [0, 0.24]]);
 const MATERIALI_OSTACOLI = Object.freeze({ banco: 'legnoChiaro', tavolo: 'legnoChiaro', bancone: 'metallo', cavallina: 'legno' });
 
-function scatolaUV(l, a, p, metri, partenza = 0) {
+export function scatolaUV(l, a, p, metri, partenza = 0) {
   const g = new THREE.BoxGeometry(l, a, p);
   const uv = g.attributes.uv;
   const facce = [[p, a], [p, a], [l, p], [l, p], [l, a], [l, a]];
@@ -36,14 +36,14 @@ function scatolaUV(l, a, p, metri, partenza = 0) {
   return g;
 }
 
-function blocco(scena, materiale, s, y0, y1, metri = H) {
+export function blocco(scena, materiale, s, y0, y1, metri = H) {
   const mesh = new THREE.Mesh(scatolaUV(s.x1 - s.x0, y1 - y0, s.z1 - s.z0, metri, y0), materiale);
   mesh.position.set((s.x0 + s.x1) / 2, (y0 + y1) / 2, (s.z0 + s.z1) / 2);
   scena.add(mesh);
   return mesh;
 }
 
-function piano(scena, materiale, x0, z0, x1, z1, y, metri, sotto = false) {
+export function piano(scena, materiale, x0, z0, x1, z1, y, metri, sotto = false) {
   const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(sotto ? Math.PI / 2 : -Math.PI / 2);
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * (x1 - x0)) / metri, (uv.getY(i) * (z1 - z0)) / metri);
@@ -53,7 +53,7 @@ function piano(scena, materiale, x0, z0, x1, z1, y, metri, sotto = false) {
   return mesh;
 }
 
-function orientamento(mesh, verso) {
+export function orientamento(mesh, verso) {
   mesh.rotation.y = Math.atan2(verso.x, verso.z);
 }
 
@@ -222,30 +222,7 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
   lavagna.rotation.y = Math.PI;
   scena.add(lavagna);
 
-  for (const a of ACQUISTI) {
-    const { x, z } = a.posizione;
-    if (a.tipo === 'arma') {
-      const supporto = new THREE.Group();
-      supporto.position.set(x, 0, z);
-      orientamento(supporto, a.verso);
-      const { gruppo, lunghezza } = modelloArma(a.arma, materialiArmi);
-      gruppo.rotation.y = Math.PI / 2;
-      gruppo.position.set(-lunghezza * 0.12, 1.55, 0.08);
-      const cornice = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(0.7, lunghezza + 0.25), 0.62), mat.legno);
-      cornice.position.set(0, 1.5, 0.012);
-      const gesso = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.22), new THREE.MeshBasicMaterial({
-        map: texturaTesto([ARMI[a.arma].nome.toUpperCase(), `${a.costo}`], { larghezza: 160, altezza: 36, colore: '#ecebe2', font: 'bold 12px monospace' }), transparent: true,
-      }));
-      gesso.position.set(0, 1.08, 0.015);
-      supporto.add(cornice, gruppo, gesso);
-      scena.add(supporto);
-    } else if (a.tipo === 'bevanda') {
-      const macchina = creaDistributore(a.bevanda);
-      macchina.position.set(x, 0, z);
-      orientamento(macchina, a.verso);
-      scena.add(macchina);
-    }
-  }
+  const macchine = creaMacchine(scena, { materialiArmi, oggetti, metallo: pbr('metallo', { color: 0x8f86a8, metalness: 0.65 }), legno: mat.legno });
 
   const cartello = (righe, x, y, z, verso, larghezza, altezza, opzioni) => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(larghezza, altezza), new THREE.MeshBasicMaterial({ map: texturaTesto(righe, opzioni), transparent: true }));
@@ -304,42 +281,6 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
   orientamento(quadro, interruttoreDati.verso);
   scena.add(quadro);
 
-  const potenziatoreDati = ACQUISTI.find(a => a.tipo === 'potenziatore');
-  const macchina = new THREE.Group();
-  const corpoMacchina = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.9, 1.15), pbr('metallo', { color: 0x8f86a8, metalness: 0.65 }));
-  corpoMacchina.position.y = 0.95;
-  const schermo = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.45), new THREE.MeshBasicMaterial({
-    map: texturaTesto(['POTENZIATORE', `${R.COSTO_POTENZIA}`], { larghezza: 128, altezza: 48, sfondo: '#1a0b2e', colore: '#d6b8ff', font: 'bold 12px monospace', bordo: '#7d3cff' }),
-  }));
-  schermo.position.set(0, 1.55, 0.58);
-  const anello = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 6, 18), new THREE.MeshBasicMaterial({ color: 0x3a2060 }));
-  anello.position.set(0, 0.9, 0.6);
-  const luceMacchina = new THREE.PointLight(0xa45cff, 0, 5, 1.5);
-  luceMacchina.position.set(0, 1.4, 1);
-  macchina.add(corpoMacchina, schermo, anello, luceMacchina);
-  macchina.position.set(potenziatoreDati.posizione.x, 0, potenziatoreDati.posizione.z);
-  orientamento(macchina, potenziatoreDati.verso);
-  scena.add(macchina);
-  const armiMacchina = new Map();
-  let armaInMacchina = null;
-
-  const cassaDati = ACQUISTI.find(a => a.tipo === 'cassa');
-  const cassa = new THREE.Group();
-  const fondo = oggetti.get('old_military_crate').clone();
-  fondo.scale.setScalar(0.62);
-  const perno = new THREE.Group();
-  perno.position.set(0, 0.56, -0.3);
-  const punto = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshBasicMaterial({ map: texturaTesto(['?'], { larghezza: 32, altezza: 32, colore: '#7dd3fc', font: 'bold 28px monospace' }), transparent: true }));
-  punto.position.set(0, 0.6, 0.05);
-  const alone = new THREE.PointLight(0x7dd3fc, 0, 4, 1.5);
-  alone.position.set(0, 1, 0.3);
-  cassa.add(fondo, perno, punto, alone);
-  cassa.position.set(cassaDati.posizione.x, 0, cassaDati.posizione.z);
-  orientamento(cassa, cassaDati.verso);
-  scena.add(cassa);
-  const armiCassa = new Map();
-  let armaMostrata = null;
-
   const lampade = LUCI.map(([x, z, tremola, colore]) => {
     const luce = new THREE.PointLight(colore, INTENSITA_LUCE, PORTATA_LUCE, 1.5);
     luce.position.set(x, H - 0.4, z);
@@ -387,51 +328,7 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
       campanaFinale.rotation.x = Math.sin(tempo * 5) * 0.45 * oscillaCampana;
       leva.rotation.x = THREE.MathUtils.lerp(leva.rotation.x, vista.corrente ? -2.4 : 0, Math.min(1, dt * 5));
       spia.material.color.setHex(vista.corrente ? 0x3cff6a : 0xb8241b);
-      const lavora = vista.potenziatore.stato === 'lavora';
-      anello.material.color.setHex(!vista.corrente ? 0x3a2060 : lavora ? 0xe0b0ff : 0xa45cff);
-      anello.rotation.z += dt * (lavora ? 9 : vista.corrente ? 1 : 0);
-      luceMacchina.intensity = !vista.corrente ? 0 : lavora ? 6 + Math.sin(tempo * 20) * 3 : 2.5;
-      const inMacchina = vista.potenziatore.stato === 'pronta' ? vista.potenziatore.arma : null;
-      if (armaInMacchina !== inMacchina) {
-        armiMacchina.forEach(m => { m.visible = false; });
-        if (inMacchina) {
-          if (!armiMacchina.has(inMacchina)) {
-            const { gruppo } = modelloArma(inMacchina, materialiArmi);
-            gruppo.scale.setScalar(1.2);
-            macchina.add(gruppo);
-            armiMacchina.set(inMacchina, gruppo);
-          }
-          armiMacchina.get(inMacchina).visible = true;
-        }
-        armaInMacchina = inMacchina;
-      }
-      if (inMacchina) {
-        const g = armiMacchina.get(inMacchina);
-        g.position.set(0, 2.25 + Math.sin(tempo * 2) * 0.05, 0.2);
-        g.rotation.y = tempo * 1.8;
-      }
-      const aperta = vista.cassa.stato === 'aperta';
-      perno.rotation.x = THREE.MathUtils.lerp(perno.rotation.x, aperta ? -1.3 : 0, Math.min(1, dt * 6));
-      alone.intensity = aperta ? 3 + Math.sin(tempo * 6) : 0.6;
-      const voluta = aperta ? vista.cassa.arma : null;
-      if (armaMostrata !== voluta) {
-        armiCassa.forEach(m => { m.visible = false; });
-        if (voluta) {
-          if (!armiCassa.has(voluta)) {
-            const { gruppo } = modelloArma(voluta, materialiArmi);
-            gruppo.scale.setScalar(1.15);
-            cassa.add(gruppo);
-            armiCassa.set(voluta, gruppo);
-          }
-          armiCassa.get(voluta).visible = true;
-        }
-        armaMostrata = voluta;
-      }
-      if (voluta) {
-        const g = armiCassa.get(voluta);
-        g.position.set(0, 1.15 + Math.sin(tempo * 2) * 0.05, 0);
-        g.rotation.y = tempo * 1.5;
-      }
+      macchine.aggiorna(vista, dt, tempo);
     },
   };
 }

@@ -32,7 +32,24 @@ const MODELLI = Object.freeze({
     clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
     velocita: { cammina: 0.75, corre: 0.8, attacco: 1, attacco2: 0.95, muore: 0.7, fermo: 0.7 },
   },
+  sciamano: {
+    url: './modelli/zombie.glb', scala: 0.013, tinta: 0x5d7a46, alto: 1.9, raggio: 0.5, raggioTesta: 0.23, reazione: 0.45,
+    clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.85, corre: 0.9, attacco: 1.2, attacco2: 1.1, muore: 0.9, fermo: 0.8 },
+  },
+  guardiano: {
+    url: './modelli/zombie.glb', scala: 0.0142, tinta: 0xc9a24a, alto: 2.05, raggio: 0.55, raggioTesta: 0.24, reazione: 0.4,
+    clip: { cammina: 'cammina', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.8, corre: 0.85, attacco: 1.1, attacco2: 1.1, muore: 0.9, fermo: 0.8 },
+  },
+  divoratore: {
+    url: './modelli/zombie.glb', scala: 0.0172, tinta: 0x4a2a38, alto: 2.6, raggio: 0.72, raggioTesta: 0.3, reazione: 0.2,
+    clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.7, corre: 0.75, attacco: 0.95, attacco2: 0.9, muore: 0.6, fermo: 0.7 },
+  },
 });
+const SALITA = 1.8;
+const R_EMERSO = 1.6;
 
 function sistemaTexture(radice) {
   radice.traverse(o => {
@@ -93,6 +110,7 @@ export async function caricaZombi() {
 
 function logica(z, siMuove) {
   if (z.stato === 'morto') return 'muore';
+  if (z.stato === 'emerge') return 'attacco';
   if (z.stato === 'assi') return 'attacco';
   if (z.stato === 'attacco') return 'attacco2';
   if (z.stato === 'dentro' && !siMuove) return 'fermo';
@@ -234,7 +252,8 @@ export function creaGestoreZombi(scena, risorse) {
         const spostamento = Math.hypot(z.x - voce.ultimaPosizione.x, z.z - voce.ultimaPosizione.y);
         voce.ultimaPosizione.set(z.x, z.z);
         suona(voce, logica(z, spostamento > 0.2 * dt));
-        const alto = sospendi(voce, z, buchi, dt);
+        voce.emerso = z.stato === 'emerge' ? (voce.emerso ?? 0) + dt : R_EMERSO;
+        const alto = sospendi(voce, z, buchi, dt) - SALITA * (1 - Math.min(1, voce.emerso / R_EMERSO));
         voce.radice.position.set(z.x, alto, z.z);
         voce.radice.rotation.y = z.yaw + voce.giro;
         voce.radice.rotation.z = alto > 0.05 ? Math.sin(voce.giro * 1.3) * 0.4 * alto : 0;

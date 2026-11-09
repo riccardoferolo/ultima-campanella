@@ -5,8 +5,8 @@ const CAMBIO_ARMA = 0.35;
 
 const nuovaArma = tipo => ({ tipo, caricatore: ARMI[tipo].caricatore, riserva: ARMI[tipo].riserva });
 
-export function creaArsenale() {
-  return { armi: [nuovaArma('pistola')], attiva: 0, attesa: 0, ricarica: 0, ricaricaTotale: 0, daCaricare: 0, cambio: 0, coltello: 0 };
+export function creaArsenale(pistola = 'pistola') {
+  return { armi: [nuovaArma(pistola)], attiva: 0, attesa: 0, ricarica: 0, ricaricaTotale: 0, daCaricare: 0, cambio: 0, coltello: 0 };
 }
 
 export const armaAttiva = a => a.armi[a.attiva];
@@ -80,6 +80,6 @@ export function riempi(a, tipo) {
   if (arma) Object.assign(arma, nuovaArma(tipo));
 }
 
-export function azzera(a) {
-  Object.assign(a, creaArsenale());
+export function azzera(a, pistola) {
+  Object.assign(a, creaArsenale(pistola));
 }

@@ -1,11 +1,19 @@
-import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseCustode } from './regole.js';
+import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseBoss, ASPETTI, PISTOLE_INIZIALI } from './regole.js';
+import { NOMI_MAPPE } from './mappa.js';
+import { obiettivoGiungla, reliquieGiungla } from './storia.js';
+
+const BOSS = Object.freeze(['divoratore', 'custode', 'guardiano', 'sciamano', 'preside']);
+const DURATA_RADIO_MS = 14000;
 
 const $ = id => document.getElementById(id);
 const DURATA_AVVISO_MS = 2200;
+const LUNGHEZZA_AVVISO_BREVE = 30;
+const MS_PER_CARATTERE = 55;
 const DURATA_SEGNO_MS = 140;
 const DURATA_UCCISIONE_MS = 240;
 
 function obiettivo(vista) {
+  if (vista.giungla) return obiettivoGiungla(vista);
   const m = vista.missione;
   if (!m || vista.fase === 'attesa' || vista.fase === 'vinta' || vista.round === 0) return '';
   if (vista.fase === 'finale') return 'Uccidete il Custode';
@@ -41,10 +49,22 @@ export function creaHud() {
   const sorso = document.createElement('div');
   sorso.className = 'sorso';
   n.radice.prepend(sorso);
+  const reliquie = document.createElement('div');
+  reliquie.className = 'obiettivo secondario';
+  const radio = document.createElement('div');
+  radio.className = 'radio';
+  radio.hidden = true;
+  const carica = document.createElement('div');
+  carica.className = 'carica';
+  carica.hidden = true;
+  const vitaCarica = document.createElement('i');
+  carica.append(vitaCarica);
+  n.nomeArma.before(carica);
+  let scadenzaRadio = 0;
   const granate = document.createElement('div');
   granate.className = 'granate';
   n.munizioni.after(granate);
-  n.radice.append(sala, effetti, boss, missione);
+  n.radice.append(sala, effetti, boss, missione, reliquie, radio);
   let chiaveSala = '';
   let chiaveEffetti = '';
   let scadenzaAvviso = 0;
@@ -55,8 +75,9 @@ export function creaHud() {
   function avviso(testo, tipo = 'pericolo') {
     n.avviso.textContent = testo;
     n.avviso.classList.toggle('bene', tipo === 'bene');
+    n.avviso.classList.toggle('lungo', testo.length > LUNGHEZZA_AVVISO_BREVE);
     n.avviso.classList.add('visibile');
-    scadenzaAvviso = performance.now() + DURATA_AVVISO_MS;
+    scadenzaAvviso = performance.now() + Math.max(DURATA_AVVISO_MS, testo.length * MS_PER_CARATTERE);
   }
 
   function disegnaPunti(vista, mioId) {
@@ -103,11 +124,21 @@ export function creaHud() {
         sorso.style.opacity = '0';
       });
     },
+    radio(righe) {
+      radio.replaceChildren(...righe.map((r, i) => {
+        const p = document.createElement('p');
+        p.textContent = r;
+        if (i === 0) p.className = 'intestazione';
+        return p;
+      }));
+      radio.hidden = false;
+      scadenzaRadio = performance.now() + DURATA_RADIO_MS;
+    },
     uccisione() {
       n.segno.classList.add('visibile', 'uccisione');
       scadenzaSegno = performance.now() + DURATA_UCCISIONE_MS;
     },
-    aggiorna({ vista, mioId, arma, suggerimento, rianimazione, inMira, cannocchiale, bloccato, rete, apertura }) {
+    aggiorna({ vista, mioId, arma, suggerimento, rianimazione, inMira, cannocchiale, bloccato, rete, apertura, host = false }) {
       const io = vista.giocatori.find(g => g.id === mioId);
       const ora = performance.now();
       if (ora > scadenzaAvviso) n.avviso.classList.remove('visibile');
@@ -117,22 +148,34 @@ export function creaHud() {
         granate.dataset.n = numero;
         granate.replaceChildren(...Array.from({ length: Number(numero) }, () => document.createElement('i')));
       }
-      const capo = vista.zombie.find(z => z.tipo === 'custode' && z.stato !== 'morto') ?? vista.zombie.find(z => z.tipo === 'preside' && z.stato !== 'morto');
+      if (ora > scadenzaRadio) radio.hidden = true;
+      const capo = BOSS.map(t => vista.zombie.find(z => z.tipo === t && z.stato !== 'morto')).find(Boolean);
       boss.hidden = !capo;
       if (capo) {
-        const fase = capo.tipo === 'custode' ? faseCustode(capo.vita / 100) : 0;
-        const titolo = fase ? `${TIPI_ZOMBIE.custode.nome} — fase ${fase}` : TIPI_ZOMBIE[capo.tipo].nome;
+        const dati = TIPI_ZOMBIE[capo.tipo];
+        const fase = dati.finale ? faseBoss(dati, capo.vita / 100) : 0;
+        const titolo = fase ? `${dati.nome} — fase ${fase}` : dati.nome;
         if (nomeBoss.textContent !== titolo) nomeBoss.textContent = titolo;
         vitaBoss.style.width = `${Math.max(0, Math.min(100, capo.vita))}%`;
       }
       const testoMissione = obiettivo(vista);
       if (missione.textContent !== testoMissione) missione.textContent = testoMissione;
+      const testoReliquie = reliquieGiungla(vista);
+      if (reliquie.textContent !== testoReliquie) reliquie.textContent = testoReliquie;
+      const bianca = ARMI[arma.tipo]?.bianca;
+      carica.hidden = !bianca;
+      if (bianca) {
+        const piena = (io?.carica ?? 0) >= 1;
+        vitaCarica.style.width = `${Math.round((io?.carica ?? 0) * 100)}%`;
+        carica.classList.toggle('piena', piena);
+        carica.dataset.testo = piena ? 'E: COLPO SPECIALE' : 'carica';
+      }
       n.round.textContent = vista.round > 0 ? String(vista.round) : '';
       n.round.classList.toggle('lampeggia', vista.fase === 'intervallo' && vista.round > 0);
       disegnaPunti(vista, mioId);
       n.nomeArma.textContent = ARMI[arma.tipo].nome;
       n.nomeArma.classList.toggle('potenziata', arma.tipo.endsWith('+'));
-      n.munizioni.textContent = `${arma.caricatore} / ${arma.riserva}`;
+      n.munizioni.textContent = bianca ? '∞' : `${arma.caricatore} / ${arma.riserva}`;
       n.munizioni.classList.toggle('poche', arma.caricatore <= Math.ceil(ARMI[arma.tipo].caricatore / 4));
       const bevande = io?.bevande ?? [];
       if (n.bibite.dataset.chiave !== bevande.join()) {
@@ -163,20 +206,39 @@ export function creaHud() {
       sala.hidden = !inSala;
       if (inSala) {
         const conto = vista.conto === null ? null : Math.ceil(vista.conto);
-        const chiave = `${conto}|${vista.giocatori.map(g => `${g.nome}:${g.pronto}`).join()}|${io?.pronto}`;
+        const chiave = `${conto}|${vista.mappa}|${host}|${vista.giocatori.map(g => `${g.nome}:${g.pronto}:${g.pistola}:${g.aspetto}`).join()}|${io?.pronto}`;
         if (chiave !== chiaveSala) {
           chiaveSala = chiave;
           const titolo = document.createElement('h3');
           titolo.textContent = conto === null ? "SALA D'ATTESA" : `SI PARTE TRA ${conto}`;
+          const scelte = document.createElement('div');
+          scelte.className = 'scelte';
+          const voce = (tasto, etichetta, valore, attiva = true) => {
+            const r = document.createElement('div');
+            r.className = attiva ? '' : 'spenta';
+            const t = document.createElement('kbd');
+            t.textContent = tasto;
+            const e = document.createElement('span');
+            e.textContent = etichetta;
+            const v = document.createElement('b');
+            v.textContent = valore;
+            r.append(t, e, v);
+            return r;
+          };
+          scelte.append(
+            voce('1', 'Pistola', ARMI[io?.pistola ?? PISTOLE_INIZIALI[0]].nome),
+            voce('2', 'Divisa', ASPETTI[io?.aspetto ?? 0]),
+            voce('3', 'Mappa', NOMI_MAPPE[vista.mappa] ?? vista.mappa, host),
+          );
           const righe = vista.giocatori.map(g => {
             const riga = document.createElement('div');
             riga.className = g.pronto ? 'pronto' : '';
-            riga.textContent = `${g.nome} — ${g.pronto ? 'PRONTO' : 'si sta preparando'}`;
+            riga.textContent = `${g.nome} — ${ASPETTI[g.aspetto ?? 0]}, ${ARMI[g.pistola ?? 'pistola'].nome} — ${g.pronto ? 'PRONTO' : 'si sta preparando'}`;
             return riga;
           });
           const nota = document.createElement('p');
-          nota.textContent = io?.pronto ? 'Invio: aspetta, non sono pronto' : 'Premi INVIO quando sei pronto';
-          sala.replaceChildren(titolo, ...righe, nota);
+          nota.textContent = io?.pronto ? 'Invio: aspetta, non sono pronto' : host ? 'Scegli con 1, 2 e 3, poi INVIO quando sei pronto' : 'Scegli con 1 e 2 (la mappa la sceglie chi ha creato la stanza), poi INVIO';
+          sala.replaceChildren(titolo, scelte, ...righe, nota);
         }
       }
       const attivi = Object.entries(vista.effetti ?? {}).filter(([, s]) => s > 0);

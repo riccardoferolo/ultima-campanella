@@ -1,9 +1,10 @@
 import './stile.css';
-import { R, ARMI, BEVANDE, BONUS, COLTELLO, saltiArco, fattoreBevande, modoRicarica } from './regole.js';
+import { R, ARMI, BEVANDE, BONUS, COLTELLO, PISTOLE_INIZIALI, ASPETTI, saltiArco, fattoreBevande, modoRicarica, dannoColtello } from './regole.js';
 import { semeCasuale } from './caso.js';
-import { MURI, OSTACOLI, PORTE, ACQUISTI, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
+import { MURI, OSTACOLI, PORTE, ACQUISTI, ZONE, ELENCO_MAPPE, NOMI_MAPPE, usaMappa, mappaAttiva, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
+import { messaggioRadio, RUNE } from './storia.js';
 import { muoviCerchio } from './fisica.js';
-import { colpisciZombie, direzioneDa, disperdi, esplosione } from './colpi.js';
+import { CORPO, colpisciZombie, direzioneDa, disperdi, esplosione, primoMuro } from './colpi.js';
 import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi } from './arsenale.js';
 import { DURATA_BEVUTA } from './grafica/vista1p.js';
 import { interazioneVicina } from './interazioni.js';
@@ -39,6 +40,25 @@ const AZIONI_REMOTE_MASSIME = 160;
 const RIPETI_ACQUISTO_DOPO_S = 1;
 const SALTO_ARCO = 6;
 const ALTEZZA_SCARICA = 1.25;
+const DURATA_AFFONDO = 0.14;
+const FERMATI_PRIMA = 0.55;
+const COLPITI_COLTELLO = 2;
+const COLPITI_RELIQUIA = 3;
+const BOSS_MINORI = new Set(['preside', 'sciamano', 'guardiano']);
+const TESTI_BOSS = {
+  sciamano: 'Lo Sciamano esce dalla giungla: tamburi in lontananza…',
+  guardiano: 'Le pietre del sole si allineano… il Guardiano si sveglia!',
+};
+const TESTI_BOSS_UCCISO = {
+  preside: 'Il Preside è morto!',
+  sciamano: 'Lo Sciamano è caduto!',
+  guardiano: 'Il Guardiano del Sole è caduto: ha lasciato una spada!',
+};
+const FASI_DIVORATORE = {
+  2: 'Il Divoratore si copre di scaglie: rompetele con le reliquie!',
+  3: 'Il Divoratore chiama lo sciame!',
+  4: 'Il tempio crolla: attenti ai massi!',
+};
 
 const $ = id => document.getElementById(id);
 const schermate = ['schermata-inizio', 'schermata-stanza', 'schermata-fine'].map($);
@@ -47,6 +67,7 @@ const mostraSchermata = id => schermate.forEach(sch => { sch.hidden = sch.id !==
 const hud = creaHud();
 const audio = creaAudio();
 const comandi = creaComandi($('mondo'));
+const mondi = new Map();
 let mondo = null;
 
 const s = {
@@ -77,18 +98,35 @@ const s = {
   ping: null,
   statoSegnali: null,
   colpiVisti: new Map(),
+  giro: 0,
+  mappaDaAprire: null,
 };
 
 const io = { x: 0, z: 0, yaw: Math.PI, pitch: 0, pronto: false, tp: 0, colpi: 0, movimento: 0, corsa: false, inMira: false };
 const arsenale = creaArsenale();
-const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 } };
+const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null };
 const cacheScatole = new Map();
 
 const collegato = () => s.coll && (s.coll.modo === 'diretto' || s.coll.modo === 'riserva');
 const modoRete = () => (s.coll?.modo === 'diretto' ? 'diretto' : 'riserva');
+const miaPistola = () => s.vista?.giocatori.find(g => g.id === s.mioId)?.pistola;
+
+async function apriMondo(mappa) {
+  usaMappa(mappa);
+  if (!mondi.has(mappa)) mondi.set(mappa, creaMondo($('mondo'), mappa));
+  let pronto;
+  try {
+    pronto = await mondi.get(mappa);
+  } catch (e) {
+    mondi.delete(mappa);
+    throw e;
+  }
+  for (const altro of mondi.values()) altro.then(m => { m.tela.style.display = m === pronto ? '' : 'none'; }, () => {});
+  return pronto;
+}
 
 function scatole(porte, perSparo) {
-  const chiave = `${perSparo}|${[...porte].sort().join(',')}`;
+  const chiave = `${mappaAttiva}|${perSparo}|${[...porte].sort().join(',')}`;
   if (!cacheScatole.has(chiave)) {
     const elenco = perSparo
       ? [...MURI, ...OSTACOLI, ...PORTE.filter(p => !porte.has(p.id)).map(p => p.scatola), ...ACQUISTI.map(scatolaAcquisto).filter(Boolean).map(sc => ({ ...sc, altezza: 2 }))]
@@ -152,8 +190,9 @@ function aggiornaStanza() {
 function inviaLobby() {
   if (!s.sonoHost || !collegato()) return;
   const giocatori = [s.nome, ...[...s.ospiti.values()].map(o => o.nome)];
-  for (const id of s.ospiti.keys()) s.coll.inviaA(id, { t: 'lobby', nomeHost: s.nome, ospite: id, giocatori });
-  if (s.fase === 'gioco') s.coll.invia({ t: 'inizia', seme: s.semeCorrente });
+  const mappa = s.partita?.mappa ?? mappaAttiva;
+  for (const id of s.ospiti.keys()) s.coll.inviaA(id, { t: 'lobby', nomeHost: s.nome, ospite: id, giocatori, mappa });
+  if (s.fase === 'gioco') s.coll.invia({ t: 'inizia', seme: s.semeCorrente, mappa });
 }
 
 function entraInStanza(sonoHost, stanza) {
@@ -195,26 +234,41 @@ function leggiNome() {
   return nome;
 }
 
-function iniziaPartita(seme, daClic = false) {
-  s.fase = 'gioco';
+async function iniziaPartita(seme, { daClic = false, mappa = 'scuola' } = {}) {
+  const giro = ++s.giro;
+  const scelte = new Map((s.partita?.giocatori ?? s.vista?.giocatori ?? []).map(g => [g.id, { pistola: g.pistola, aspetto: g.aspetto }]));
+  s.fase = 'carico';
   s.semeCorrente = seme;
   s.buffer = [];
   s.scarto = null;
   s.vista = null;
+  s.mappaDaAprire = null;
+  if (mondo?.mappa !== mappa) hud.avviso(`Si parte: ${NOMI_MAPPE[mappa] ?? mappa}…`, 'bene');
+  let nuovo;
+  try {
+    nuovo = await apriMondo(mappa);
+  } catch (e) {
+    console.error('Caricamento della mappa non riuscito:', e);
+    if (giro === s.giro) hud.avviso('Non riesco a caricare la mappa: ricarica la pagina');
+    return;
+  }
+  if (giro !== s.giro) return;
+  mondo = nuovo;
   s.accumulo = 0;
   s.azioniLocali = [];
   s.azioniRemote = [];
   s.ospiti.forEach(o => { o.remoto = null; });
   s.colpiVisti.clear();
-  azzera(arsenale);
+  azzera(arsenale, scelte.get(s.mioId)?.pistola);
   Object.assign(io, { pronto: false, tp: 0, colpi: 0, pitch: 0 });
-  locale.inRianimazione = false;
+  Object.assign(locale, { inRianimazione: false, affondo: null, aspetto: null });
   mondo.svuota();
   if (s.sonoHost) {
     const giocatori = [{ id: s.mioId, nome: s.nome }];
     for (const [id, o] of s.ospiti) if (s.coll.collegato(id)) giocatori.push({ id, nome: o.nome });
-    s.partita = creaPartita({ seme, giocatori, sala: true });
+    s.partita = creaPartita({ seme, giocatori: giocatori.map(g => ({ ...g, ...scelte.get(g.id) })), sala: true, mappa });
   }
+  s.fase = 'gioco';
   mostraSchermata(null);
   hud.mostra(true);
   comandi.attiva(true);
@@ -222,11 +276,11 @@ function iniziaPartita(seme, daClic = false) {
   if (daClic) comandi.blocca();
 }
 
-function partiComeHost() {
+function partiComeHost(mappa = s.partita?.mappa ?? 'scuola', daClic = true) {
   if (!s.sonoHost) return;
   const seme = semeCasuale();
-  iniziaPartita(seme, true);
-  if (collegato()) s.coll.invia({ t: 'inizia', seme });
+  iniziaPartita(seme, { daClic, mappa });
+  if (collegato()) s.coll.invia({ t: 'inizia', seme, mappa });
 }
 
 function mostraFine(evento) {
@@ -237,8 +291,11 @@ function mostraFine(evento) {
   document.querySelector('.titolo-fine').textContent = evento.vinto ? 'Avete vinto!' : 'Siete morti';
   const minuti = Math.floor((evento.durata ?? 0) / 60);
   const secondi = String((evento.durata ?? 0) % 60).padStart(2, '0');
+  const impresa = mappaAttiva === 'giungla'
+    ? `Avete abbattuto il Divoratore e siete decollati dalla giungla al round ${evento.round}`
+    : `Avete suonato l'ultima campanella e abbattuto il Custode al round ${evento.round}`;
   $('t-dettaglio').textContent = evento.vinto
-    ? `Avete suonato l'ultima campanella e abbattuto il Custode al round ${evento.round}${evento.durata ? ` dopo ${minuti}:${secondi} di battaglia` : ''}.`
+    ? `${impresa}${evento.durata ? ` dopo ${minuti}:${secondi} di battaglia` : ''}.`
     : evento.round > 1 ? `Siete sopravvissuti fino al round ${evento.round}.` : 'Non siete andati oltre il primo round.';
   $('t-tabella').replaceChildren(...evento.giocatori.map(g => {
     const riga = document.createElement('div');
@@ -275,18 +332,69 @@ function suEventi(eventi) {
         mondo.effetti.esplosione({ x: e.x, y: e.y + 0.8, z: e.z }, 'fuoco', 0xffc070);
         audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z), Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
         break;
-      case 'boss': audio.suona('boss'); hud.avviso(e.fusibile ? 'Il Preside è arrivato… e ha qualcosa in tasca' : 'Il Preside è tornato!'); break;
+      case 'boss': audio.suona('boss'); hud.avviso(TESTI_BOSS[e.tipo] ?? (e.fusibile ? 'Il Preside è arrivato… e ha qualcosa in tasca' : 'Il Preside è tornato!')); break;
       case 'infuriato': audio.suona('urlo'); hud.avviso('Il Preside si è infuriato!'); break;
-      case 'bossUcciso': audio.suona('bossUcciso'); if (e.tipo === 'preside') hud.avviso('Il Preside è morto!', 'bene'); break;
+      case 'bossUcciso': audio.suona('bossUcciso'); if (TESTI_BOSS_UCCISO[e.tipo]) hud.avviso(TESTI_BOSS_UCCISO[e.tipo], 'bene'); break;
       case 'fusibileCaduto': hud.avviso('Il Preside ha perso un fusibile!', 'bene'); break;
       case 'fusibile': audio.suona('fusibile'); hud.avviso(`Fusibile ${e.trovati}/${e.totale}`, 'bene'); break;
       case 'fusibiliMessi': audio.suona('fusibile'); hud.avviso(`Quadro del cancello: ${e.messi}/${e.totale}`, 'bene'); break;
       case 'rifugio': audio.suona('rifugio'); hud.avviso('Il cancello del rifugio si apre…', 'bene'); break;
       case 'generatore': audio.suona('generatore'); hud.avviso('Generatore acceso: difendetelo!'); break;
       case 'generatoreFinito': audio.suona('fusibile'); hud.avviso('Il generatore ha sputato un fusibile!', 'bene'); break;
-      case 'finale': audio.suona('finale'); hud.avviso('Il cancello si chiude… il Custode si sveglia'); break;
-      case 'faseBoss': audio.suona('urlo'); hud.avviso(e.fase === 2 ? 'Il Custode si infuria!' : 'Il Custode è fuori di sé!'); break;
-      case 'urlo': audio.suona('urlo'); hud.avviso('Il Custode chiama i suoi!'); break;
+      case 'finale': audio.suona('finale'); hud.avviso(e.mappa === 'giungla' ? 'Il cuore del tempio si apre… il Divoratore si sveglia' : 'Il cancello si chiude… il Custode si sveglia'); break;
+      case 'faseBoss':
+        audio.suona('urlo');
+        if (e.tipo === 'divoratore') hud.avviso(FASI_DIVORATORE[e.fase] ?? 'Il Divoratore si infuria!');
+        else hud.avviso(e.fase === 2 ? 'Il Custode si infuria!' : 'Il Custode è fuori di sé!');
+        break;
+      case 'urlo': audio.suona('urlo'); hud.avviso(mappaAttiva === 'giungla' ? 'Il Divoratore chiama i suoi!' : 'Il Custode chiama i suoi!'); break;
+      case 'mappaScelta':
+        hud.avviso(`Mappa: ${NOMI_MAPPE[e.mappa] ?? e.mappa}`, 'bene');
+        if (s.sonoHost) s.mappaDaAprire = e.mappa;
+        break;
+      case 'generatoreG': audio.suona('generatore'); hud.avviso(`Generatore ${e.n + 1} acceso: restategli vicino e difendetelo!`); break;
+      case 'generatoreGFinito': audio.suona('fusibile'); hud.avviso(`Generatore ${e.n + 1} a pieno regime`, 'bene'); break;
+      case 'radio': audio.suona('radio'); hud.radio(messaggioRadio(e.n, s.vista?.giungla?.ordine)); break;
+      case 'assi': audio.suona('fusibile'); hud.avviso(`Assi del ponte ${e.trovate}/${e.totale}`, 'bene'); break;
+      case 'assiPortate': audio.suona('assaMessa'); hud.avviso(`Assi al cantiere ${e.portate}/${e.totale}`, 'bene'); break;
+      case 'ponteCantiere': audio.suona('generatore'); hud.avviso('Si costruisce il ponte: restate al cantiere e difendetelo!'); break;
+      case 'ponte': audio.suona('rifugio'); hud.avviso('Il ponte regge: si passa il fiume!', 'bene'); break;
+      case 'scheggia': audio.suona('frammento'); hud.avviso(`Scheggia di giada ${e.trovate}/3`, 'bene'); break;
+      case 'scheggeAltare': audio.suona('fusibile'); hud.avviso(`Schegge sull'altare ${e.messe}/${e.totale}`, 'bene'); break;
+      case 'forgia': audio.suona('potenzia'); hud.avviso("L'altare si accende: a fine round la giada sarà forgiata", 'bene'); break;
+      case 'reliquiaPronta': audio.suona('segreto'); hud.avviso(`${ARMI[e.arma]?.nome ?? e.arma} vi aspetta: andate a prenderla!`, 'bene'); break;
+      case 'reliquia': audio.suona('segreto'); hud.avviso(e.da === s.mioId ? `Hai ${ARMI[e.arma]?.nome ?? e.arma}: uccidi per caricarla, poi E` : `${nomeDi(e.da)} ha preso ${ARMI[e.arma]?.nome ?? e.arma}`, 'bene'); break;
+      case 'reliquiaTornata': hud.avviso(`${ARMI[e.arma]?.nome ?? e.arma} è tornata al suo posto`); break;
+      case 'anima':
+        mondo.anima(e);
+        audio.suona('anima');
+        if (e.anime === 6) hud.avviso('Un idolo è sazio', 'bene');
+        break;
+      case 'maschera': audio.suona('fusibile'); hud.avviso('Avete la maschera dello Sciamano: portatela alla porta del tempio', 'bene'); break;
+      case 'mascheraCaduta': hud.avviso('Lo Sciamano ha perso la maschera!', 'bene'); break;
+      case 'mascheraMessa': audio.suona('rifugio'); hud.avviso('La maschera si incastra nella porta…', 'bene'); break;
+      case 'portaTempio': audio.suona('generatore'); hud.avviso('La porta del tempio si apre piano: difendetela!'); break;
+      case 'tempioAperto': audio.suona('rifugio'); hud.avviso('Il tempio è aperto!', 'bene'); break;
+      case 'pietraGirata': audio.suona('pietra'); break;
+      case 'runa': audio.suona('fusibile'); hud.avviso(`Runa del ${RUNE[e.runa] ?? '?'} (${e.giuste}/4)`, 'bene'); break;
+      case 'runaSbagliata': audio.suona('urlo'); hud.avviso('Ordine sbagliato: le rune si spengono e il tempio si sveglia!'); break;
+      case 'runeComplete': audio.suona('segreto'); hud.avviso('Le rune brillano: spezzate il sigillo con un colpo speciale!', 'bene'); break;
+      case 'sigilloRotto': audio.suona('implosione'); hud.avviso('Il sigillo è spezzato: tutti nel cuore del tempio!', 'bene'); break;
+      case 'presagio': hud.avviso('Tamburi tra gli alberi… qualcosa sta arrivando'); break;
+      case 'evocazione':
+        mondo.effetti.esplosione({ x: e.x, y: 1, z: e.z }, 'energia', 0x7dff6a);
+        audio.suona('evocazione');
+        break;
+      case 'speciale':
+        mondo.speciale(e);
+        audio.suona(`speciale_${e.tipo}`);
+        break;
+      case 'pietra':
+        mondo.pietra(e);
+        audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z), Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
+        break;
+      case 'fuga': audio.suona('finale'); hud.avviso(`Il Divoratore è morto! Tutti all'aereo sulla pista: ${e.secondi} s`, 'bene'); break;
+      case 'fugaFallita': hud.avviso("L'aereo è partito senza di voi…"); break;
       case 'scatto': audio.suona('scatto'); break;
       case 'sfera': if (!perMe) audio.suona('sfera'); break;
       case 'buco': audio.suona('buco'); break;
@@ -298,7 +406,7 @@ function suEventi(eventi) {
       case 'congelato': audio.suona('congelato'); break;
       case 'arco': disegnaArco(e); break;
       case 'vittoria': mostraFine({ ...e, vinto: true }); break;
-      case 'via': azzera(arsenale); audio.suona('round'); hud.avviso('Si comincia! Restate vicini', 'bene'); break;
+      case 'via': azzera(arsenale, miaPistola()); audio.suona('round'); hud.avviso(mappaAttiva === 'giungla' ? 'Si comincia! La giungla non perdona' : 'Si comincia! Restate vicini', 'bene'); break;
       case 'conto': audio.suona('conto'); break;
       case 'contoAnnullato': hud.avviso('Partenza annullata: qualcuno non è pronto'); break;
       case 'bonusCompare': audio.suona('bonusCompare'); break;
@@ -342,7 +450,7 @@ function suEventi(eventi) {
       case 'aTerra': audio.suona('aTerra'); hud.avviso(perMe ? 'Sei a terra!' : `${nomeDi(e.a)} è a terra!`); break;
       case 'rianimato': audio.suona('rianimato'); hud.avviso(perMe ? 'Sei di nuovo in piedi' : `${nomeDi(e.a)} è di nuovo in piedi`, 'bene'); break;
       case 'morto': hud.avviso(perMe ? 'Sei morto' : `${nomeDi(e.a)} è morto`); break;
-      case 'rinato': if (perMe) azzera(arsenale); break;
+      case 'rinato': if (perMe) azzera(arsenale, miaPistola()); break;
       case 'armi': if (perMe) allinea(arsenale, e.armi); break;
       case 'fine': mostraFine(e); break;
       default:
@@ -371,8 +479,8 @@ function suMessaggio(m, da) {
       aggiornaStanza();
       return;
     case 'inizia':
-      if (s.sonoHost || (s.fase === 'gioco' && m.seme === s.semeCorrente)) return;
-      iniziaPartita(m.seme);
+      if (s.sonoHost || m.seme === s.semeCorrente) return;
+      iniziaPartita(m.seme, { mappa: m.mappa ?? 'scuola' });
       return;
     case 'g': {
       const ospite = s.sonoHost ? s.ospiti.get(da) : null;
@@ -382,7 +490,7 @@ function suMessaggio(m, da) {
       return;
     }
     case 'az':
-      if (!s.sonoHost || !s.ospiti.has(da)) return;
+      if (!s.sonoHost || !s.ospiti.has(da) || (m.a.tipo === 'scegli' && m.a.cosa === 'mappa')) return;
       riprendiOspite(da);
       if (s.azioniRemote.length >= AZIONI_REMOTE_MASSIME) {
         const scartabile = s.azioniRemote.findIndex(a => a.tipo === 'colpo' || a.tipo === 'assa');
@@ -486,6 +594,7 @@ function tick() {
   if (s.fase !== 'gioco' && s.fase !== 'fine') return;
   if (s.sonoHost && s.partita) tickHost(dt, ora);
   else if (!s.sonoHost) tickOspite(ora);
+  if (s.sonoHost && s.mappaDaAprire && s.fase === 'gioco') partiComeHost(s.mappaDaAprire, false);
 }
 
 function vistaOspite(ora) {
@@ -497,8 +606,29 @@ function vistaOspite(ora) {
   return a.vista;
 }
 
+function avanzaAffondo(vista, dt) {
+  const a = locale.affondo;
+  if (!a) return false;
+  const passo = Math.min(dt, a.resto);
+  const nuova = muoviCerchio(io, a.vx * passo, a.vz * passo, R.RAGGIO_GIOCATORE, scatole(vista.porte, false));
+  io.x = nuova.x;
+  io.z = nuova.z;
+  a.resto -= passo;
+  if (a.resto > 0) return true;
+  locale.affondo = null;
+  const bersaglio = mondo.bersagli(vista).find(b => b.id === a.zombie);
+  if (bersaglio && Math.hypot(bersaglio.x - io.x, bersaglio.z - io.z) - raggioDi(bersaglio) <= COLTELLO.portata + 0.4) colpisciDiMischia([bersaglio], dannoColtello(vista.round), { coltello: true });
+  return true;
+}
+
 function muovi(lettura, me, dt) {
   const vivo = me.stato === 'vivo' && s.fase === 'gioco';
+  if (!vivo) locale.affondo = null;
+  if (vivo && avanzaAffondo(s.vista, dt)) {
+    io.movimento = 1;
+    io.corsa = false;
+    return;
+  }
   io.inMira = vivo && lettura.mira && arsenale.ricarica === 0;
   io.corsa = vivo && lettura.corsa && lettura.avanti > 0 && !io.inMira;
   const lunghezza = Math.hypot(lettura.avanti, lettura.lato);
@@ -514,10 +644,62 @@ function muovi(lettura, me, dt) {
   io.z = nuova.z;
 }
 
+const raggioDi = b => b.raggio ?? CORPO.raggio;
+const angoloDa = (dx, dz) => Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - io.yaw), Math.cos(Math.atan2(dx, dz) - io.yaw)));
+
+function bersagliDiMischia(vista, portata, arco, quanti) {
+  const origine = { x: io.x, y: R.ALTEZZA_OCCHI - 0.4, z: io.z };
+  const ostacoli = scatole(vista.porte, true);
+  const scelti = [];
+  for (const b of mondo.bersagli(vista)) {
+    const dx = b.x - io.x;
+    const dz = b.z - io.z;
+    const d = Math.hypot(dx, dz);
+    const bordo = Math.max(0, d - raggioDi(b));
+    const angolo = angoloDa(dx, dz);
+    if (bordo > portata || (d > raggioDi(b) + 0.3 && angolo > arco)) continue;
+    if (d > 1e-3 && primoMuro(origine, { x: dx / d, y: 0, z: dz / d }, ostacoli) < bordo) continue;
+    scelti.push({ b, peso: bordo + angolo * 2 });
+  }
+  return scelti.sort((a, c) => a.peso - c.peso).slice(0, quanti).map(x => x.b);
+}
+
+function colpisciDiMischia(bersagli, danno, extra) {
+  for (const b of bersagli) {
+    inviaAzione({ tipo: 'colpo', zombie: b.id, danno, ...extra });
+    mondo.colpito(b.id, false);
+    mondo.effetti.sangue({ x: b.x, y: 1.2, z: b.z }, direzioneDa(io.yaw, 0));
+  }
+  if (!bersagli.length) return;
+  audio.suona('carne');
+  hud.segno(false);
+}
+
+function colpoDiColtello(vista) {
+  audio.suona('coltello');
+  mondo.spara();
+  const vicini = bersagliDiMischia(vista, COLTELLO.portata, COLTELLO.arco, COLPITI_COLTELLO);
+  if (vicini.length) {
+    colpisciDiMischia(vicini, dannoColtello(vista.round), { coltello: true });
+    return;
+  }
+  const [lontano] = bersagliDiMischia(vista, COLTELLO.affondo, COLTELLO.arco * 0.6, 1);
+  if (!lontano) return;
+  const dx = lontano.x - io.x;
+  const dz = lontano.z - io.z;
+  const d = Math.hypot(dx, dz);
+  const corsa = Math.max(0, d - raggioDi(lontano) - FERMATI_PRIMA);
+  locale.affondo = { vx: (dx / d) * (corsa / DURATA_AFFONDO), vz: (dz / d) * (corsa / DURATA_AFFONDO), resto: DURATA_AFFONDO, zombie: lontano.id };
+}
+
 function sparaColpo(arma, vista) {
   io.colpi += 1;
   mondo.spara();
   audio.sparo(armaAttiva(arsenale).tipo);
+  if (arma.bianca) {
+    colpisciDiMischia(bersagliDiMischia(vista, arma.portata, arma.arco, COLPITI_RELIQUIA), arma.danno, { arma: armaAttiva(arsenale).tipo });
+    return;
+  }
   const origine = { x: io.x, y: R.ALTEZZA_OCCHI, z: io.z };
   const centro = direzioneDa(io.yaw, io.pitch);
   const tipo = armaAttiva(arsenale).tipo;
@@ -607,9 +789,9 @@ const vistaGiocatore = id => s.vista?.giocatori.find(g => g.id === id) ?? null;
 
 function statoMusica(vista) {
   if (vista.fase === 'fine' || vista.fase === 'vinta') return 'silenzio';
-  if (vista.fase === 'finale') return 'custode';
+  if (vista.fase === 'finale' || vista.fase === 'fuga') return 'custode';
   if (vista.fase !== 'gioco') return 'calma';
-  return vista.zombie.some(z => z.tipo === 'preside' && z.stato !== 'morto') ? 'preside' : 'round';
+  return vista.zombie.some(z => BOSS_MINORI.has(z.tipo) && z.stato !== 'morto') ? 'preside' : 'round';
 }
 
 function avviaRicarica(me) {
@@ -638,21 +820,14 @@ function usaArmi(lettura, me, vista, dt) {
         audio.suona('lancio');
       } else if (vista.fase !== 'attesa') hud.avviso('Niente granate');
     }
-    else if (azione?.arma !== undefined) cambia(arsenale, azione.arma);
-    else if (azione === 'coltello' && coltellata(arsenale)) {
-      audio.suona('coltello');
-      const d = direzioneDa(io.yaw, Math.min(io.pitch, -0.15));
-      const colpo = colpisciZombie({ x: io.x, y: R.ALTEZZA_OCCHI, z: io.z }, d, mondo.bersagli(vista), scatole(vista.porte, true), COLTELLO.portata);
-      if (colpo.id !== null) {
-        inviaAzione({ tipo: 'colpo', zombie: colpo.id, danno: COLTELLO.danno, coltello: true });
-        mondo.colpito(colpo.id, false);
-        audio.suona('carne');
-        hud.segno(false);
-      }
-    }
+    else if (azione?.arma !== undefined) {
+      if (vista.fase === 'attesa') scegliInSala(azione.arma, me, vista);
+      else cambia(arsenale, azione.arma);
+    } else if (azione === 'coltello' && !locale.affondo && coltellata(arsenale)) colpoDiColtello(vista);
+    else if (azione === 'speciale') speciale(me);
   }
   const arma = ARMI[armaAttiva(arsenale).tipo];
-  const vuole = locale.sparoForzato || (arma.automatica ? lettura.sparo : lettura.sparoPremuto);
+  const vuole = locale.sparoForzato || (arma.automatica || arma.bianca ? lettura.sparo : lettura.sparoPremuto);
   locale.sparoForzato = false;
   if (!vuole || io.corsa) return;
   if (armaAttiva(arsenale).caricatore === 0) {
@@ -667,6 +842,28 @@ function usaArmi(lettura, me, vista, dt) {
   if (vista.effetti?.infinite > 0) armaAttiva(arsenale).caricatore += 1;
   sparaColpo(colpo, vista);
   if (armaAttiva(arsenale).caricatore === 0) avviaRicarica(me);
+}
+
+function scegliInSala(tasto, me, vista) {
+  const prossimo = (elenco, attuale) => elenco[(Math.max(0, elenco.indexOf(attuale)) + 1) % elenco.length];
+  if (tasto === 0) inviaAzione({ tipo: 'scegli', cosa: 'pistola', valore: prossimo(PISTOLE_INIZIALI, me.pistola) });
+  else if (tasto === 1) inviaAzione({ tipo: 'scegli', cosa: 'aspetto', valore: ((me.aspetto ?? 0) + 1) % ASPETTI.length });
+  else if (tasto === 2 && s.sonoHost) inviaAzione({ tipo: 'scegli', cosa: 'mappa', valore: prossimo(ELENCO_MAPPE, vista.mappa) });
+  else if (tasto === 2) {
+    hud.avviso('La mappa la sceglie chi ha creato la stanza');
+    return;
+  }
+  audio.suona('scatto');
+}
+
+function speciale(me) {
+  if (!ARMI[armaAttiva(arsenale).tipo]?.bianca) return;
+  if ((me.carica ?? 0) < 1) {
+    hud.avviso(`Colpo speciale al ${Math.round((me.carica ?? 0) * 100)}%: continua a uccidere`);
+    return;
+  }
+  inviaAzione({ tipo: 'speciale', yaw: io.yaw });
+  mondo.spara();
 }
 
 function interagisci(lettura, me, vista) {
@@ -730,10 +927,16 @@ function ciclo(ora) {
       if ((vista.fase === 'fine' || vista.fase === 'vinta') && s.fase === 'gioco') mostraFine({ round: vista.round, vinto: vista.fase === 'vinta', giocatori: vista.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });
       const lettura = comandi.leggi();
       comandi.applicaVista(io);
+      if (vista.fase === 'attesa' && (arsenale.armi.length !== me.armi.length || arsenale.armi.some((a, i) => a.tipo !== me.armi[i]))) allinea(arsenale, me.armi);
+      if (locale.aspetto !== me.aspetto) {
+        locale.aspetto = me.aspetto;
+        mondo.tingiManica(me.aspetto ?? 0);
+      }
       muovi(lettura, me, dt);
       usaArmi(lettura, me, vista, dt);
       const interazione = interagisci(lettura, me, vista);
       suoniAmbiente(vista, dt);
+      audio.ambiente?.(mappaAttiva, ZONE.some(z => z.aperto && io.x >= z.x0 && io.x <= z.x1 && io.z >= z.z0 && io.z <= z.z1));
       audio.musica(statoMusica(vista), Math.min(1, vista.round / 12));
       const ferito = vista.giocatori.find(g => g.id !== s.mioId && g.stato === 'terra');
       const tipo = armaAttiva(arsenale).tipo;
@@ -747,7 +950,7 @@ function ciclo(ora) {
       hud.aggiorna({
         vista, mioId: s.mioId, arma: armaAttiva(arsenale), suggerimento: interazione?.testo ?? null,
         rianimazione: locale.inRianimazione && ferito ? ferito.progressoRianimazione / (me.bevande.includes('ritorno') ? R.RIANIMA_RAPIDO : R.RIANIMA_IN) : null,
-        inMira: io.inMira, cannocchiale, bloccato: comandi.bloccato || s.fase !== 'gioco', rete: [testoRete(), `${Math.round(fps)} fps`].filter(Boolean).join(' · '),
+        inMira: io.inMira, cannocchiale, host: s.sonoHost, bloccato: comandi.bloccato || s.fase !== 'gioco', rete: [testoRete(), `${Math.round(fps)} fps`].filter(Boolean).join(' · '),
         apertura: 6 + (io.movimento ? 6 : 0) + (io.corsa ? 8 : 0) - (io.inMira ? 4 : 0),
       });
     }
@@ -790,8 +993,8 @@ $('copia').addEventListener('click', async () => {
     $('copia').textContent = 'Premi Ctrl+C';
   }
 });
-$('parti').addEventListener('click', partiComeHost);
-$('rigioca').addEventListener('click', partiComeHost);
+$('parti').addEventListener('click', () => partiComeHost());
+$('rigioca').addEventListener('click', () => partiComeHost());
 comandi.suBlocco(bloccato => {
   if (bloccato) audio.prepara();
 });
@@ -809,7 +1012,7 @@ requestAnimationFrame(ciclo);
 const orologio = new Worker(new URL('./orologio-worker.js', import.meta.url));
 orologio.onmessage = tick;
 
-creaMondo($('mondo')).then(m => {
+apriMondo('scuola').then(m => {
   mondo = m;
   $('crea').disabled = false;
   $('crea').textContent = 'Crea una stanza';

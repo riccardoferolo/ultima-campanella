@@ -7,6 +7,6 @@
 | `soldato.glb` | «Soldier» degli esempi di three.js (personaggio Mixamo) | uso libero come negli esempi di three.js |
 | `armi.glb` | «Ultimate Gun Pack», Quaternius | CC0 |
 | `aliene.glb` | «Sci-Fi Essentials Kit», Quaternius | CC0 |
-| `arredi.glb`, `public/texture/*` | Poly Haven (polyhaven.com) | CC0 |
+| `arredi.glb`, `giungla.glb`, `public/texture/*` | Poly Haven (polyhaven.com) | CC0 |
 
 Le armi, i nomi, la mappa e le regole del gioco sono originali.
