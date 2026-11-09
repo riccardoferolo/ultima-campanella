@@ -1,7 +1,7 @@
 import { ARMI } from './regole.js';
 import { creaMotore } from './suoni/motore.js';
 import { creaAmbiente } from './suoni/ambiente.js';
-import { FAMIGLIE_SPARO } from './suoni/armi.js';
+import { FAMIGLIE_SPARO, MODELLI_FUCILE } from './suoni/armi.js';
 import { TIPI_LAMENTO } from './suoni/zombi.js';
 import { RICETTE } from './suoni/ricette.js';
 
@@ -31,14 +31,23 @@ function salvaPreferenza(si) {
   }
 }
 const PRIMA_DA_PREPARARE = Object.freeze([
-  ...FAMIGLIE_SPARO.map(f => `sparo_${f}`), 'm_clic', 'm_clac', 'm_slitta', 'm_scivolo', 'm_bossolo', 'fendente_coltello',
-  'z_lamento', 'z_rantolo', 'z_ringhio', 'esplosione', 'm_guscio', 'm_pompa', 'm_otturatore', 'm_cricchetto',
-  'fendente_giada', 'fendente_sole', 'fendente_serpente', 'sparo_buco', 'sparo_gelo', 'sparo_arco', 'sparo_eco',
+  ...FAMIGLIE_SPARO.map(f => `sparo_${f}`), ...MODELLI_FUCILE.map(m => `sparo_${m}`), 'm_clic', 'm_clac', 'm_slitta', 'm_scivolo', 'm_bossolo', 'fendente_coltello',
+  'z_lamento', 'z_rantolo', 'z_ringhio', 'esplosione', 'm_guscio', 'm_pompa', 'm_pompa_caccia', 'm_canne', 'm_ciclo', 'm_otturatore', 'm_cricchetto',
+  'fendente_giada', 'fendente_sole', 'fendente_serpente', 'sparo_buco', 'sparo_gelo', 'sparo_arco', 'sparo_eco', 'sparo_eco_fucile',
   'z_gorgoglio', 'z_inspiro', 'z_urlo', 'm_sibilo', 'm_risucchio', 'm_tonfo', 'e_scatto', 'e_carica', 'e_radio', 'e_anima',
   'e_pietra', 'e_evocazione', 'e_turbine', 'e_onda', 'e_veleno', 'esplosione_grande',
 ]);
-const VOLUMI_SPARO = Object.freeze({ pistola: 0.55, revolver: 0.8, pompa: 0.9, mitra: 0.42, assalto: 0.55, battaglia: 0.65, mitragliatrice: 0.62, precisione: 0.9 });
-const ECO_SPARO = Object.freeze({ precisione: 0.5, pompa: 0.35, revolver: 0.3, battaglia: 0.22, mitragliatrice: 0.2, assalto: 0.15 });
+const VOLUMI_SPARO = Object.freeze({ pistola: 0.55, revolver: 0.8, mitra: 0.42, assalto: 0.55, battaglia: 0.65, mitragliatrice: 0.62, precisione: 0.9 });
+const ECO_SPARO = Object.freeze({ precisione: 0.5, revolver: 0.3, battaglia: 0.22, mitragliatrice: 0.2, assalto: 0.15 });
+const FUCILI = Object.freeze({
+  pompa: { volume: 0.95, eco: 0.4, meccanica: 'm_pompa', quota: 0.33, volumeMeccanica: 0.42, guscio: 0.1 },
+  caccia: { volume: 0.92, eco: 0.45, meccanica: 'm_pompa_caccia', quota: 0.3, volumeMeccanica: 0.45, guscio: 0.1 },
+  doppietta: { volume: 0.9, eco: 0.38, meccanica: 'm_canne', quota: 0.4, volumeMeccanica: 0.18, guscio: 0 },
+  aa12: { volume: 0.9, eco: 0.25, meccanica: 'm_ciclo', quota: 0.2, volumeMeccanica: 0.2, guscio: 0.05 },
+});
+const RITARDO_GUSCIO = 0.3;
+const PROBABILITA_GUSCIO_AUTOMATICO = 0.3;
+const PROBABILITA_ECO_AUTOMATICA = 0.2;
 const FENDENTI = Object.freeze({ giada: 'fendente_giada', sole: 'fendente_sole', serpente: 'fendente_serpente' });
 const ALIENI = Object.freeze({ buco: ['sparo_buco', 0.6], gelo: ['sparo_gelo', 0.35], arco: ['sparo_arco', 0.5] });
 const CON_CARRELLO = new Set(['pistola', 'mitra', 'assalto', 'battaglia', 'mitragliatrice']);
@@ -166,6 +175,7 @@ export function creaAudio() {
   function regolaMusica() {
     if (!musica.uscita) return;
     const t = ctx.currentTime;
+    ambiente.sottoMusica(musica.accesa ? LIVELLI[musica.stato] : 0);
     const volume = musica.accesa ? LIVELLI[musica.stato] * VOLUME_MUSICA : 0;
     musica.uscita.gain.cancelScheduledValues(t);
     musica.uscita.gain.setTargetAtTime(volume, t, 0.8);
@@ -305,14 +315,25 @@ export function creaAudio() {
     const automatica = dati?.automatica;
     const cadenza = dati?.cadenza ?? 0.5;
     if (CON_CARRELLO.has(famiglia) && (!automatica || Math.random() < 0.35)) strati.push({ chiave: 'm_clic', ritardo: caso(0.012, 0.025), volume: 0.12, velocita: caso(0.9, 1.1) });
-    if (famiglia === 'pompa' && !automatica && cadenza >= 0.5) {
-      strati.push({ chiave: 'm_pompa', ritardo: cadenza * 0.38, volume: 0.35 }, { chiave: 'm_guscio', ritardo: cadenza * 0.38 + 0.3, volume: 0.1 });
-    } else if (famiglia === 'precisione' && cadenza >= 1) {
+    if (famiglia === 'precisione' && cadenza >= 1) {
       strati.push({ chiave: 'm_otturatore', ritardo: cadenza * 0.4, volume: 0.32 }, { chiave: 'm_bossolo', ritardo: cadenza * 0.4 + 0.25, volume: 0.1 });
-    } else if (famiglia !== 'revolver' && famiglia !== 'pompa' && Math.random() < (automatica ? 0.18 : 0.6)) {
+    } else if (famiglia !== 'revolver' && Math.random() < (automatica ? 0.18 : 0.6)) {
       strati.push({ chiave: 'm_bossolo', ritardo: caso(0.35, 0.6), volume: 0.1, velocita: caso(0.9, 1.1) });
     }
     return strati;
+  }
+
+  function sparoFucile(dati, arma, distanza, angolo) {
+    const modello = FUCILI[dati.base ?? arma] ? dati.base ?? arma : 'pompa';
+    const fucile = FUCILI[modello];
+    const strati = [{ chiave: `sparo_${modello}`, velocita: caso(0.97, 1.03) * (dati.potenziata ? 0.95 : 1), ritardo: caso(0, 0.004) }];
+    if (distanza === 0) {
+      const ritardo = (dati.cadenza ?? 0.5) * fucile.quota;
+      strati.push({ chiave: fucile.meccanica, ritardo, volume: fucile.volumeMeccanica, velocita: caso(0.96, 1.04) });
+      if (fucile.guscio > 0 && (!dati.automatica || Math.random() < PROBABILITA_GUSCIO_AUTOMATICO)) strati.push({ chiave: 'm_guscio', ritardo: ritardo + RITARDO_GUSCIO, volume: fucile.guscio, velocita: caso(0.9, 1.1) });
+    }
+    if (motore.esterno() && (!dati.automatica || Math.random() < PROBABILITA_ECO_AUTOMATICA)) strati.push({ chiave: 'sparo_eco_fucile', ritardo: 0.05, volume: fucile.eco, velocita: caso(0.94, 1.06) });
+    motore.suona(strati, { distanza, angolo, volume: fucile.volume * caso(0.92, 1.03) * (dati.potenziata ? 1.06 : 1), umido: 0.26, riferimento: 4, taglio: caso(14000, 20000), priorita: distanza === 0 ? 3 : 1.5 });
   }
 
   function sparoArma(arma, distanza, angolo) {
@@ -326,11 +347,15 @@ export function creaAudio() {
       motore.suona([{ chiave: alieno[0], velocita: caso(0.94, 1.06) }], { distanza, angolo, volume: alieno[1], umido: 0.3, riferimento: 3 });
       return;
     }
+    if (dati?.famiglia === 'pompa') {
+      sparoFucile(dati, arma, distanza, angolo);
+      return;
+    }
     const famiglia = VOLUMI_SPARO[dati?.famiglia] ? dati.famiglia : 'pistola';
     const potenziata = dati?.potenziata;
     const strati = [{ chiave: `sparo_${famiglia}`, velocita: caso(0.96, 1.04) * (potenziata ? 0.95 : 1), ritardo: caso(0, 0.004) }];
     if (distanza === 0) strati.push(...stratiMeccanici(dati, famiglia));
-    if (ECO_SPARO[famiglia] && motore.esterno() && (!dati?.automatica || Math.random() < 0.2)) strati.push({ chiave: 'sparo_eco', ritardo: 0.05, volume: ECO_SPARO[famiglia], velocita: caso(0.92, 1.08) });
+    if (ECO_SPARO[famiglia] && motore.esterno() && (!dati?.automatica || Math.random() < PROBABILITA_ECO_AUTOMATICA)) strati.push({ chiave: 'sparo_eco', ritardo: 0.05, volume: ECO_SPARO[famiglia], velocita: caso(0.92, 1.08) });
     motore.suona(strati, { distanza, angolo, volume: VOLUMI_SPARO[famiglia] * caso(0.9, 1.05) * (potenziata ? 1.08 : 1), umido: 0.22, riferimento: 4, taglio: caso(14000, 20000), priorita: distanza === 0 ? 3 : 1.5 });
   }
 

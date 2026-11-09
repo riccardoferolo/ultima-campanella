@@ -1,93 +1,121 @@
 import {
-  DUE_PI, caso, intero, campioni, vuoto, bianco, rosa, marrone, lento, bassa, filtra, gonfia, normalizza, normalizzaRms,
-  mescola, tono, cicla, panorama, aggiungiStereo, stereoVuoto, finisci, finisciStereo,
+  DUE_PI, caso, intero, campioni, vuoto, bianco, rosa, marrone, lento, bassa, alta, filtra, gonfia, liscia, normalizza, normalizzaRms,
+  mescola, tono, cicla, panorama, aggiungiStereo, stereoVuoto, finisci, finisciStereo, picco,
 } from './dsp.js';
 import { voce } from './voce.js';
 import { goccia, scricchiolio } from './materiali.js';
 
 const SOVRAPPOSIZIONE_S = 1.5;
 const RMS_LETTO = 0.12;
+const PICCO_LETTO = 0.98;
+const RUMORE_DI_FONDO = 1e-6;
 const TICK_MS = 200;
 const ATTESA_APERTO = 2;
 const TICK_SILENZIO = 8;
 const VOLUME_AMBIENTE = 0.6;
+const VARIAZIONE_LETTO = Object.freeze([0.65, 1.1]);
+const ATTESA_LETTO = Object.freeze([4, 8]);
+const TAU_ENTRATA_LETTO = 1.5;
+const TAU_LETTO = 2.5;
+
+function livella(canali) {
+  for (const d of canali) normalizzaRms(d, RMS_LETTO);
+  const m = Math.max(...canali.map(picco));
+  if (m > PICCO_LETTO) for (const d of canali) normalizza(d, (PICCO_LETTO * picco(d)) / m);
+  return canali;
+}
 
 function letto(sr, durata, rendiCanale) {
-  return [0, 1].map(c => normalizzaRms(cicla(rendiCanale(campioni(durata + SOVRAPPOSIZIONE_S, sr), c), sr, SOVRAPPOSIZIONE_S), RMS_LETTO));
+  return livella([0, 1].map(c => cicla(rendiCanale(campioni(durata + SOVRAPPOSIZIONE_S, sr), c), sr, SOVRAPPOSIZIONE_S)));
 }
 
 function cicale(sr) {
-  const durata = 7;
-  const n = campioni(durata + SOVRAPPOSIZIONE_S, sr);
-  const out = stereoVuoto(durata + SOVRAPPOSIZIONE_S, sr);
+  const durata = 9 + SOVRAPPOSIZIONE_S;
+  const n = campioni(durata, sr);
+  const out = stereoVuoto(durata, sr);
   for (let k = 0; k < 3; k++) {
-    const voceCicala = normalizza(filtra(bianco(n), sr, 'banda', caso(4200, 6800), caso(5, 9)), 1);
-    const ronzio = caso(35, 95);
-    const canto = lento(n, sr, caso(0.2, 0.5));
-    for (let i = 0; i < n; i++) voceCicala[i] *= (0.5 + 0.5 * Math.sin((DUE_PI * ronzio * i) / sr)) ** 3 * Math.max(0, canto[i] * 1.6 - 0.4);
-    aggiungiStereo(out, panorama(voceCicala, caso(-0.9, 0.9)), sr, 0, caso(0.5, 1));
+    const voceCicala = normalizza(bassa(filtra(bianco(n), sr, 'banda', caso(2900, 3900), caso(1.6, 2.6)), sr, 4200, 2), 1);
+    const fremito = lento(n, sr, caso(5, 9));
+    const canto = lento(n, sr, caso(0.12, 0.25));
+    for (let i = 0; i < n; i++) voceCicala[i] *= (0.6 + 0.4 * fremito[i]) * liscia(canto[i] * 1.5 - 0.35);
+    aggiungiStereo(out, panorama(voceCicala, caso(-0.8, 0.8)), sr, 0, caso(0.5, 1));
   }
-  return out.map(d => normalizzaRms(cicla(d, sr, SOVRAPPOSIZIONE_S), RMS_LETTO));
+  return livella(out.map(d => cicla(d, sr, SOVRAPPOSIZIONE_S)));
 }
 
 function grilli(sr) {
-  const durata = 7 + SOVRAPPOSIZIONE_S;
+  const durata = 10 + SOVRAPPOSIZIONE_S;
   const out = stereoVuoto(durata, sr);
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 5; k++) {
     const g = vuoto(durata, sr);
-    const f = caso(3600, 5200);
-    const sillabe = intero(2, 5);
-    const passo = caso(0.35, 0.9);
+    const f = caso(3100, 4100);
+    const sillabe = intero(2, 3);
+    const passo = caso(1.1, 2.2);
     let t = caso(0, passo);
-    while (t < durata - 0.2) {
-      for (let s = 0; s < sillabe; s++) tono(g, sr, t + s * 0.03, { f, tau: 0.006, attacco: 0.004, ampiezza: 1, durata: 0.02 });
-      t += passo * caso(0.9, 1.1) + (Math.random() < 0.08 ? caso(1, 3) : 0);
+    while (t < durata - 0.3) {
+      for (let s = 0; s < sillabe; s++) tono(g, sr, t + s * 0.05, { f, tau: 0.014, attacco: 0.012, ampiezza: 1, durata: 0.08 });
+      t += passo * caso(0.7, 1.4) + (Math.random() < 0.25 ? caso(1.5, 4.5) : 0);
     }
-    aggiungiStereo(out, panorama(bassa(g, sr, caso(5000, 9000)), caso(-1, 1)), sr, 0, caso(0.3, 1));
+    aggiungiStereo(out, panorama(bassa(g, sr, caso(3600, 4400), 2), caso(-0.9, 0.9)), sr, 0, caso(0.3, 1));
   }
-  return out.map(d => normalizzaRms(cicla(d, sr, SOVRAPPOSIZIONE_S), RMS_LETTO));
+  return livella(out.map(d => cicla(d, sr, SOVRAPPOSIZIONE_S)));
 }
 
 function coroRane(sr) {
-  const durata = 6 + SOVRAPPOSIZIONE_S;
+  const durata = 9 + SOVRAPPOSIZIONE_S;
   const n = campioni(durata, sr);
   const out = stereoVuoto(durata, sr);
-  for (let k = 0; k < 8; k++) {
-    const r = new Float32Array(n);
-    const passo = caso(0.3, 0.7);
-    const pulsazione = caso(60, 120);
-    for (let t = caso(0, 1); t < durata - 0.2; t += passo * caso(0.8, 1.3)) {
-      const lunghezza = caso(0.05, 0.12);
-      for (let p = 0; p < lunghezza; p += 1 / pulsazione) r[Math.floor((t + p) * sr)] += 1;
+  for (let k = 0; k < 4; k++) {
+    const r = normalizza(bianco(n), RUMORE_DI_FONDO);
+    const passo = caso(0.9, 1.8);
+    const pulsazione = caso(45, 80);
+    for (let t = caso(0, 1.5); t < durata - 0.3; t += passo * caso(0.7, 1.4) + (Math.random() < 0.3 ? caso(1.5, 4) : 0)) {
+      const lunghezza = caso(0.06, 0.12);
+      for (let p = 0; p < lunghezza; p += 1 / pulsazione) r[Math.floor((t + p) * sr)] += Math.sin((Math.PI * p) / lunghezza);
     }
-    filtra(r, sr, 'banda', caso(700, 1500), 4);
-    aggiungiStereo(out, panorama(bassa(r, sr, 2500), caso(-1, 1)), sr, 0, caso(0.3, 1));
+    filtra(r, sr, 'banda', caso(450, 950), 2.5);
+    aggiungiStereo(out, panorama(bassa(r, sr, 1300, 2), caso(-1, 1)), sr, 0, caso(0.3, 1));
   }
-  return out.map(d => normalizzaRms(cicla(d, sr, SOVRAPPOSIZIONE_S), RMS_LETTO));
+  return livella(out.map(d => cicla(d, sr, SOVRAPPOSIZIONE_S)));
 }
 
-function vento(sr, foglie) {
+function brezza(sr) {
+  const durata = 12;
+  const raffiche = lento(campioni(durata + SOVRAPPOSIZIONE_S, sr), sr, 0.1);
+  return letto(sr, durata, n => {
+    const base = alta(alta(normalizza(bassa(marrone(n), sr, 650, 2), 1), sr, 120), sr, 120);
+    const soffio = normalizza(filtra(rosa(n), sr, 'banda', 800, 0.5), 1);
+    const foglie = normalizza(bassa(filtra(bianco(n), sr, 'banda', 2100, 0.7), sr, 3800), 1);
+    const grana = lento(n, sr, 11);
+    for (let i = 0; i < n; i++) {
+      const g = 0.3 + 0.7 * raffiche[i] ** 1.5;
+      base[i] = base[i] * 0.6 * g + soffio[i] * 0.5 * g * g + foglie[i] * 0.3 * g * g * grana[i] ** 2;
+    }
+    return base;
+  });
+}
+
+function vento(sr) {
   const durata = 11;
   const raffiche = lento(campioni(durata + SOVRAPPOSIZIONE_S, sr), sr, 0.12);
   return letto(sr, durata, n => {
-    const base = normalizza(bassa(marrone(n), sr, foglie ? 500 : 320, 2), 1);
-    const fruscio = normalizza(filtra(bianco(n), sr, 'banda', foglie ? 3800 : 650, foglie ? 0.6 : 12), 1);
-    const grana = lento(n, sr, 18);
+    const base = normalizza(bassa(marrone(n), sr, 320, 2), 1);
+    const fruscio = normalizza(filtra(bianco(n), sr, 'banda', 650, 12), 1);
     for (let i = 0; i < n; i++) {
       const g = 0.25 + 0.75 * raffiche[i] ** 1.5;
-      base[i] = base[i] * g + fruscio[i] * (foglie ? 0.4 * g * g * grana[i] ** 3 : 0.25 * g ** 3);
+      base[i] = base[i] * g + fruscio[i] * 0.25 * g ** 3;
     }
     return base;
   });
 }
 
 function acqua(sr) {
-  return letto(sr, 8, n => {
-    const d = normalizza(bassa(rosa(n), sr, 1600, 2), 1);
-    const onda = lento(n, sr, 0.3);
-    for (let i = 0; i < n; i++) d[i] *= 0.85 + 0.15 * onda[i];
-    for (let k = 0; k < 90; k++) tono(d, sr, caso(0, n / sr - 0.1), { f: caso(600, 1500), fFine: caso(1600, 2400), glissando: 0.01, tau: 0.01, ampiezza: 0.15 });
-    return d;
+  return letto(sr, 9, n => {
+    const d = normalizza(rosa(n), 1);
+    const onda = lento(n, sr, 0.25);
+    for (let i = 0; i < n; i++) d[i] *= 0.8 + 0.2 * onda[i];
+    for (let k = 0; k < 50; k++) tono(d, sr, caso(0, n / sr - 0.1), { f: caso(450, 1000), fFine: caso(1000, 1600), glissando: 0.012, tau: 0.012, attacco: 0.002, ampiezza: 0.1 });
+    return alta(bassa(d, sr, 1000, 2), sr, 110);
   });
 }
 
@@ -122,23 +150,23 @@ function rana(sr) {
   }
   const corpo = filtra(out.slice(), sr, 'banda', tipo === 0 ? caso(900, 1500) : caso(1500, 2500), 3);
   mescola(corpo, filtra(out, sr, 'banda', 2200, 4), sr, 0, 0.4);
-  return finisci(corpo, sr);
+  return finisci(bassa(corpo, sr, 1800, 2), sr);
 }
 
 function uccello(sr) {
-  const out = vuoto(1.2, sr);
+  const out = vuoto(1.4, sr);
   const tipo = intero(0, 3);
-  const f = caso(1800, 3200);
-  if (tipo === 0) for (let k = 0; k < intero(2, 3); k++) tono(out, sr, k * 0.32, { f: f * 1.4, fFine: f, glissando: 0.12, tau: 0.08, attacco: 0.02, ampiezza: 1, armonica: 0.1 });
+  const f = caso(1500, 2600);
+  if (tipo === 0) for (let k = 0; k < intero(2, 3); k++) tono(out, sr, k * 0.36, { f: f * 1.25, fFine: f, glissando: 0.14, tau: 0.09, attacco: 0.04, ampiezza: 1, armonica: 0.04 });
   if (tipo === 1) {
-    const trillo = vuoto(0.8, sr);
-    tono(trillo, sr, 0, { f, fFine: f * 0.8, glissando: 0.4, tau: 0.3, attacco: 0.05, ampiezza: 1 });
-    for (let i = 0; i < trillo.length; i++) trillo[i] *= 0.5 + 0.5 * Math.sin((DUE_PI * 24 * i) / sr);
+    const trillo = vuoto(0.9, sr);
+    tono(trillo, sr, 0, { f, fFine: f * 0.85, glissando: 0.4, tau: 0.3, attacco: 0.08, ampiezza: 1 });
+    for (let i = 0; i < trillo.length; i++) trillo[i] *= 0.7 + 0.3 * Math.sin((DUE_PI * 16 * i) / sr);
     mescola(out, trillo, sr, 0, 1);
   }
-  if (tipo === 2) [0, 0.25, 0.45].forEach((t, k) => tono(out, sr, t, { f: f * (0.8 + k * 0.15), fFine: f * (1 + k * 0.2), glissando: 0.05, tau: 0.07, attacco: 0.015, ampiezza: 1 }));
-  if (tipo === 3) [0, 0.4].forEach((t, k) => tono(out, sr, t, { f: f * (k ? 1.25 : 1), fFine: f * (k ? 1.5 : 0.9), glissando: 0.1, tau: 0.12, attacco: 0.03, ampiezza: 1, armonica: 0.15 }));
-  return finisci(out, sr, 0.9, 0.1);
+  if (tipo === 2) [0, 0.3, 0.55].forEach((t, k) => tono(out, sr, t, { f: f * (0.85 + k * 0.12), fFine: f * (1 + k * 0.15), glissando: 0.06, tau: 0.08, attacco: 0.03, ampiezza: 1 }));
+  if (tipo === 3) [0, 0.45].forEach((t, k) => tono(out, sr, t, { f: f * (k ? 1.2 : 1), fFine: f * (k ? 1.4 : 0.9), glissando: 0.12, tau: 0.14, attacco: 0.05, ampiezza: 1, armonica: 0.06 }));
+  return finisci(bassa(out, sr, 3400, 2), sr, 0.9, 0.15);
 }
 
 function gufo(sr) {
@@ -158,10 +186,10 @@ function scimmia(sr) {
   let t = 0;
   for (let k = 0; k < intero(4, 6); k++) {
     const d = caso(0.45, 0.75);
-    mescola(out, voce(sr, d, { altezza: x => caso(90, 120) * (1 + 0.2 * Math.sin(Math.PI * x)), tappe: [['o', 0], ['u', 0.5], ['o', 1]], tratto: 0.75, ruvidita: 0.85, respiro: 0.4, satura: 2.5, forma: gonfia(0.1, 1, 0.3) }), sr, t, 1);
+    mescola(out, voce(sr, d, { altezza: x => caso(90, 120) * (1 + 0.2 * Math.sin(Math.PI * x)), tappe: [['o', 0], ['u', 0.5], ['o', 1]], tratto: 0.75, ruvidita: 0.6, respiro: 0.4, satura: 1.6, forma: gonfia(0.15, 1, 0.35) }), sr, t, 1);
     t += d + caso(0.15, 0.3);
   }
-  return finisci(bassa(out, sr, 1600, 2), sr);
+  return finisci(bassa(out, sr, 1000, 2), sr, 0.9, 0.3);
 }
 
 function corvo(sr) {
@@ -174,13 +202,14 @@ function corvo(sr) {
 }
 
 function fruscio(sr) {
-  const durata = caso(0.8, 1.4);
+  const durata = caso(1.4, 2.6);
   const n = campioni(durata, sr);
-  const d = normalizza(filtra(bianco(n), sr, 'banda', 3000, 0.8), 1);
-  const grana = lento(n, sr, caso(10, 25));
-  const passi = lento(n, sr, 3);
-  for (let i = 0; i < n; i++) d[i] *= grana[i] ** 5 * passi[i];
-  return finisci(d, sr);
+  const d = normalizza(bassa(filtra(bianco(n), sr, 'banda', caso(1700, 2600), 0.6), sr, 4500), 1);
+  const grana = lento(n, sr, caso(6, 14));
+  const passi = lento(n, sr, 2);
+  const forma = gonfia(0.35, durata, 0.6);
+  for (let i = 0; i < n; i++) d[i] *= grana[i] ** 3 * (0.4 + 0.6 * passi[i]) * forma(i / sr);
+  return finisci(d, sr, 0.9, 0.2);
 }
 
 const ricetta = (rendi, varianti = 1) => ({ rendi, varianti, sr: 'medio' });
@@ -189,10 +218,10 @@ export const RICETTE_AMBIENTE = Object.freeze({
   g_cicale: ricetta(cicale),
   g_grilli: ricetta(grilli),
   g_rane: ricetta(coroRane),
-  g_vento: ricetta(sr => vento(sr, true)),
+  g_vento: ricetta(brezza),
   g_acqua: ricetta(acqua),
   g_grotta: ricetta(grotta),
-  s_vento: ricetta(sr => vento(sr, false)),
+  s_vento: ricetta(vento),
   s_neon: ricetta(neon),
   a_rana: ricetta(rana, 5),
   a_uccello: ricetta(uccello, 5),
@@ -206,21 +235,29 @@ export const RICETTE_AMBIENTE = Object.freeze({
 
 const SCENE = Object.freeze({
   giungla: {
-    letti: [['g_cicale', 0.3, 'esterno'], ['g_grilli', 0.24, 'esterno'], ['g_rane', 0.16, 'esterno'], ['g_vento', 0.24, 'esterno'], ['g_acqua', 0.12, 'esterno'], ['g_grotta', 0.3, 'interno']],
+    letti: [
+      { chiave: 'g_cicale', volume: 0.085, bus: 'esterno', ondata: { quiete: 0.4, fondo: [0, 0.1], cresta: [0.35, 1], ogni: [6, 15], tau: [3, 6] } },
+      { chiave: 'g_grilli', volume: 0.08, bus: 'esterno', ondata: { quiete: 0.3, fondo: [0, 0.15], cresta: [0.4, 1], ogni: [5, 12], tau: [2.5, 5] } },
+      { chiave: 'g_rane', volume: 0.25, bus: 'esterno', ondata: { quiete: 0.3, fondo: [0, 0.2], cresta: [0.5, 1], ogni: [6, 14], tau: [3, 6] } },
+      { chiave: 'g_vento', volume: 0.22, bus: 'esterno' },
+      { chiave: 'g_acqua', volume: 0.2, bus: 'esterno' },
+      { chiave: 'g_grotta', volume: 0.3, bus: 'interno' },
+    ],
     eventi: [
-      { chiave: 'a_rana', ogni: 6, spazio: [6, 22], volume: 0.5, bus: 'esterno', individui: [1, 3], richiami: [2, 4], pausa: [0.25, 0.6] },
-      { chiave: 'a_uccello', ogni: 9, spazio: [12, 35], volume: 0.35, bus: 'esterno', richiami: [1, 3], pausa: [1, 2] },
-      { chiave: 'a_gufo', ogni: 28, spazio: [15, 35], volume: 0.45, bus: 'esterno' },
-      { chiave: 'a_scimmia', ogni: 110, spazio: [60, 90], volume: 0.5, bus: 'esterno' },
-      { chiave: 'a_fruscio', ogni: 14, spazio: [4, 12], volume: 0.35, bus: 'esterno' },
-      { chiave: 'a_goccia', ogni: 7, spazio: [2, 10], volume: 0.25, bus: 'esterno' },
+      { chiave: 'a_rana', ogni: 16, spazio: [16, 34], volume: 0.3, bus: 'esterno', individui: [1, 2], richiami: [1, 3], pausa: [0.4, 0.9] },
+      { chiave: 'a_uccello', ogni: 20, spazio: [18, 40], volume: 0.26, bus: 'esterno', richiami: [1, 2], pausa: [1.2, 2.5] },
+      { chiave: 'a_gufo', ogni: 34, spazio: [18, 38], volume: 0.38, bus: 'esterno' },
+      { chiave: 'a_scimmia', ogni: 360, spazio: [90, 130], volume: 0.22, bus: 'esterno' },
+      { chiave: 'a_fruscio', ogni: 7, spazio: [5, 14], volume: 0.2, bus: 'esterno' },
+      { chiave: 'a_goccia', ogni: 9, spazio: [3, 12], volume: 0.2, bus: 'esterno' },
       { chiave: 'a_goccia', ogni: 1.8, spazio: [2, 14], volume: 0.4, bus: 'interno', soloChiuso: true },
     ],
     aperto: { taglio: 16000, volume: 1, umido: 0.12 },
     chiuso: { taglio: 520, volume: 0.22, umido: 0.55 },
+    sottoMusica: 0.3,
   },
   scuola: {
-    letti: [['s_vento', 0.22, 'esterno'], ['s_neon', 0.08, 'interno']],
+    letti: [{ chiave: 's_vento', volume: 0.22, bus: 'esterno' }, { chiave: 's_neon', volume: 0.08, bus: 'interno' }],
     eventi: [
       { chiave: 'a_corvo', ogni: 22, spazio: [25, 50], volume: 0.35, bus: 'esterno' },
       { chiave: 'a_scricchiolio', ogni: 11, spazio: [4, 16], volume: 0.3, bus: 'interno', soloChiuso: true },
@@ -228,10 +265,11 @@ const SCENE = Object.freeze({
     ],
     aperto: { taglio: 12000, volume: 1, umido: 0.15 },
     chiuso: { taglio: 900, volume: 0.4, umido: 0.35 },
+    sottoMusica: 0,
   },
 });
 
-export const CHIAVI_SCENA = Object.freeze(Object.fromEntries(Object.entries(SCENE).map(([m, s]) => [m, [...s.letti.map(l => l[0]), ...s.eventi.map(e => e.chiave)]])));
+export const CHIAVI_SCENA = Object.freeze(Object.fromEntries(Object.entries(SCENE).map(([m, s]) => [m, [...s.letti.map(l => l.chiave), ...s.eventi.map(e => e.chiave)]])));
 
 function creaScena(motore, mappa) {
   const { ctx } = motore;
@@ -253,7 +291,7 @@ function creaScena(motore, mappa) {
   const ora = ctx.currentTime;
   return {
     mappa, profilo, master, esterno, volumeEsterno, interno, mandata, sorgenti: [],
-    letti: profilo.letti.map(([chiave, volume, bus]) => ({ chiave, volume, bus, avviato: false, guadagno: null, prossimo: 0 })),
+    letti: profilo.letti.map(l => ({ ...l, avviato: false, guadagno: null, prossimo: 0 })),
     eventi: profilo.eventi.map(e => ({ ...e, prossimo: ora + e.ogni * caso(0.2, 1.2) })),
   };
 }
@@ -274,6 +312,13 @@ function chiudiScena(scena, ora) {
   }, 4000);
 }
 
+function onda(l) {
+  const o = l.ondata;
+  if (!o) return { livello: l.volume * caso(...VARIAZIONE_LETTO), tau: TAU_LETTO, attesa: caso(...ATTESA_LETTO) };
+  const livello = Math.random() < o.quiete ? caso(...o.fondo) : caso(...o.cresta);
+  return { livello: l.volume * livello, tau: caso(...o.tau), attesa: caso(...o.ogni) };
+}
+
 function avviaLetti(motore, scena, ora) {
   for (const l of scena.letti) {
     if (!l.avviato && motore.banco.pronto(l.chiave)) {
@@ -282,15 +327,17 @@ function avviaLetti(motore, scena, ora) {
       s.loop = true;
       l.guadagno = motore.ctx.createGain();
       l.guadagno.gain.value = 0;
-      l.guadagno.gain.setTargetAtTime(l.volume, ora, 1.5);
+      const primo = l.ondata ? onda(l) : { livello: l.volume, tau: TAU_ENTRATA_LETTO, attesa: caso(...ATTESA_LETTO) };
+      l.guadagno.gain.setTargetAtTime(primo.livello, ora, primo.tau);
       s.connect(l.guadagno).connect(l.bus === 'interno' ? scena.interno : scena.esterno);
       s.start(ora, Math.random() * s.buffer.duration);
       scena.sorgenti.push(s);
       l.avviato = true;
-      l.prossimo = ora + caso(4, 8);
+      l.prossimo = ora + primo.attesa;
     } else if (l.avviato && ora > l.prossimo) {
-      l.guadagno.gain.setTargetAtTime(l.volume * caso(0.65, 1.1), ora, 2.5);
-      l.prossimo = ora + caso(4, 8);
+      const prossima = onda(l);
+      l.guadagno.gain.setTargetAtTime(prossima.livello, ora, prossima.tau);
+      l.prossimo = ora + prossima.attesa;
     }
   }
 }
@@ -329,7 +376,7 @@ function programmaEventi(motore, scena, ora, chiuso) {
 }
 
 export function creaAmbiente() {
-  const stato = { mappa: null, chiuso: false, attesa: 0, applicato: null, chiamate: 0, viste: 0, silenzio: 0, scena: null, motore: null, timer: null };
+  const stato = { mappa: null, chiuso: false, attesa: 0, applicato: null, chiamate: 0, viste: 0, silenzio: 0, musica: 0, scena: null, motore: null, timer: null };
 
   function cambiaScena(ora) {
     if (stato.scena) chiudiScena(stato.scena, ora);
@@ -354,7 +401,8 @@ export function creaAmbiente() {
     }
     const scena = stato.scena;
     if (!scena) return;
-    scena.master.gain.setTargetAtTime(attivo ? VOLUME_AMBIENTE : 0, ora, attivo ? 1 : 0.5);
+    const volume = VOLUME_AMBIENTE * (1 - scena.profilo.sottoMusica * stato.musica);
+    scena.master.gain.setTargetAtTime(attivo ? volume : 0, ora, attivo ? 1 : 0.5);
     avviaLetti(motore, scena, ora);
     if (attivo) programmaEventi(motore, scena, ora, stato.applicato);
   }
@@ -372,6 +420,9 @@ export function creaAmbiente() {
         stato.chiuso = chiuso;
         stato.attesa = 0;
       }
+    },
+    sottoMusica(livello) {
+      stato.musica = livello;
     },
   };
 }
