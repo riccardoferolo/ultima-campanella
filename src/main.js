@@ -14,6 +14,7 @@ import { apriSegnali } from './rete/segnali.js';
 import { collega, collegaHost } from './rete/collegamento.js';
 import { codiceStanza, normalizzaCodice, pulisciNome } from './rete/protocollo.js';
 import { creaMondo } from './grafica/scena.js';
+import { LIVELLI, leggiScelta, salvaScelta, livelloAttivo } from './grafica/qualita.js';
 import { creaComandi } from './comandi.js';
 import { creaHud } from './hud.js';
 import { creaAudio } from './audio.js';
@@ -117,7 +118,7 @@ const miaPistola = () => s.vista?.giocatori.find(g => g.id === s.mioId)?.pistola
 
 async function apriMondo(mappa) {
   usaMappa(mappa);
-  if (!mondi.has(mappa)) mondi.set(mappa, creaMondo($('mondo'), mappa));
+  if (!mondi.has(mappa)) mondi.set(mappa, creaMondo($('mondo'), mappa, { suQualita: livello => hud.avviso(`Grafica ${LIVELLI[livello].nome}: così tieni i 60 fps`, 'bene') }));
   let pronto;
   try {
     pronto = await mondi.get(mappa);
@@ -1032,6 +1033,13 @@ comandi.suBlocco(bloccato => {
 });
 
 $('nome').value = leggiNomeSalvato();
+$('grafica').value = leggiScelta();
+$('grafica').options[0].textContent = `Automatica (${LIVELLI[livelloAttivo()].nome})`;
+$('grafica').addEventListener('change', () => {
+  salvaScelta($('grafica').value);
+  if (pulisciNome($('nome').value)) salvaNome(pulisciNome($('nome').value));
+  location.reload();
+});
 const codiceInvito = normalizzaCodice(PARAMETRI.get('stanza'));
 if (codiceInvito) {
   $('codice').value = codiceInvito;

@@ -27,6 +27,10 @@ npm test
   ricariche meccaniche, rantoli degli zombie, riverbero di corridoio, cortile, giungla e grotta; nella giungla
   cicale, grilli, rane, uccelli notturni, gufo, scimmia urlatrice lontana e acqua.
 - Fucili a pompa che sparano a rosa: ogni pallino ha la sua scia, il suo impatto e il suo schizzo di sangue.
+- Grafica Alta, Media o Bassa (PC lenti), scelta nella schermata iniziale; «Automatica» la stima dalla scheda
+  video, dai core e dalla memoria, e in partita scende da sola di un livello se a risoluzione minima non si
+  tengono i 50 fps (Bassa: niente antialias, risoluzione fino al 35%, texture senza rilievo, metà dei cespugli,
+  vista più corta, due luci, niente animaletti).
 - 60 fps: vegetazione divisa a celle (si disegna solo quella inquadrata), luci della giungla a rotazione sui fuochi
   più vicini, particelle in due soli disegni.
 - Coltello (tasto V) che colpisce ad arco fino a due zombie, fa uno scatto verso lo zombie vicino e scala coi round.

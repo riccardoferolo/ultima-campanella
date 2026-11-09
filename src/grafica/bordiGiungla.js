@@ -180,7 +180,7 @@ export function costruisciBordi(scena, { muri, zone, acquisti, porte, altezzaSie
   }
 
   const caduche = new THREE.MeshLambertMaterial({ map: texturaCiuffo(caso), alphaTest: 0.5, side: THREE.DoubleSide });
-  istanzeACelle(scena, geometriaCiuffo(), caduche, matriceCiuffo.map((matrice, i) => ({ matrice, colore: tinteCiuffo[i] })));
+  istanzeACelle(scena, geometriaCiuffo(), caduche, matriceCiuffo.map((matrice, i) => ({ matrice, colore: tinteCiuffo[i] })), { diradabile: true });
 
   const mappaChioma = texturaChioma(caso);
   mappaChioma.repeat.set(2, 2);

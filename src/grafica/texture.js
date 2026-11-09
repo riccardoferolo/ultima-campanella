@@ -21,7 +21,7 @@ const REALI = Object.freeze(['muro', 'piastrelle', 'parquet', 'soffitto', 'legno
 export const TEXTURE_SCUOLA = REALI;
 export const TEXTURE_GIUNGLA = Object.freeze(['suoloGiungla', 'foglieTerra', 'pietraMuschio', 'pietraTempio', 'roccia', 'paglia', 'assiVecchie', 'fango', 'cortecciaPalma', 'corteccia', 'metallo', 'legno']);
 
-export async function caricaTextureReali(chiavi = REALI, base = './texture/') {
+export async function caricaTextureReali(chiavi = REALI, { piene = true, base = './texture/' } = {}) {
   const loader = new THREE.TextureLoader();
   const carica = async (nome, colore) => {
     const t = await loader.loadAsync(`${base}${nome}.jpg`);
@@ -31,7 +31,7 @@ export async function caricaTextureReali(chiavi = REALI, base = './texture/') {
     return t;
   };
   const voci = await Promise.all(chiavi.map(async chiave => {
-    const [map, normalMap, roughnessMap] = await Promise.all([carica(`${chiave}_diff`, true), carica(`${chiave}_nor`, false), carica(`${chiave}_rough`, false)]);
+    const [map, normalMap, roughnessMap] = await Promise.all([carica(`${chiave}_diff`, true), piene ? carica(`${chiave}_nor`, false) : null, piene ? carica(`${chiave}_rough`, false) : null]);
     return [chiave, { map, normalMap, roughnessMap }];
   }));
   return Object.fromEntries(voci);

@@ -17,7 +17,6 @@ import { istanzeACelle } from './celle.js';
 const H = ALTEZZA_SOFFITTO;
 const ALTEZZA_SIEPE = 4.2;
 const URL_GIUNGLA = './modelli/giungla.glb';
-const LUCI_ACCESE = 3;
 const SCEGLI_LUCI_OGNI_S = 0.3;
 const ACCENSIONE_LUCE_S = 0.4;
 const SFONDO_LUCI = Object.freeze([
@@ -279,7 +278,7 @@ function dentroAlgo(x, z, margine) {
     || FINESTRE.some(f => Math.hypot(f.interno.x - x, f.interno.z - z) < 1.4);
 }
 
-export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modelli }) {
+export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modelli, luciAccese = 3 }) {
   const caso = creaCaso(1337);
   const alone = texturaAlone();
   const pbr = (chiave, extra = {}) => new THREE.MeshStandardMaterial({ ...reali[chiave], metalness: 0, ...extra });
@@ -370,7 +369,7 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
   istanzeACelle(scena, geometriaFelce(), mat.fronda, [
     ...felci.map(matrice => ({ matrice, colore: tintaFelce() })),
     ...erba.map(m => ({ matrice: m.multiply(new THREE.Matrix4().makeScale(0.55, 0.6, 0.55)), colore: tintaFelce() })),
-  ]);
+  ], { diradabile: true });
 
   const sasso = geometriaRoccia(caso);
   const roccia = (materiale, x, z, larghezza, altezza, profondita, rot = caso() * Math.PI * 2) => {
@@ -674,7 +673,7 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
   const materialeNube = new THREE.SpriteMaterial({ map: alone, color: 0x7dff6a, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
   const materialeSegno = new THREE.MeshBasicMaterial({ color: 0xff3a2a, transparent: true, opacity: 0.6, depthWrite: false });
 
-  const luci = Array.from({ length: LUCI_ACCESE }, () => {
+  const luci = Array.from({ length: luciAccese }, () => {
     const luce = new THREE.PointLight(0xffffff, 0, 10, 1.4);
     scena.add(luce);
     return { luce, fonte: null, accensione: 0 };
@@ -685,7 +684,7 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
     attesaLuci -= dt;
     if (punto && attesaLuci <= 0) {
       attesaLuci = SCEGLI_LUCI_OGNI_S;
-      const vicine = [...SFONDO_LUCI].sort((a, b) => distanzaDa(punto, a) - distanzaDa(punto, b)).slice(0, LUCI_ACCESE);
+      const vicine = [...SFONDO_LUCI].sort((a, b) => distanzaDa(punto, a) - distanzaDa(punto, b)).slice(0, luciAccese);
       const libere = luci.filter(l => !vicine.includes(l.fonte));
       for (const f of vicine) {
         if (luci.some(l => l.fonte === f)) continue;

@@ -7,6 +7,7 @@ import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA } from
 import { caricaGiungla, costruisciGiungla } from './giungla3d.js';
 import { TINTE_ASPETTO } from './compagno3d.js';
 import { creaAnimali } from './animali3d.js';
+import { LIVELLI, ORDINE, livelloAttivo } from './qualita.js';
 import { modelloArma } from './armi3d.js';
 import { caricaArmi, creaMaterialiArmi } from './armi3d.js';
 import { costruisciScuola } from './scuola3d.js';
@@ -16,7 +17,7 @@ import { caricaOggetti, costruisciArredi, costruisciSala, creaBonus3d, creaSegre
 import { creaEffetti } from './effetti.js';
 import { creaVista1p } from './vista1p.js';
 
-const SCALA_MINIMA = 0.5;
+const CONTROLLI_PRIMA_DI_SCENDERE = 3;
 const PASSO_SCALA = 0.1;
 const FPS_BASSI = 50;
 const FPS_ALTI = 58;
@@ -193,8 +194,10 @@ function precompila(renderer, scena, camera, extra) {
 
 const aperta = (x, z) => ZONE.some(zona => zona.aperto && x >= zona.x0 && x <= zona.x1 && z >= zona.z0 && z <= zona.z1);
 
-export async function creaMondo(contenitore, mappa = mappaAttiva) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = () => {} } = {}) {
+  let livello = livelloAttivo();
+  let q = LIVELLI[livello];
+  const renderer = new THREE.WebGLRenderer({ antialias: q.antialias, powerPreference: 'high-performance' });
   renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -213,7 +216,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
   luna.position.set(-20, 30, -30);
   scena.add(luna);
 
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, atmosfera.nebbiaFuori + MARGINE_VISTA);
+  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, atmosfera.nebbiaFuori * q.vista + MARGINE_VISTA);
   camera.rotation.order = 'YXZ';
   const torcia = new THREE.SpotLight(0xfff0d0, 28, 24, 0.45, 0.55, 1.3);
   torcia.position.set(0.15, -0.1, 0);
@@ -229,14 +232,14 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
   scena.environmentIntensity = 0.12;
   const texture = creaTexture();
   const [libreria, risorseZombi, personaggi, oggetti, reali, modelliGiungla] = await Promise.all([
-    caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(), caricaTextureReali(giungla ? TEXTURE_GIUNGLA : TEXTURE_SCUOLA), giungla ? caricaGiungla() : null,
+    caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(), caricaTextureReali(giungla ? TEXTURE_GIUNGLA : TEXTURE_SCUOLA, { piene: q.texturePiene }), giungla ? caricaGiungla() : null,
   ]);
   const mappaPrima = mappaAttiva;
   usaMappa(mappa);
   const materialiArmi = creaMaterialiArmi(texture, libreria);
   const vuoto = { aggiorna() {}, suona() {} };
   const mondoMappa = giungla
-    ? costruisciGiungla(scena, { reali, materialiArmi, oggetti, modelli: modelliGiungla })
+    ? costruisciGiungla(scena, { reali, materialiArmi, oggetti, modelli: modelliGiungla, luciAccese: q.luci })
     : costruisciScuola(scena, texture, materialiArmi, oggetti, reali);
   if (!giungla) {
     costruisciArredi(scena, oggetti);
@@ -244,7 +247,13 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
   }
   const bonus3d = creaBonus3d(scena);
   const segreti = giungla ? vuoto : creaSegreti(scena);
-  const animali = creaAnimali(scena, mappa);
+  const animali = q.animali ? creaAnimali(scena, mappa) : { aggiorna() {}, svuota() {} };
+  function applicaDensita() {
+    scena.traverse(o => {
+      if (o.isInstancedMesh && o.userData.pieni) o.count = Math.max(1, Math.round(o.userData.pieni * q.densita));
+    });
+  }
+  applicaDensita();
   const scenaMini = new THREE.Scene();
   scenaMini.environment = ambiente;
   scenaMini.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.2));
@@ -270,7 +279,8 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
   let tempo = 0;
   let passo = 0;
 
-  let scala = 1;
+  let scala = q.scalaMassima;
+  let controlliBassi = 0;
   let campioni = 0;
   let sommaDt = 0;
   function dimensiona() {
@@ -311,7 +321,17 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
     const fps = campioni / sommaDt;
     campioni = 0;
     sommaDt = 0;
-    const nuova = fps < FPS_BASSI ? Math.max(SCALA_MINIMA, scala - PASSO_SCALA) : fps > FPS_ALTI ? Math.min(1, scala + PASSO_SCALA / 2) : scala;
+    controlliBassi = fps < FPS_BASSI && scala <= q.scalaMinima + 0.01 ? controlliBassi + 1 : 0;
+    if (controlliBassi >= CONTROLLI_PRIMA_DI_SCENDERE && livello !== ORDINE[ORDINE.length - 1]) {
+      livello = ORDINE[ORDINE.indexOf(livello) + 1];
+      q = { ...LIVELLI[livello], antialias: q.antialias, texturePiene: q.texturePiene, animali: q.animali, luci: q.luci };
+      controlliBassi = 0;
+      camera.far = atmosfera.nebbiaFuori * q.vista + MARGINE_VISTA;
+      camera.updateProjectionMatrix();
+      applicaDensita();
+      suQualita(livello);
+    }
+    const nuova = fps < FPS_BASSI ? Math.max(q.scalaMinima, scala - PASSO_SCALA) : fps > FPS_ALTI ? Math.min(q.scalaMassima, scala + PASSO_SCALA / 2) : scala;
     if (Math.abs(nuova - scala) < 0.01) return;
     scala = nuova;
     dimensiona();
@@ -335,7 +355,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
     if (vista1p.lampoAcceso) lampo.color.setHex(vista1p.coloreLampo);
     const fuori = aperta(io.x, io.z);
     const fattore = Math.min(1, dt * 2);
-    scena.fog.far += ((fuori ? atmosfera.nebbiaFuori : atmosfera.nebbiaDentro) - scena.fog.far) * fattore;
+    scena.fog.far += ((fuori ? atmosfera.nebbiaFuori : atmosfera.nebbiaDentro) * q.vista - scena.fog.far) * fattore;
     scena.fog.color.lerp(new THREE.Color(fuori ? atmosfera.cielo : atmosfera.buio), fattore);
     scena.background.copy(scena.fog.color);
     mondoMappa.aggiorna(vista, dt, tempo, camera.position);
@@ -371,6 +391,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
     mappa,
     scena,
     renderer,
+    get qualita() { return livello; },
     miniatura(tipo) {
       const { gruppo } = modelloArma(tipo, materialiArmi);
       const perno = new THREE.Group();

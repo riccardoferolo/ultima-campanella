@@ -272,3 +272,8 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
   .sala-scelte .colonne { grid-template-columns: 1fr 1fr; }
   .sala-scelte .colonne section:first-child { grid-column: 1 / -1; }
 }
+select {
+  font: inherit; font-size: 20px; color: var(--testo); background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--bordo); border-radius: 6px; padding: 8px 10px;
+}
+select option { background: #14181c; color: var(--testo); }
