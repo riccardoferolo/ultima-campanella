@@ -1,9 +1,12 @@
 import * as scuola from './mappe/scuola.js';
 import * as giungla from './mappe/giungla.js';
+import * as teatro from './mappe/teatro.js';
 
-export const MAPPE = Object.freeze({ scuola, giungla });
+export const MAPPE = Object.freeze({ scuola, giungla, teatro });
 export const ELENCO_MAPPE = Object.freeze(Object.keys(MAPPE));
-export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla' });
+export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla', teatro: "Il Teatro dell'Eclissi" });
+const PIANO = () => 0;
+const NESSUN_NOME = Object.freeze({});
 
 export let mappaAttiva = 'scuola';
 export let ALTEZZA_SOFFITTO;
@@ -24,6 +27,8 @@ export let PARTENZE_SALA;
 export let CARTELLO_PRONTI;
 export let FRAMMENTI;
 export let ARREDI;
+export let NOMI = NESSUN_NOME;
+export let quota = PIANO;
 
 export function usaMappa(id) {
   const scelta = Object.hasOwn(MAPPE, id) ? id : 'scuola';
@@ -33,6 +38,8 @@ export function usaMappa(id) {
   RECINZIONI = m.RECINZIONI ?? [];
   FRAMMENTI = m.FRAMMENTI ?? [];
   ARREDI = m.ARREDI ?? [];
+  NOMI = m.NOMI ?? NESSUN_NOME;
+  quota = m.quota ?? PIANO;
   return scelta;
 }
 
@@ -55,7 +62,7 @@ export function zonaDi(x, z) {
 }
 
 export function zoneAperte(porteAperte) {
-  const aperte = new Set([ZONE[0].id]);
+  const aperte = new Set([ZONE[0].id, ...ZONE.filter(z => z.sempre).map(z => z.id)]);
   for (const porta of PORTE) if (porteAperte.has(porta.id)) porta.zone.forEach(z => aperte.add(z));
   return aperte;
 }
@@ -71,5 +78,17 @@ export function ostacoliPerGiocatori(porteAperte) {
     ...ARREDI.filter(a => a.solido).map(a => a.solido),
   ];
 }
+
+export const sottoCielo = (x, z) => ZONE.some(zona => zona.aperto && x >= zona.x0 && x <= zona.x1 && z >= zona.z0 && z <= zona.z1);
+
+export function tetto(x, z, { cielo = true } = {}) {
+  const zona = ZONE.find(q => x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1);
+  if (Number.isFinite(zona?.tetto)) return zona.tetto;
+  return cielo && sottoCielo(x, z) ? Infinity : quota(x, z) + ALTEZZA_SOFFITTO;
+}
+
+export const stessoPiano = (a, b, scarto = 2.5) => Math.abs(quota(a.x, a.z) - quota(b.x, b.z)) < scarto;
+
+export const nomeBevanda = (id, bevande) => NOMI.bevande?.[id] ?? bevande[id]?.nome ?? id;
 
 export const dentroSala = (x, z) => x >= SALA.x0 && x <= SALA.x1 && z >= SALA.z0 && z <= SALA.z1;

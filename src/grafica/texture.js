@@ -19,6 +19,7 @@ function disegna(larghezza, altezza, pittore, ripeti = true) {
 const REALI = Object.freeze(['muro', 'piastrelle', 'parquet', 'soffitto', 'legno', 'legnoChiaro', 'porta', 'terra', 'linoleum', 'cemento', 'asfalto', 'metallo']);
 
 export const TEXTURE_SCUOLA = REALI;
+export const TEXTURE_TEATRO = Object.freeze(['muro', 'parquet', 'soffitto', 'legno', 'porta', 'cemento', 'asfalto', 'metallo', 'assiVecchie']);
 export const TEXTURE_GIUNGLA = Object.freeze(['suoloGiungla', 'foglieTerra', 'pietraMuschio', 'pietraTempio', 'roccia', 'paglia', 'assiVecchie', 'fango', 'cortecciaPalma', 'corteccia', 'metallo', 'legno']);
 
 export async function caricaTextureReali(chiavi = REALI, { piene = true, base = './texture/' } = {}) {

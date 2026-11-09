@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { BEVANDE } from '../regole.js';
+import { NOMI } from '../mappa.js';
 
 export const MARCHI = Object.freeze({
   ferro: { nome: 'FERRO', slogan: "Pelle d'acciaio", icona: 'scudo' },
@@ -10,6 +11,8 @@ export const MARCHI = Object.freeze({
   scatto: { nome: 'SCATTO', slogan: 'Gambe da lepre', icona: 'ala' },
   tasca: { nome: 'TASCA', slogan: "Ce n'è sempre una in più", icona: 'tasca' },
 });
+
+const marchioDi = tipo => ({ ...MARCHI[tipo], ...(NOMI.marchi?.[tipo] ?? {}) });
 
 const LARGO = 0.95;
 const ALTO = 2;
@@ -135,7 +138,7 @@ function scritta(ctx, testo, x, y, dimensione, colore, bordo = '#000') {
 }
 
 function texturaPannello(tipo) {
-  const marchio = MARCHI[tipo];
+  const marchio = marchioDi(tipo);
   const colore = new THREE.Color(BEVANDE[tipo].colore);
   const chiaro = esadecimale(colore.clone().lerp(new THREE.Color(0xffffff), 0.35).getHex());
   const scuro = esadecimale(colore.clone().multiplyScalar(0.25).getHex());
@@ -162,7 +165,7 @@ function texturaPannello(tipo) {
     alone.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = alone;
     ctx.fillRect(0, 0, l, a);
-    scritta(ctx, 'BIBITA', l / 2, 50, 38, '#ffffff');
+    scritta(ctx, NOMI.marchi?.[tipo] ? 'SIERO' : 'BIBITA', l / 2, 50, 38, '#ffffff');
     disegnaIcona(ctx, marchio.icona, l / 2, a * 0.42, 92, chiaro);
     scritta(ctx, marchio.nome, l / 2, a * 0.72, 92, '#ffffff', scuro);
     ctx.font = `italic 30px Georgia, serif`;
@@ -176,7 +179,7 @@ function texturaPannello(tipo) {
 }
 
 function texturaInsegna(tipo) {
-  const marchio = MARCHI[tipo];
+  const marchio = marchioDi(tipo);
   const colore = esadecimale(BEVANDE[tipo].colore);
   return tela(512, 128, (ctx, l, a) => {
     ctx.fillStyle = '#0d0d10';
@@ -211,7 +214,7 @@ function texturaPulsantiera(tipo) {
 }
 
 function texturaEtichetta(tipo) {
-  const marchio = MARCHI[tipo];
+  const marchio = marchioDi(tipo);
   const colore = esadecimale(BEVANDE[tipo].colore);
   return tela(256, 64, (ctx, l, a) => {
     ctx.fillStyle = '#f4ecd8';
@@ -224,7 +227,8 @@ function texturaEtichetta(tipo) {
 }
 
 function risorse(tipo) {
-  if (cache.has(tipo)) return cache.get(tipo);
+  const chiave = `${tipo}|${marchioDi(tipo).nome}`;
+  if (cache.has(chiave)) return cache.get(chiave);
   const colore = new THREE.Color(BEVANDE[tipo].colore);
   const profilo = [[0, 0], [0.034, 0], [0.036, 0.01], [0.036, 0.12], [0.03, 0.15], [0.013, 0.185], [0.012, 0.215], [0, 0.215]].map(([x, y]) => new THREE.Vector2(x, y));
   const r = {
@@ -235,7 +239,7 @@ function risorse(tipo) {
     etichetta: new THREE.MeshStandardMaterial({ map: texturaEtichetta(tipo), roughness: 0.6 }),
     tappo: new THREE.MeshStandardMaterial({ color: 0xc9c2b0, metalness: 0.9, roughness: 0.3 }),
   };
-  cache.set(tipo, r);
+  cache.set(chiave, r);
   return r;
 }
 

@@ -19,7 +19,7 @@ npm test
 - Difficoltà a crescere: nei primi tre round solo zombie che camminano, poi arrivano gli Scuoiati e i corridori
   (20% in più a round); nella giungla vita, numero, danno e velocità salgono dal 4° al 9° round fino al massimo.
 - Zombie fluidi: simulazione a passo fisso con disegno interpolato fra gli ultimi due passi.
-- Due mappe: La scuola e Il tempio nella giungla. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
+- Tre mappe: La scuola, Il tempio nella giungla e Il Teatro dell'Eclissi. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
   alberi con la chioma che sporge, palme e felci) e la mappa è piena di animaletti che scappano quando arrivi:
   pappagalli sulle palme, pipistrelli in grotta e nel tempio, lucciole, farfalle blu, rane sulle ninfee del fiume;
   nella scuola corvi e pipistrelli.
@@ -71,12 +71,41 @@ cabina dell'aereo — sull'altare, forgiato a fine round), il Bastone del Serpen
 quattro idoli) e la Spada del Sole (le tre pietre girate come dice il murale della grotta, poi il Guardiano).
 Ogni uccisione carica la reliquia; carica piena = colpo speciale col tasto E (turbine, nube velenosa, onda di fuoco).
 
+### Il Teatro dell'Eclissi
+
+Teatro degli anni '60 in rovina, invaso dai Corrotti, con piani veri (si sale, si scende e si salta giù). Dall'Atrio di
+Velluto (pavimento a scacchi, scalone a doppia rampa con la rampa destra crollata, lampadario di cristallo, quattro
+barricate, Siero del Risveglio al centro) partono due percorsi:
+
+- **piani alti**: porta in cima allo scalone a sinistra → Salone dei Ricevimenti (bancone curvo a destra, tavolini
+  rovesciati, mitra sul muro di sinistra, Scrigno del Fato) → corridoio dei camerini → Guardaroba degli Attori
+  (specchiere, manichini, costumi, barricate ai lati, Siero della Ricarica Rapida) → balconcino antincendio da cui si
+  salta sul palco (dal palco non si risale);
+- **piani bassi**: porta a destra al piano terra → vicolo sotto la pioggia (rete metallica a sinistra da cui entrano i
+  Corrotti, bidoni e Siero del Fuoco Rapido a destra) → scala nei Sotterranei della Caldaia (corridoi stretti attorno
+  alla fornace) → rampa metallica che sbuca sul palco.
+
+Sul palco il Generatore Centrale: la leva accende la corrente, il sipario sale in 6 secondi e unisce palco e platea,
+si aprono le doppie porte sotto lo scalone e i Sieri (spenti fino ad allora) si accendono; c'è il Siero della
+Robustezza. La platea è in pendenza con un largo giro attorno alle poltrone; la regia al centro accende la Sentinella
+automatica appesa al soffitto (1500 punti, 30 s). Trappole incendiarie a pagamento sulle due scalette tra platea e
+palco e nel corridoio dei camerini (bruciano anche i giocatori). Sparando al lampadario dell'atrio lo si fa crollare
+sui Corrotti. La botola al centro del palco (750 punti, con la corrente) porta nel Sottopalco con la Forgia Arcana;
+dopo 40 secondi, o prima con la leva, il montacarichi riporta sul palco. Ogni 5-6 round arriva l'eclissi: nebbia
+rossa e Corrotti in fiamme che scoppiano morendo; dal quarto round compaiono i Mutanti tossici, pallidi, che uccisi da
+vicino lasciano un gas che annebbia e rallenta.
+
+La mappa è scritta in coordinate «di progetto» (`PROGETTO` in `src/mappe/teatro.js`) e pubblicata specchiata in x, così
+a sinistra e a destra tornano come nel progetto; la grafica (`src/grafica/teatro3d.js`) si costruisce in coordinate di
+progetto dentro un gruppo con `scale.x = -1`. L'altezza del pavimento sta in `quota(x, z)` (0 nelle altre due mappe).
+
 ## Strumenti
 
 `_lavoro/` contiene gli script di collaudo e di conversione (Playwright con Edge, server Vite su 5421):
 
 - `collaudo.mjs` – partita in due dall'inizio alla fine (`--riserva`, `--supabase`);
 - `vetrina3.mjs`, `mani.mjs` – schermate di sala, armi in mano, zombie e mappa;
+- `teatro.mjs` – giro di foto del Teatro dell'Eclissi (Edge su GPU) e misura degli fps in platea con un'orda;
 - `converti-tutto.mjs` + `converti/tutto.html` – conversione dei modelli scaricati in `public/modelli/*.glb`
   (i file sorgente vanno rimessi in `_lavoro/scaricati/`, vedi `CREDITI.md`).
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { R, ARMI } from '../regole.js';
-import { ACQUISTI } from '../mappa.js';
+import { ACQUISTI, NOMI, quota } from '../mappa.js';
 import { texturaTesto } from './texture.js';
 import { modelloArma } from './armi3d.js';
 import { creaDistributore } from './bibite3d.js';
@@ -9,7 +9,7 @@ const orientamento = (mesh, verso) => { mesh.rotation.y = Math.atan2(verso.x, ve
 
 function armaAppesa(scena, a, materialiArmi, legno) {
   const supporto = new THREE.Group();
-  supporto.position.set(a.posizione.x, 0, a.posizione.z);
+  supporto.position.set(a.posizione.x, quota(a.posizione.x, a.posizione.z), a.posizione.z);
   orientamento(supporto, a.verso);
   const { gruppo, lunghezza } = modelloArma(a.arma, materialiArmi);
   gruppo.rotation.y = Math.PI / 2;
@@ -48,14 +48,16 @@ function vetrinaArma(contenitore, materialiArmi, scala) {
   };
 }
 
-export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno }) {
+export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno, serveCorrente = false }) {
+  const bagliori = [];
   for (const a of ACQUISTI) {
     if (a.tipo === 'arma') armaAppesa(scena, a, materialiArmi, legno);
     else if (a.tipo === 'bevanda') {
       const macchina = creaDistributore(a.bevanda);
-      macchina.position.set(a.posizione.x, 0, a.posizione.z);
+      macchina.position.set(a.posizione.x, quota(a.posizione.x, a.posizione.z), a.posizione.z);
       orientamento(macchina, a.verso);
       scena.add(macchina);
+      if (serveCorrente) macchina.traverse(o => { if (o.isSprite) bagliori.push(o); });
     }
   }
 
@@ -64,7 +66,7 @@ export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno }) 
   const corpoMacchina = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.9, 1.15), metallo);
   corpoMacchina.position.y = 0.95;
   const schermo = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.45), new THREE.MeshBasicMaterial({
-    map: texturaTesto(['POTENZIATORE', `${R.COSTO_POTENZIA}`], { larghezza: 128, altezza: 48, sfondo: '#1a0b2e', colore: '#d6b8ff', font: 'bold 12px monospace', bordo: '#7d3cff' }),
+    map: texturaTesto([(NOMI.potenziatore ?? 'Potenziatore').toUpperCase(), `${R.COSTO_POTENZIA}`], { larghezza: 128, altezza: 48, sfondo: '#1a0b2e', colore: '#d6b8ff', font: 'bold 12px monospace', bordo: '#7d3cff' }),
   }));
   schermo.position.set(0, 1.55, 0.58);
   const anello = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 6, 18), new THREE.MeshBasicMaterial({ color: 0x3a2060 }));
@@ -72,7 +74,7 @@ export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno }) 
   const luceMacchina = new THREE.PointLight(0xa45cff, 0, 5, 1.5);
   luceMacchina.position.set(0, 1.4, 1);
   macchina.add(corpoMacchina, schermo, anello, luceMacchina);
-  macchina.position.set(potenziatoreDati.posizione.x, 0, potenziatoreDati.posizione.z);
+  macchina.position.set(potenziatoreDati.posizione.x, quota(potenziatoreDati.posizione.x, potenziatoreDati.posizione.z), potenziatoreDati.posizione.z);
   orientamento(macchina, potenziatoreDati.verso);
   scena.add(macchina);
   const armaInMacchina = vetrinaArma(macchina, materialiArmi, 1.2);
@@ -88,7 +90,7 @@ export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno }) 
   const alone = new THREE.PointLight(0x7dd3fc, 0, 4, 1.5);
   alone.position.set(0, 1, 0.3);
   cassa.add(fondo, perno, punto, alone);
-  cassa.position.set(cassaDati.posizione.x, 0, cassaDati.posizione.z);
+  cassa.position.set(cassaDati.posizione.x, quota(cassaDati.posizione.x, cassaDati.posizione.z), cassaDati.posizione.z);
   orientamento(cassa, cassaDati.verso);
   scena.add(cassa);
   const armaInCassa = vetrinaArma(cassa, materialiArmi, 1.15);
@@ -96,6 +98,7 @@ export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno }) 
 
   return {
     aggiorna(vista, dt, tempo) {
+      for (const b of bagliori) b.visible = vista.corrente;
       const lavora = vista.potenziatore.stato === 'lavora';
       anello.material.color.setHex(!vista.corrente ? 0x3a2060 : lavora ? 0xe0b0ff : 0xa45cff);
       anello.rotation.z += dt * (lavora ? 9 : vista.corrente ? 1 : 0);

@@ -224,6 +224,8 @@ export const TIPI_ZOMBIE = Object.freeze({
   sciamano: Object.freeze({ nome: 'Lo Sciamano', vita: 16, velocita: 0.95, danno: 1.6, portata: 1.3, punti: 10, boss: true, carica: 1.3, infuria: 0.5, evoca: true }),
   guardiano: Object.freeze({ nome: 'Il Guardiano del Sole', vita: 22, velocita: 1, danno: 2, portata: 1.4, punti: 12, boss: true, carica: 1.5, infuria: 0.5 }),
   divoratore: Object.freeze({ nome: 'Il Divoratore', vita: 1, velocita: 0.95, danno: 2.2, portata: 1.8, punti: 30, boss: true, finale: true, fasi: 4, carica: 1.5, attesa: 0.85 }),
+  ardente: Object.freeze({ nome: 'Corrotto in fiamme', vita: 0.55, velocita: 1.2, danno: 0.8, portata: 1, punti: 1.2, corre: true }),
+  tossico: Object.freeze({ nome: 'Mutante tossico', vita: 0.85, velocita: 0.95, danno: 1, portata: 1, punti: 1.3 }),
 });
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 

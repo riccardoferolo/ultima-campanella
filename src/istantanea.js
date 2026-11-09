@@ -1,5 +1,6 @@
 import { FINESTRE, ELENCO_MAPPE } from './mappa.js';
 import { istantanea as istantaneaGiungla, espandi as espandiGiungla } from './giungla.js';
+import { istantanea as istantaneaTeatro, espandi as espandiTeatro } from './teatro.js';
 import { ELENCO_TIPI_ZOMBIE, ELENCO_BONUS, BONUS_A_TEMPO } from './regole.js';
 
 export const STATI_ZOMBIE = Object.freeze(['arriva', 'assi', 'scavalca', 'dentro', 'attacco', 'morto', 'emerge']);
@@ -43,6 +44,7 @@ export function faiIstantanea(stato) {
     mp: Math.max(0, ELENCO_MAPPE.indexOf(stato.mappa ?? 'scuola')),
     ms: Math.max(0, ELENCO_MAPPE.indexOf(stato.mappaScelta ?? stato.mappa ?? 'scuola')),
     ...istantaneaGiungla(stato),
+    ...istantaneaTeatro(stato),
   };
 }
 
@@ -71,6 +73,7 @@ export function espandi(ist) {
     mappa: ELENCO_MAPPE[ist.mp ?? 0] ?? 'scuola',
     mappaScelta: ELENCO_MAPPE[ist.ms ?? ist.mp ?? 0] ?? 'scuola',
     giungla: espandiGiungla(ist),
+    teatro: espandiTeatro(ist),
     granate: (ist.gr ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
     proiettili: (ist.pj ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
     buchi: (ist.bh ?? []).map(([id, x, y, z, timer, raggio]) => ({ id, x, y, z, timer, raggio })),

@@ -1,5 +1,5 @@
 import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseBoss, ASPETTI } from './regole.js';
-import { NOMI_MAPPE } from './mappa.js';
+import { NOMI_MAPPE, nomeBevanda } from './mappa.js';
 import { obiettivoGiungla, reliquieGiungla } from './storia.js';
 import { creaSalaScelte } from './salaScelte.js';
 
@@ -13,8 +13,20 @@ const MS_PER_CARATTERE = 55;
 const DURATA_SEGNO_MS = 140;
 const DURATA_UCCISIONE_MS = 240;
 
-function obiettivo(vista) {
+function obiettivoTeatro(vista, mioId) {
+  const t = vista.teatro;
+  if (vista.fase === 'attesa' || vista.round === 0) return '';
+  const sotto = t.sotto?.[mioId];
+  if (sotto > 0) return `Sottopalco: il montacarichi riparte tra ${Math.ceil(sotto)} s`;
+  if (t.eclissi) return "Eclissi: i Corrotti in fiamme scoppiano quando muoiono, non fateli arrivare addosso";
+  if (!vista.corrente) return 'Raggiungete il palco e tirate la leva del generatore centrale';
+  if (t.sipario === 1) return 'Il sipario si sta alzando…';
+  return '';
+}
+
+function obiettivo(vista, mioId) {
   if (vista.giungla) return obiettivoGiungla(vista);
+  if (vista.teatro) return obiettivoTeatro(vista, mioId);
   const m = vista.missione;
   if (!m || vista.fase === 'attesa' || vista.fase === 'vinta' || vista.round === 0) return '';
   if (vista.fase === 'finale') return 'Uccidete il Custode';
@@ -27,6 +39,9 @@ function obiettivo(vista) {
 }
 
 export function creaHud() {
+  const nebbiaGas = document.createElement('div');
+  nebbiaGas.className = 'nebbia-gas';
+  $('vignetta').after(nebbiaGas);
   const n = {
     radice: $('hud'), vignetta: $('vignetta'), cannocchiale: $('cannocchiale'), mirino: $('mirino'), segno: $('segno'),
     round: $('round'), punti: $('punti'), nomeArma: $('nome-arma'), munizioni: $('munizioni'), bibite: $('bibite'),
@@ -168,7 +183,9 @@ export function creaHud() {
         if (nomeBoss.textContent !== titolo) nomeBoss.textContent = titolo;
         vitaBoss.style.width = `${Math.max(0, Math.min(100, capo.vita))}%`;
       }
-      const testoMissione = obiettivo(vista);
+      const testoMissione = obiettivo(vista, mioId);
+      const gas = (vista.teatro?.gas?.[mioId] ?? 0) > 0;
+      if (nebbiaGas.classList.contains('attiva') !== gas) nebbiaGas.classList.toggle('attiva', gas);
       if (missione.textContent !== testoMissione) missione.textContent = testoMissione;
       const testoReliquie = reliquieGiungla(vista);
       if (reliquie.textContent !== testoReliquie) reliquie.textContent = testoReliquie;
@@ -193,7 +210,7 @@ export function creaHud() {
         n.bibite.replaceChildren(...bevande.map(b => {
           const icona = document.createElement('i');
           icona.style.background = `#${BEVANDE[b].colore.toString(16).padStart(6, '0')}`;
-          icona.title = BEVANDE[b].nome;
+          icona.title = nomeBevanda(b, BEVANDE);
           return icona;
         }));
       }

@@ -1,10 +1,12 @@
 import './stile.css';
 import { R, ARMI, BEVANDE, BONUS, COLTELLO, PISTOLE_INIZIALI, ASPETTI, saltiArco, fattoreBevande, modoRicarica, dannoColtello } from './regole.js';
 import { semeCasuale } from './caso.js';
-import { MURI, OSTACOLI, PORTE, ACQUISTI, ZONE, ELENCO_MAPPE, NOMI_MAPPE, usaMappa, mappaAttiva, ostacoliPerGiocatori, scatolaAcquisto } from './mappa.js';
+import { MURI, OSTACOLI, PORTE, ACQUISTI, ZONE, ELENCO_MAPPE, NOMI_MAPPE, usaMappa, mappaAttiva, ostacoliPerGiocatori, scatolaAcquisto, quota, nomeBevanda } from './mappa.js';
+import { OGGETTI as OGGETTI_TEATRO } from './mappe/teatro.js';
+import { rallentamento } from './teatro.js';
 import { messaggioRadio, RUNE } from './storia.js';
 import { muoviCerchio } from './fisica.js';
-import { CORPO, colpisciZombie, direzioneDa, disperdi, esplosione, primoMuro } from './colpi.js';
+import { CORPO, colpisciZombie, direzioneDa, disperdi, esplosione, primoMuro, raggioSfera } from './colpi.js';
 import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi } from './arsenale.js';
 import { DURATA_BEVUTA } from './grafica/vista1p.js';
 import { interazioneVicina } from './interazioni.js';
@@ -48,6 +50,8 @@ const FERMATI_PRIMA = 0.55;
 const COLPITI_COLTELLO = 2;
 const COLPITI_RELIQUIA = 3;
 const BOSS_MINORI = new Set(['preside', 'sciamano', 'guardiano']);
+const RAGGIO_LAMPADARIO = 1.4;
+const ALTEZZA_SOPRA = 3;
 const TESTI_BOSS = {
   sciamano: 'Lo Sciamano esce dalla giungla: tamburi in lontananza…',
   guardiano: 'Le pietre del sole si allineano… il Guardiano si sveglia!',
@@ -56,6 +60,10 @@ const TESTI_BOSS_UCCISO = {
   preside: 'Il Preside è morto!',
   sciamano: 'Lo Sciamano è caduto!',
   guardiano: 'Il Guardiano del Sole è caduto: ha lasciato una spada!',
+};
+const TESTI_VIA = {
+  giungla: 'Si comincia! La giungla non perdona',
+  teatro: 'Si va in scena! Il sipario è chiuso: il generatore è sul palco',
 };
 const FASI_DIVORATORE = {
   2: 'Il Divoratore si copre di scaglie: rompetele con le reliquie!',
@@ -134,12 +142,20 @@ function scatole(porte, perSparo) {
   const chiave = `${mappaAttiva}|${perSparo}|${[...porte].sort().join(',')}`;
   if (!cacheScatole.has(chiave)) {
     const elenco = perSparo
-      ? [...MURI, ...OSTACOLI, ...PORTE.filter(p => !porte.has(p.id)).map(p => p.scatola), ...ACQUISTI.map(scatolaAcquisto).filter(Boolean).map(sc => ({ ...sc, altezza: 2 }))]
+      ? [...MURI, ...OSTACOLI, ...PORTE.filter(p => !porte.has(p.id)).map(p => p.scatola), ...ACQUISTI.map(scatolaAcquisto).filter(Boolean).map(sc => ({ ...sc, base: quota((sc.x0 + sc.x1) / 2, (sc.z0 + sc.z1) / 2), altezza: 2 }))]
       : ostacoliPerGiocatori(porte);
     cacheScatole.set(chiave, elenco);
   }
   return cacheScatole.get(chiave);
 }
+
+function ostacoliMovimento(porte) {
+  const tutte = scatole(porte, false);
+  const piede = quota(io.x, io.z);
+  return tutte.some(sc => sc.soloSotto !== undefined) ? tutte.filter(sc => sc.soloSotto === undefined || piede < sc.soloSotto) : tutte;
+}
+
+const suolo = (x, z) => quota(x, z);
 
 function leggiNomeSalvato() {
   try { return localStorage.getItem(CHIAVE_NOME) ?? ''; } catch { return ''; }
@@ -325,7 +341,7 @@ function suEventi(eventi) {
       case 'fineRound': audio.suona('fineRound'); break;
       case 'ucciso':
         mondo.effetti.macchia(e.x, e.z);
-        if (e.bomba) mondo.effetti.esplosione({ x: e.x, y: 1, z: e.z }, 'fuoco');
+        if (e.bomba) mondo.effetti.esplosione({ x: e.x, y: suolo(e.x, e.z) + 1, z: e.z }, 'fuoco');
         else if (e.frantumato) {
           mondo.frantuma(e.zombie, e.x, e.z);
           audio.suona('frantumato');
@@ -411,7 +427,33 @@ function suEventi(eventi) {
       case 'congelato': audio.suona('congelato'); break;
       case 'arco': disegnaArco(e); break;
       case 'vittoria': mostraFine({ ...e, vinto: true }); break;
-      case 'via': azzera(arsenale, miaPistola()); audio.suona('round'); hud.avviso(mappaAttiva === 'giungla' ? 'Si comincia! La giungla non perdona' : 'Si comincia! Restate vicini', 'bene'); break;
+      case 'via': azzera(arsenale, miaPistola()); audio.suona('round'); hud.avviso(TESTI_VIA[mappaAttiva] ?? 'Si comincia! Restate vicini', 'bene'); break;
+      case 'sipario': audio.suona('generatore'); hud.avviso('Il generatore ruggisce: il sipario si alza e i Sieri si risvegliano', 'bene'); break;
+      case 'siparioAlzato': audio.suona('rifugio'); hud.avviso("Palco e platea sono uniti: le doppie porte riportano all'atrio", 'bene'); break;
+      case 'botola':
+        audio.suona('porta');
+        hud.avviso(perMe ? `La botola si apre: hai ${e.secondi} s nel sottopalco con la Forgia Arcana` : `${nomeDi(e.a)} è sceso nel sottopalco`, 'bene');
+        break;
+      case 'risalita': if (perMe) { audio.suona('porta'); hud.avviso('Il montacarichi ti riporta sul palco'); } break;
+      case 'sentinella': audio.suona('generatore'); hud.avviso(`La sentinella della platea apre il fuoco per ${e.secondi} s`, 'bene'); break;
+      case 'sentinellaSpenta': hud.avviso('La sentinella si ferma a raffreddarsi'); break;
+      case 'trappola': audio.suona('implosione'); hud.avviso('Trappola incendiaria accesa: non attraversatela!'); break;
+      case 'lampadario': audio.suona('frantumato'); hud.avviso('Il lampadario cede!'); break;
+      case 'lampadarioCrollato':
+        mondo.effetti.esplosione({ x: e.x, y: suolo(e.x, e.z) + 0.6, z: e.z }, 'energia', 0xfff0d0);
+        mondo.effetti.esplosione({ x: e.x, y: suolo(e.x, e.z) + 0.3, z: e.z }, 'fuoco', 0xffc070);
+        audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z), Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
+        break;
+      case 'eclissi': audio.suona('boss'); hud.avviso("L'eclissi copre il teatro: i Corrotti prendono fuoco!"); break;
+      case 'eclissiFinita': hud.avviso("La luna se ne va: l'eclissi è finita", 'bene'); break;
+      case 'fiammata':
+        mondo.effetti.esplosione({ x: e.x, y: suolo(e.x, e.z) + 0.8, z: e.z }, 'fuoco');
+        audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z) + 4, Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
+        break;
+      case 'gas':
+        mondo.effetti.esplosione({ x: e.x, y: suolo(e.x, e.z) + 1, z: e.z }, 'energia', 0x9be15d);
+        audio.suona('evocazione');
+        break;
       case 'conto': audio.suona('conto'); break;
       case 'contoAnnullato': hud.avviso('Partenza annullata: qualcuno non è pronto'); break;
       case 'bonusCompare': audio.suona('bonusCompare'); break;
@@ -447,7 +489,7 @@ function suEventi(eventi) {
         audio.suona('sorsi');
         setTimeout(() => {
           hud.sorso(BEVANDE[e.bevanda].colore);
-          hud.avviso(`${BEVANDE[e.bevanda].nome}: ${BEVANDE[e.bevanda].descrizione}`, 'bene');
+          hud.avviso(`${nomeBevanda(e.bevanda, BEVANDE)}: ${BEVANDE[e.bevanda].descrizione}`, 'bene');
         }, DURATA_BEVUTA * 850);
         break;
       case 'cassa': if (perMe) { audio.suona('cassa'); hud.avviso(`Prendi: ${ARMI[e.arma].nome}`, 'bene'); } break;
@@ -624,7 +666,7 @@ function avanzaAffondo(vista, dt) {
   const a = locale.affondo;
   if (!a) return false;
   const passo = Math.min(dt, a.resto);
-  const nuova = muoviCerchio(io, a.vx * passo, a.vz * passo, R.RAGGIO_GIOCATORE, scatole(vista.porte, false));
+  const nuova = muoviCerchio(io, a.vx * passo, a.vz * passo, R.RAGGIO_GIOCATORE, ostacoliMovimento(vista.porte));
   io.x = nuova.x;
   io.z = nuova.z;
   a.resto -= passo;
@@ -648,12 +690,12 @@ function muovi(lettura, me, dt) {
   const lunghezza = Math.hypot(lettura.avanti, lettura.lato);
   io.movimento = vivo && lunghezza > 0 ? 1 : 0;
   if (!io.movimento) return;
-  const velocita = (io.corsa ? R.VELOCITA_CORSA : R.VELOCITA) * (io.inMira ? 0.6 : 1) * fattoreBevande(me.bevande, 'velocita');
+  const velocita = (io.corsa ? R.VELOCITA_CORSA : R.VELOCITA) * (io.inMira ? 0.6 : 1) * fattoreBevande(me.bevande, 'velocita') * rallentamento(s.vista.teatro, s.mioId);
   const avanti = lettura.avanti / lunghezza;
   const lato = lettura.lato / lunghezza;
   const dx = (Math.sin(io.yaw) * avanti - Math.cos(io.yaw) * lato) * velocita * dt;
   const dz = (Math.cos(io.yaw) * avanti + Math.sin(io.yaw) * lato) * velocita * dt;
-  const nuova = muoviCerchio(io, dx, dz, R.RAGGIO_GIOCATORE, scatole(s.vista.porte, false));
+  const nuova = muoviCerchio(io, dx, dz, R.RAGGIO_GIOCATORE, ostacoliMovimento(s.vista.porte));
   io.x = nuova.x;
   io.z = nuova.z;
 }
@@ -662,7 +704,7 @@ const raggioDi = b => b.raggio ?? CORPO.raggio;
 const angoloDa = (dx, dz) => Math.abs(Math.atan2(Math.sin(Math.atan2(dx, dz) - io.yaw), Math.cos(Math.atan2(dx, dz) - io.yaw)));
 
 function bersagliDiMischia(vista, portata, arco, quanti) {
-  const origine = { x: io.x, y: R.ALTEZZA_OCCHI - 0.4, z: io.z };
+  const origine = { x: io.x, y: suolo(io.x, io.z) + R.ALTEZZA_OCCHI - 0.4, z: io.z };
   const ostacoli = scatole(vista.porte, true);
   const scelti = [];
   for (const b of mondo.bersagli(vista)) {
@@ -671,7 +713,7 @@ function bersagliDiMischia(vista, portata, arco, quanti) {
     const d = Math.hypot(dx, dz);
     const bordo = Math.max(0, d - raggioDi(b));
     const angolo = angoloDa(dx, dz);
-    if (bordo > portata || (d > raggioDi(b) + 0.3 && angolo > arco)) continue;
+    if (bordo > portata || (d > raggioDi(b) + 0.3 && angolo > arco) || Math.abs((b.base ?? 0) - suolo(io.x, io.z)) > ALTEZZA_SOPRA) continue;
     if (d > 1e-3 && primoMuro(origine, { x: dx / d, y: 0, z: dz / d }, ostacoli) < bordo) continue;
     scelti.push({ b, peso: bordo + angolo * 2 });
   }
@@ -682,7 +724,7 @@ function colpisciDiMischia(bersagli, danno, extra) {
   for (const b of bersagli) {
     inviaAzione({ tipo: 'colpo', zombie: b.id, danno, ...extra });
     mondo.colpito(b.id, false);
-    mondo.effetti.sangue({ x: b.x, y: 1.2, z: b.z }, direzioneDa(io.yaw, 0));
+    mondo.effetti.sangue({ x: b.x, y: (b.base ?? 0) + 1.2, z: b.z }, direzioneDa(io.yaw, 0));
   }
   if (!bersagli.length) return;
   audio.suona('carne');
@@ -714,7 +756,7 @@ function sparaColpo(arma, vista) {
     colpisciDiMischia(bersagliDiMischia(vista, arma.portata, arma.arco, COLPITI_RELIQUIA), arma.danno, { arma: armaAttiva(arsenale).tipo });
     return;
   }
-  const origine = { x: io.x, y: R.ALTEZZA_OCCHI, z: io.z };
+  const origine = { x: io.x, y: suolo(io.x, io.z) + R.ALTEZZA_OCCHI, z: io.z };
   const centro = direzioneDa(io.yaw, io.pitch);
   const tipo = armaAttiva(arsenale).tipo;
   if (arma.proiettile) {
@@ -723,6 +765,7 @@ function sparaColpo(arma, vista) {
   }
   const bersagli = mondo.bersagli(vista);
   const ostacoli = scatole(vista.porte, true);
+  if (vista.teatro?.lampadario === 0 && raggioSfera(origine, centro, OGGETTI_TEATRO.LAMPADARIO, RAGGIO_LAMPADARIO) < primoMuro(origine, centro, ostacoli)) inviaAzione({ tipo: 'lampadario' });
   if (arma.catena) {
     scarica(arma, tipo, origine, centro, bersagli, ostacoli);
     return;
@@ -797,9 +840,9 @@ function scarica(arma, tipo, origine, centro, bersagli, ostacoli) {
 
 function disegnaArco(e) {
   const tiratore = vistaGiocatore(e.da);
-  const partenza = e.da === s.mioId ? mondo.bocca() : tiratore ? { x: tiratore.x, y: ALTEZZA_SCARICA + 0.2, z: tiratore.z } : null;
+  const partenza = e.da === s.mioId ? mondo.bocca() : tiratore ? { x: tiratore.x, y: suolo(tiratore.x, tiratore.z) + ALTEZZA_SCARICA + 0.2, z: tiratore.z } : null;
   const punti = [];
-  for (let i = 0; i + 1 < e.punti.length; i += 2) punti.push({ x: e.punti[i], y: ALTEZZA_SCARICA, z: e.punti[i + 1] });
+  for (let i = 0; i + 1 < e.punti.length; i += 2) punti.push({ x: e.punti[i], y: suolo(e.punti[i], e.punti[i + 1]) + ALTEZZA_SCARICA, z: e.punti[i + 1] });
   if (partenza) punti.unshift(partenza);
   if (punti.length >= 2) mondo.fulmine(punti);
   if (e.da !== s.mioId) audio.suona('scarica');
@@ -811,6 +854,7 @@ function statoMusica(vista) {
   if (vista.fase === 'fine' || vista.fase === 'vinta') return 'silenzio';
   if (vista.fase === 'finale' || vista.fase === 'fuga') return 'custode';
   if (vista.fase !== 'gioco') return 'calma';
+  if (vista.teatro?.eclissi) return 'preside';
   return vista.zombie.some(z => BOSS_MINORI.has(z.tipo) && z.stato !== 'morto') ? 'preside' : 'round';
 }
 
@@ -1070,7 +1114,7 @@ if (import.meta.env.DEV) {
     partita: () => s.partita,
     puntaA(x, y, z) {
       io.yaw = Math.atan2(x - io.x, z - io.z);
-      io.pitch = Math.atan2(y - R.ALTEZZA_OCCHI, Math.hypot(x - io.x, z - io.z));
+      io.pitch = Math.atan2(y - R.ALTEZZA_OCCHI - suolo(io.x, io.z), Math.hypot(x - io.x, z - io.z));
     },
     vaiA(x, z) {
       io.x = x;

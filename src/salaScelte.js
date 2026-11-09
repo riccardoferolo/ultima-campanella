@@ -5,16 +5,21 @@ const COLORI_ASPETTO = Object.freeze(['#3f5f34', '#c9ab78', '#3a4560', '#e6eaee'
 const DESCRIZIONI_MAPPA = Object.freeze({
   scuola: 'La vecchia scuola di notte: corridoi, aule, il rifugio e il Custode.',
   giungla: 'Il tempio perduto: fiume, grotta, rune, reliquie e il Divoratore.',
+  teatro: "Un teatro del '66 in rovina: scalone, camerini, caldaia, sipario e la Forgia Arcana.",
 });
 const SFONDI_MAPPA = Object.freeze({
   scuola: 'linear-gradient(180deg, #121a2e 0%, #2a2f45 60%, #3b3326 100%)',
   giungla: 'linear-gradient(180deg, #0d2418 0%, #1f4a2a 55%, #3a3a1c 100%)',
+  teatro: 'linear-gradient(180deg, #14070a 0%, #3a0d14 55%, #2a1a0c 100%)',
 });
 const DISEGNI_MAPPA = Object.freeze({
   scuola: '<svg viewBox="0 0 120 60"><rect x="18" y="22" width="84" height="34" fill="#1b1f2c"/><polygon points="14,24 60,6 106,24" fill="#262b3d"/><rect x="54" y="38" width="12" height="18" fill="#0c0e14"/>'
     + '<g fill="#e8c46a" opacity="0.8"><rect x="26" y="30" width="8" height="7"/><rect x="40" y="30" width="8" height="7"/><rect x="72" y="30" width="8" height="7"/><rect x="86" y="30" width="8" height="7"/></g><rect x="57" y="10" width="6" height="8" fill="#e8c46a"/></svg>',
   giungla: '<svg viewBox="0 0 120 60"><polygon points="34,56 60,14 86,56" fill="#3c3a2a"/><polygon points="44,56 60,30 76,56" fill="#2a2a1e"/><rect x="56" y="44" width="8" height="12" fill="#7dff6a" opacity="0.7"/>'
     + '<g stroke="#1e3a1c" stroke-width="3" fill="none"><path d="M14 58 Q16 34 20 24"/><path d="M104 58 Q102 34 98 22"/></g><g fill="#2f6b34"><ellipse cx="20" cy="22" rx="14" ry="5"/><ellipse cx="98" cy="20" rx="14" ry="5"/></g></svg>',
+  teatro: '<svg viewBox="0 0 120 60"><rect x="14" y="10" width="92" height="48" fill="#1c0c0e"/><rect x="24" y="16" width="72" height="34" fill="#0a0506"/>'
+    + '<path d="M24 16 Q34 34 30 50 L24 50 Z" fill="#8a1424"/><path d="M96 16 Q86 34 90 50 L96 50 Z" fill="#8a1424"/><rect x="24" y="14" width="72" height="6" fill="#b08a3a"/>'
+    + '<circle cx="60" cy="31" r="9" fill="#020203"/><circle cx="60" cy="31" r="11" fill="none" stroke="#ffb070" stroke-width="2" opacity="0.8"/><rect x="18" y="52" width="84" height="6" fill="#4e0c13"/></svg>',
 });
 const SOLDATO = colore => `<svg viewBox="0 0 40 60"><circle cx="20" cy="9" r="7" fill="#c9a98a"/><path d="M12 6 Q20 -1 28 6 L28 9 L12 9 Z" fill="${colore}"/>`
   + `<path d="M8 18 Q20 13 32 18 L33 40 L7 40 Z" fill="${colore}"/><rect x="9" y="40" width="9" height="18" fill="${colore}"/><rect x="22" y="40" width="9" height="18" fill="${colore}"/>`

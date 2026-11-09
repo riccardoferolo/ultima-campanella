@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { quota } from '../mappa.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { modelloArma } from './armi3d.js';
@@ -90,7 +91,7 @@ export function creaCompagno(scena, nome, materialiArmi, personaggio) {
         }
       }
       radice.visible = g.stato !== 'morto';
-      radice.position.set(g.x, 0, g.z);
+      radice.position.set(g.x, quota(g.x, g.z), g.z);
       radice.rotation.y = g.yaw;
       const aTerra = g.stato === 'terra';
       suona(aTerra ? 'fermo' : g.inMovimento ? (g.corsa ? 'corre' : 'cammina') : 'fermo');

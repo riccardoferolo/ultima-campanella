@@ -50,7 +50,7 @@ export function raggioCilindro(o, d, cx, cz, raggio, y0, y1) {
 
 export function primoMuro(o, d, scatole) {
   let minimo = Infinity;
-  for (const s of scatole) minimo = Math.min(minimo, raggioScatola(o, d, s, 0, s.altezza ?? ALTEZZA_SOFFITTO));
+  for (const s of scatole) minimo = Math.min(minimo, raggioScatola(o, d, s, s.base ?? 0, (s.base ?? 0) + (s.altezza ?? ALTEZZA_SOFFITTO)));
   return minimo;
 }
 
@@ -58,8 +58,9 @@ export function colpisciZombie(o, d, bersagli, scatole, portata = Infinity) {
   const muro = Math.min(portata, primoMuro(o, d, scatole));
   let migliore = null;
   for (const b of bersagli) {
-    const testa = raggioSfera(o, d, b.testa ?? { x: b.x, y: TESTA.altezza, z: b.z }, b.raggioTesta ?? TESTA.raggio);
-    const corpo = raggioCilindro(o, d, b.x, b.z, b.raggio ?? CORPO.raggio, CORPO.basso, b.alto ?? CORPO.alto);
+    const base = b.base ?? 0;
+    const testa = raggioSfera(o, d, b.testa ?? { x: b.x, y: base + TESTA.altezza, z: b.z }, b.raggioTesta ?? TESTA.raggio);
+    const corpo = raggioCilindro(o, d, b.x, b.z, b.raggio ?? CORPO.raggio, base + CORPO.basso, base + (b.alto ?? CORPO.alto));
     const t = Math.min(testa, corpo);
     if (t >= muro || (migliore && t >= migliore.t)) continue;
     migliore = { id: b.id, t, testa: testa <= corpo };
@@ -70,7 +71,7 @@ export function colpisciZombie(o, d, bersagli, scatole, portata = Infinity) {
 export function esplosione(punto, bersagli, raggio) {
   const colpiti = [];
   for (const b of bersagli) {
-    const d = Math.hypot(b.x - punto.x, CORPO.alto / 2 - punto.y, b.z - punto.z);
+    const d = Math.hypot(b.x - punto.x, (b.base ?? 0) + CORPO.alto / 2 - punto.y, b.z - punto.z);
     if (d < raggio) colpiti.push({ id: b.id, fattore: 1 - d / raggio });
   }
   return colpiti;

@@ -1,5 +1,6 @@
 import { R, ARMI, BEVANDE, armaBase, versionePotenziata } from './regole.js';
-import { FINESTRE, PORTE, ACQUISTI, FRAMMENTI, SOGLIA_RIFUGIO, zoneAperte, zonaDi } from './mappa.js';
+import { FINESTRE, PORTE, ACQUISTI, FRAMMENTI, SOGLIA_RIFUGIO, NOMI, zoneAperte, zonaDi, nomeBevanda } from './mappa.js';
+import { COSTO_BOTOLA, COSTO_SENTINELLA, COSTO_TRAPPOLA, DURATA_SENTINELLA, DURATA_TRAPPOLA } from './teatro.js';
 import { OGGETTI } from './mappe/giungla.js';
 import { ID_ASSI, ID_SCHEGGIA_GROTTA, ID_SCHEGGIA_FIUME, ID_MASCHERA, RELIQUIE, ASSI, SCHEGGE, ANIME_PER_IDOLO } from './giungla.js';
 import { RUNE } from './storia.js';
@@ -9,7 +10,42 @@ const PORTE_CHIUSE = Object.freeze({
   ponte: 'Il ponte è crollato: servono le assi del villaggio, da portare al cantiere',
   tempio: "La porta del tempio: si apre con la maschera dello Sciamano",
   sigillo: "Il sigillo del cuore: cede solo al colpo speciale di una reliquia",
+  sipario: 'Il sipario è chiuso: la leva del generatore è sul retro del palco',
+  centrali: 'Le doppie porte della platea si aprono quando torna la corrente',
 });
+const NOMI_TRAPPOLE = Object.freeze({ sinistra: 'della scaletta sinistra', destra: 'della scaletta destra', corridoio: 'del corridoio dei camerini' });
+
+function descriviTeatro(a, io, vista) {
+  const t = vista.teatro;
+  const nessuno = testo => ({ costo: Infinity, testo });
+  switch (a.tipo) {
+    case 'bevanda':
+      return vista.corrente ? null : nessuno(`${nomeBevanda(a.bevanda, BEVANDE)}: spento, serve la corrente del generatore`);
+    case 'leva':
+      return vista.corrente ? nessuno('Il generatore centrale è acceso') : { costo: 0, testo: 'Premi F per tirare la leva del generatore centrale' };
+    case 'botola':
+      if (!vista.corrente) return nessuno('La botola è bloccata: serve la corrente');
+      return { costo: COSTO_BOTOLA, testo: `Premi F per scendere dalla botola alla ${NOMI.potenziatore} [${COSTO_BOTOLA}]` };
+    case 'montacarichi':
+      return { costo: 0, testo: `Premi F per risalire col montacarichi (${Math.ceil(t?.sotto?.[io.id] ?? 0)} s)` };
+    case 'sentinella': {
+      const s = t?.sentinella;
+      if (!vista.corrente) return nessuno('La sentinella della platea non ha corrente');
+      if (s?.attiva > 0) return nessuno(`Sentinella attiva: ${Math.ceil(s.attiva)} s`);
+      if (s?.ricarica > 0) return nessuno(`La sentinella si raffredda: ${Math.ceil(s.ricarica)} s`);
+      return { costo: COSTO_SENTINELLA, testo: `Premi F per la sentinella automatica, ${DURATA_SENTINELLA} s [${COSTO_SENTINELLA}]` };
+    }
+    case 'trappola': {
+      const tr = t?.trappole?.[a.trappola];
+      if (!vista.corrente) return nessuno('La trappola incendiaria non ha corrente');
+      if (tr?.attiva > 0) return nessuno(`Trappola accesa: ${Math.ceil(tr.attiva)} s`);
+      if (tr?.ricarica > 0) return nessuno(`La trappola si ricarica: ${Math.ceil(tr.ricarica)} s`);
+      return { costo: COSTO_TRAPPOLA, testo: `Premi F per la trappola incendiaria ${NOMI_TRAPPOLE[a.trappola] ?? ''}, ${DURATA_TRAPPOLA} s [${COSTO_TRAPPOLA}]` };
+    }
+    default:
+      return null;
+  }
+}
 const NOMI_OGGETTI = Object.freeze({ [ID_SCHEGGIA_GROTTA]: 'la scheggia di giada', [ID_MASCHERA]: 'la maschera dello Sciamano' });
 
 function testoOggetto(id) {
@@ -125,9 +161,10 @@ export function interazioneVicina(io, vista) {
 
 function descriviPotenziatore(io, vista) {
   const macchina = vista.potenziatore;
-  if (!vista.corrente) return { costo: Infinity, testo: 'Il potenziatore non ha corrente: accendila in caldaia' };
+  const nome = NOMI.potenziatore ?? 'Il potenziatore';
+  if (!vista.corrente) return { costo: Infinity, testo: NOMI.potenziatore ? `${nome}: serve la corrente del generatore` : 'Il potenziatore non ha corrente: accendila in caldaia' };
   if (macchina.stato === 'pronta' && macchina.per === io.id) return { costo: 0, testo: `Premi F per prendere: ${ARMI[macchina.arma].nome}` };
-  if (macchina.stato !== 'libero') return { costo: Infinity, testo: macchina.per === io.id ? 'Il potenziatore sta lavorando…' : 'Il potenziatore è occupato' };
+  if (macchina.stato !== 'libero') return { costo: Infinity, testo: macchina.per === io.id ? `${nome}: sta lavorando…` : `${nome}: è occupata` };
   const potenziata = io.armaAttiva ? versionePotenziata(io.armaAttiva) : null;
   if (!potenziata) return { costo: Infinity, testo: 'Questa arma è già potenziata' };
   return { costo: R.COSTO_POTENZIA, testo: `Premi F per potenziare: ${ARMI[io.armaAttiva].nome} [${R.COSTO_POTENZIA}]` };
@@ -159,6 +196,8 @@ function descriviAllarme(vista) {
 function descrivi(a, io, vista) {
   const giungla = vista.giungla ? descriviGiungla(a, io, vista) : null;
   if (giungla) return giungla;
+  const teatro = vista.teatro ? descriviTeatro(a, io, vista) : null;
+  if (teatro) return teatro;
   if (a.tipo === 'arma') {
     const possiede = io.armi.some(x => armaBase(x) === a.arma);
     const costo = possiede ? a.munizioni : a.costo;
@@ -166,8 +205,9 @@ function descrivi(a, io, vista) {
   }
   if (a.tipo === 'bevanda') {
     const bevanda = BEVANDE[a.bevanda];
-    if (io.bevande.includes(a.bevanda)) return { costo: Infinity, testo: `${bevanda.nome}: ce l'hai già` };
-    return { costo: bevanda.costo, testo: `Premi F per bere: ${bevanda.nome}, ${bevanda.descrizione} [${bevanda.costo}]` };
+    const nome = nomeBevanda(a.bevanda, BEVANDE);
+    if (io.bevande.includes(a.bevanda)) return { costo: Infinity, testo: `${nome}: ce l'hai già` };
+    return { costo: bevanda.costo, testo: `Premi F per bere: ${nome}, ${bevanda.descrizione} [${bevanda.costo}]` };
   }
   if (a.tipo === 'interruttore') {
     return vista.corrente ? { costo: Infinity, testo: 'La corrente è accesa' } : { costo: 0, testo: 'Premi F per accendere la corrente' };
@@ -181,5 +221,5 @@ function descrivi(a, io, vista) {
   if (cassa.stato === 'aperta' && cassa.per === io.id) return { costo: 0, testo: `Premi F per prendere: ${ARMI[cassa.arma].nome}` };
   if (cassa.stato === 'aperta') return { costo: Infinity, testo: 'La cassa è occupata' };
   const costo = vista.effetti?.saldi > 0 ? R.COSTO_CASSA_SALDI : R.COSTO_CASSA;
-  return { costo, testo: `Premi F per la cassa a sorpresa [${costo}]${costo < R.COSTO_CASSA ? ' SALDI!' : ''}` };
+  return { costo, testo: `Premi F per ${NOMI.cassa ? `lo ${NOMI.cassa}` : 'la cassa a sorpresa'} [${costo}]${costo < R.COSTO_CASSA ? ' SALDI!' : ''}` };
 }

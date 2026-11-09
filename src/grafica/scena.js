@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { R } from '../regole.js';
-import { ZONE, ATMOSFERA, mappaAttiva, usaMappa } from '../mappa.js';
+import { ZONE, ATMOSFERA, mappaAttiva, usaMappa, quota } from '../mappa.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA } from './texture.js';
+import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA, TEXTURE_TEATRO } from './texture.js';
 import { caricaGiungla, costruisciGiungla } from './giungla3d.js';
+import { costruisciTeatro } from './teatro3d.js';
 import { TINTE_ASPETTO } from './compagno3d.js';
 import { creaAnimali } from './animali3d.js';
 import { LIVELLI, ORDINE, livelloAttivo } from './qualita.js';
@@ -30,6 +31,9 @@ const FOV_CANNOCCHIALE = 20;
 const ONDEGGIO = 0.01;
 const RAGGIO_BOMBA = 0.034;
 const SU = new THREE.Vector3(0, 1, 0);
+const GRAVITA_VISTA = 14;
+const GRADINO_MASSIMO = 0.35;
+const SALTO_TELETRASPORTO = 2.5;
 
 function texturaDisco() {
   const canvas = document.createElement('canvas');
@@ -207,11 +211,12 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
 
   usaMappa(mappa);
   const giungla = mappa === 'giungla';
+  const teatro = mappa === 'teatro';
   const atmosfera = ATMOSFERA;
   const scena = new THREE.Scene();
   scena.background = new THREE.Color(atmosfera.buio);
   scena.fog = new THREE.Fog(atmosfera.buio, atmosfera.nebbiaVicino, atmosfera.nebbiaDentro);
-  scena.add(new THREE.HemisphereLight(giungla ? 0x7fa392 : 0x7f8ea3, giungla ? 0x15200f : 0x1b150f, giungla ? 0.6 : 0.55));
+  scena.add(new THREE.HemisphereLight(giungla ? 0x7fa392 : teatro ? 0x8a7a6c : 0x7f8ea3, giungla ? 0x15200f : 0x1b150f, giungla ? 0.6 : teatro ? 0.42 : 0.55));
   const luna = new THREE.DirectionalLight(0x7088b8, 0.6);
   luna.position.set(-20, 30, -30);
   scena.add(luna);
@@ -232,7 +237,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   scena.environmentIntensity = 0.12;
   const texture = creaTexture();
   const [libreria, risorseZombi, personaggi, oggetti, reali, modelliGiungla] = await Promise.all([
-    caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(), caricaTextureReali(giungla ? TEXTURE_GIUNGLA : TEXTURE_SCUOLA, { piene: q.texturePiene }), giungla ? caricaGiungla() : null,
+    caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(), caricaTextureReali(giungla ? TEXTURE_GIUNGLA : teatro ? TEXTURE_TEATRO : TEXTURE_SCUOLA, { piene: q.texturePiene }), giungla ? caricaGiungla() : null,
   ]);
   const mappaPrima = mappaAttiva;
   usaMappa(mappa);
@@ -240,14 +245,16 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const vuoto = { aggiorna() {}, suona() {} };
   const mondoMappa = giungla
     ? costruisciGiungla(scena, { reali, materialiArmi, oggetti, modelli: modelliGiungla, luciAccese: q.luci })
-    : costruisciScuola(scena, texture, materialiArmi, oggetti, reali);
-  if (!giungla) {
+    : teatro
+      ? costruisciTeatro(scena, { reali, texture, materialiArmi, oggetti, luciAccese: q.luci })
+      : costruisciScuola(scena, texture, materialiArmi, oggetti, reali);
+  if (!giungla && !teatro) {
     costruisciArredi(scena, oggetti);
     costruisciSala(scena);
   }
   const bonus3d = creaBonus3d(scena);
-  const segreti = giungla ? vuoto : creaSegreti(scena);
-  const animali = q.animali ? creaAnimali(scena, mappa) : { aggiorna() {}, svuota() {} };
+  const segreti = giungla || teatro ? vuoto : creaSegreti(scena);
+  const animali = q.animali && !teatro ? creaAnimali(scena, mappa) : { aggiorna() {}, svuota() {} };
   function applicaDensita() {
     scena.traverse(o => {
       if (o.isInstancedMesh && o.userData.pieni) o.count = Math.max(1, Math.round(o.userData.pieni * q.densita));
@@ -278,6 +285,10 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const ultimePosizioni = new Map();
   let tempo = 0;
   let passo = 0;
+  let suoloVista = null;
+  let caduta = 0;
+  const ultimaVista = { x: 0, z: 0 };
+  const coloreNebbia = new THREE.Color();
 
   let scala = q.scalaMassima;
   let controlliBassi = 0;
@@ -342,7 +353,18 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
     adattaRisoluzione(dt);
     passo += dt * movimento * (corsa ? 13 : 9);
     const occhi = aTerra ? 0.45 : R.ALTEZZA_OCCHI;
-    camera.position.set(io.x, occhi + Math.sin(passo) * ONDEGGIO * movimento * (inMira ? 0 : 1), io.z);
+    const piede = quota(io.x, io.z);
+    const salto = suoloVista === null || Math.hypot(io.x - ultimaVista.x, io.z - ultimaVista.z) > SALTO_TELETRASPORTO;
+    if (salto || piede >= suoloVista - GRADINO_MASSIMO) {
+      suoloVista = piede;
+      caduta = 0;
+    } else {
+      caduta += GRAVITA_VISTA * dt;
+      suoloVista = Math.max(piede, suoloVista - caduta * dt);
+    }
+    ultimaVista.x = io.x;
+    ultimaVista.z = io.z;
+    camera.position.set(io.x, suoloVista + occhi + Math.sin(passo) * ONDEGGIO * movimento * (inMira ? 0 : 1), io.z);
     camera.rotation.y = io.yaw + Math.PI;
     camera.rotation.x = io.pitch + vista1p.calcio * vista1p.calcio * 0.06;
     camera.rotation.z = aTerra ? 0.35 : 0;
@@ -355,8 +377,9 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
     if (vista1p.lampoAcceso) lampo.color.setHex(vista1p.coloreLampo);
     const fuori = aperta(io.x, io.z);
     const fattore = Math.min(1, dt * 2);
-    scena.fog.far += ((fuori ? atmosfera.nebbiaFuori : atmosfera.nebbiaDentro) * q.vista - scena.fog.far) * fattore;
-    scena.fog.color.lerp(new THREE.Color(fuori ? atmosfera.cielo : atmosfera.buio), fattore);
+    const nebbiaMappa = mondoMappa.nebbia?.(vista) ?? null;
+    scena.fog.far += ((fuori ? atmosfera.nebbiaFuori : atmosfera.nebbiaDentro) * q.vista * (nebbiaMappa?.fattore ?? 1) - scena.fog.far) * fattore;
+    scena.fog.color.lerp(coloreNebbia.setHex(nebbiaMappa?.colore ?? (fuori ? atmosfera.cielo : atmosfera.buio)), fattore);
     scena.background.copy(scena.fog.color);
     mondoMappa.aggiorna(vista, dt, tempo, camera.position);
     zombi.aggiorna(vista, dt);
@@ -467,6 +490,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
     },
     effetti,
     svuota() {
+      suoloVista = null;
       zombi.svuota();
       granate3d.svuota();
       vuoto3d.svuota();

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { quota } from '../mappa.js';
 import { creaNuvola, creaTracce } from './particelle.js';
 
 const PER_NUVOLA = 260;
@@ -155,7 +156,7 @@ export function creaEffetti(scena) {
     },
     macchia(x, z) {
       const mesh = macchie.length >= MACCHIE_MASSIME ? macchie.shift() : new THREE.Mesh(geometriaMacchia, materialeMacchia);
-      mesh.position.set(x + (Math.random() - 0.5) * 0.4, 0.012 + macchie.length * 0.0001, z + (Math.random() - 0.5) * 0.4);
+      mesh.position.set(x + (Math.random() - 0.5) * 0.4, quota(x, z) + 0.012 + macchie.length * 0.0001, z + (Math.random() - 0.5) * 0.4);
       mesh.scale.setScalar(0.6 + Math.random() * 0.8);
       scena.add(mesh);
       macchie.push(mesh);

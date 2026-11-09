@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ARMI, BONUS } from '../regole.js';
-import { ARREDI, CARTELLO_PRONTI, FRAMMENTI, ACQUISTI, ALTEZZA_SOFFITTO } from '../mappa.js';
+import { ARREDI, CARTELLO_PRONTI, FRAMMENTI, ACQUISTI, ALTEZZA_SOFFITTO, quota } from '../mappa.js';
 import { texturaTesto } from './texture.js';
 
 const URL_OGGETTI = './modelli/arredi.glb';
@@ -96,7 +96,7 @@ export function creaBonus3d(scena) {
           visibili.set(b.id, sprite);
         }
         const sprite = visibili.get(b.id);
-        sprite.position.set(b.x, 0.9 + Math.sin(tempo * 3 + b.id) * 0.12, b.z);
+        sprite.position.set(b.x, quota(b.x, b.z) + 0.9 + Math.sin(tempo * 3 + b.id) * 0.12, b.z);
         sprite.visible = b.timer > 5 || Math.sin(tempo * 18) > 0;
       }
       for (const [id, sprite] of visibili) {

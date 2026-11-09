@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { TESTA } from '../colpi.js';
+import { quota } from '../mappa.js';
 
 const DISSOLVENZA = 0.25;
 const AFFONDA_DOPO = 2.6;
@@ -47,7 +48,42 @@ const MODELLI = Object.freeze({
     clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
     velocita: { cammina: 0.7, corre: 0.75, attacco: 0.95, attacco2: 0.9, muore: 0.6, fermo: 0.7 },
   },
+  ardente: {
+    url: './modelli/zombie.glb', scala: 0.0098, tinta: 0x4a2c22, fiamme: true,
+    clip: { cammina: 'cammina', cammina2: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 1.1, corre: 1.2, attacco: 1.7, attacco2: 1.8, muore: 1.3, fermo: 1 },
+  },
+  tossico: {
+    url: './modelli/zombi_magro.glb', scala: 0.25, tinta: 0xc9d6b4, nebbia: true,
+    clip: { cammina: 'walk', cammina2: 'walk2', corre: 'run', attacco: 'attack2', attacco2: 'attack1_r', muore: 'dead1', fermo: 'idle' }, velocita: { cammina: 0.85, cammina2: 0.85 },
+    riserva: { tinta: 0xc9d6b4, scala: 0.94 },
+  },
 });
+const MATERIALE_FIAMMA = new THREE.SpriteMaterial({ map: texturaFiamma(), color: 0xff8a3a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+const MATERIALE_NEBBIA = new THREE.SpriteMaterial({ map: texturaFiamma(), color: 0x9be15d, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending });
+
+function texturaFiamma() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(32, 40, 2, 32, 34, 30);
+  g.addColorStop(0, 'rgba(255,240,200,1)');
+  g.addColorStop(0.35, 'rgba(255,150,40,0.85)');
+  g.addColorStop(1, 'rgba(120,20,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function aggiungiAlone(radice, materiale, punti) {
+  return punti.map(([x, y, z, s]) => {
+    const sprite = new THREE.Sprite(materiale);
+    sprite.position.set(x, y, z);
+    sprite.scale.setScalar(s);
+    radice.add(sprite);
+    return sprite;
+  });
+}
 const SALITA = 1.8;
 const R_EMERSO = 1.6;
 
@@ -142,6 +178,9 @@ export function creaGestoreZombi(scena, risorse) {
       o.boundingSphere.radius *= 1.8;
     });
     radice.add(corpo);
+    const aloni = dati.fiamme
+      ? aggiungiAlone(radice, MATERIALE_FIAMMA, [[0, 1.55, 0.05, 0.55], [0.18, 1.15, 0.1, 0.45], [-0.18, 1.05, 0.05, 0.42], [0, 0.6, 0.1, 0.4]])
+      : dati.nebbia ? aggiungiAlone(radice, MATERIALE_NEBBIA, [[0, 1.1, 0, 0.9], [0, 0.5, 0, 0.8]]) : [];
     scena.add(radice);
     let testa = null;
     let busto = null;
@@ -164,7 +203,7 @@ export function creaGestoreZombi(scena, risorse) {
       azioni.set(logico, azione);
     }
     const voce = {
-      radice, corpo, testa, busto, mixer, azioni, dati, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3,
+      radice, corpo, testa, busto, mixer, azioni, dati, aloni, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3,
       vitaPrima: z.vita, sussulto: 0, senzaTesta: false, gelo: null, sollevato: 0, giro: 0,
     };
     zombi.set(z.id, voce);
@@ -254,13 +293,18 @@ export function creaGestoreZombi(scena, risorse) {
         suona(voce, logica(z, spostamento > 0.2 * dt));
         voce.emerso = z.stato === 'emerge' ? (voce.emerso ?? 0) + dt : R_EMERSO;
         const alto = sospendi(voce, z, buchi, dt) - SALITA * (1 - Math.min(1, voce.emerso / R_EMERSO));
-        voce.radice.position.set(z.x, alto, z.z);
+        const suolo = quota(z.x, z.z);
+        voce.radice.position.set(z.x, suolo + alto, z.z);
+        for (let i = 0; i < voce.aloni.length; i++) {
+          voce.aloni[i].visible = z.stato !== 'morto';
+          voce.aloni[i].scale.y = voce.aloni[i].scale.x * (1 + 0.25 * Math.sin(performance.now() / 90 + i * 1.7 + z.id));
+        }
         voce.radice.rotation.y = z.yaw + voce.giro;
         voce.radice.rotation.z = alto > 0.05 ? Math.sin(voce.giro * 1.3) * 0.4 * alto : 0;
         ghiaccia(voce, z.gelo ?? 0);
         if (z.stato === 'morto') {
           voce.tempoMorto += dt;
-          if (voce.tempoMorto > AFFONDA_DOPO) voce.radice.position.y = -(voce.tempoMorto - AFFONDA_DOPO) * 0.6;
+          if (voce.tempoMorto > AFFONDA_DOPO) voce.radice.position.y = suolo - (voce.tempoMorto - AFFONDA_DOPO) * 0.6;
         } else voce.tempoMorto = 0;
         if (z.vita < voce.vitaPrima && z.stato !== 'morto') scuoti(voce, 0.45 + (voce.vitaPrima - z.vita) / 40);
         voce.vitaPrima = z.vita;
@@ -274,12 +318,13 @@ export function creaGestoreZombi(scena, risorse) {
       return vista.zombie.filter(z => z.stato !== 'morto').map(z => {
         const voce = zombi.get(z.id);
         const dati = MODELLI[z.tipo] ?? MODELLI.normale;
-        const forma = { id: z.id, x: z.x, z: z.z, alto: dati.alto, raggio: dati.raggio, raggioTesta: dati.raggioTesta };
+        const base = quota(z.x, z.z);
+        const forma = { id: z.id, x: z.x, z: z.z, base, alto: dati.alto, raggio: dati.raggio, raggioTesta: dati.raggioTesta };
         if (voce?.testa) {
           voce.testa.getWorldPosition(punto);
           return { ...forma, testa: { x: punto.x, y: punto.y + 0.06, z: punto.z } };
         }
-        return { ...forma, testa: { x: z.x, y: dati.testa ?? TESTA.altezza, z: z.z } };
+        return { ...forma, testa: { x: z.x, y: base + (dati.testa ?? TESTA.altezza), z: z.z } };
       });
     },
     colpito(id, testa) {

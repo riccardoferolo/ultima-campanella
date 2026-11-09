@@ -95,6 +95,22 @@ function brezza(sr) {
   });
 }
 
+function pioggia(sr) {
+  return letto(sr, 10, n => {
+    const d = normalizza(alta(filtra(rosa(n), sr, 'banda', 1800, 0.4), sr, 300), 1);
+    const scroscio = lento(n, sr, 0.2);
+    for (let i = 0; i < n; i++) d[i] *= 0.7 + 0.3 * scroscio[i];
+    for (let k = 0; k < 400; k++) tono(d, sr, caso(0, n / sr - 0.05), { f: caso(1800, 4200), fFine: caso(900, 1800), glissando: 0.004, tau: 0.004, attacco: 0.0005, ampiezza: caso(0.05, 0.18) });
+    return bassa(d, sr, 7000);
+  });
+}
+
+const sala = sr => letto(sr, 9, n => {
+  const d = normalizza(bassa(marrone(n), sr, 140, 2), 1);
+  mescola(d, normalizza(filtra(rosa(n), sr, 'banda', 420, 2), 1), sr, 0, 0.15);
+  return d;
+});
+
 function vento(sr) {
   const durata = 11;
   const raffiche = lento(campioni(durata + SOVRAPPOSIZIONE_S, sr), sr, 0.12);
@@ -222,6 +238,8 @@ export const RICETTE_AMBIENTE = Object.freeze({
   g_acqua: ricetta(acqua),
   g_grotta: ricetta(grotta),
   s_vento: ricetta(vento),
+  t_pioggia: ricetta(pioggia),
+  t_sala: ricetta(sala),
   s_neon: ricetta(neon),
   a_rana: ricetta(rana, 5),
   a_uccello: ricetta(uccello, 5),
@@ -255,6 +273,17 @@ const SCENE = Object.freeze({
     aperto: { taglio: 16000, volume: 1, umido: 0.12 },
     chiuso: { taglio: 520, volume: 0.22, umido: 0.55 },
     sottoMusica: 0.3,
+  },
+  teatro: {
+    letti: [{ chiave: 't_pioggia', volume: 0.3, bus: 'esterno' }, { chiave: 't_sala', volume: 0.22, bus: 'interno' }],
+    eventi: [
+      { chiave: 'a_scricchiolio', ogni: 8, spazio: [4, 16], volume: 0.32, bus: 'interno', soloChiuso: true },
+      { chiave: 'a_goccia', ogni: 3, spazio: [2, 10], volume: 0.32, bus: 'interno', soloChiuso: true },
+      { chiave: 'a_corvo', ogni: 30, spazio: [25, 50], volume: 0.25, bus: 'esterno' },
+    ],
+    aperto: { taglio: 14000, volume: 1, umido: 0.15 },
+    chiuso: { taglio: 700, volume: 0.35, umido: 0.45 },
+    sottoMusica: 0,
   },
   scuola: {
     letti: [{ chiave: 's_vento', volume: 0.22, bus: 'esterno' }, { chiave: 's_neon', volume: 0.08, bus: 'interno' }],
