@@ -13,8 +13,12 @@ npm test
 
 ## Cosa c'è
 
-- Sala d'attesa prima della partita: tasto 1 sceglie la pistola iniziale (Pistola, Magnum, Aquila, Raffica),
-  2 la divisa (sei colori), 3 la mappa (solo chi ha creato la stanza); Invio quando sei pronto, conto alla rovescia di 5 secondi.
+- Sala d'attesa a schede da cliccare col mouse: pistola iniziale (con immagine e barre di danno, rateo e colpi),
+  divisa (sei colori), mappa (solo chi ha creato la stanza), giocatori presenti e pulsante «SONO PRONTO»;
+  conto alla rovescia di 5 secondi. Invio torna alle schede.
+- Difficoltà a crescere: nei primi tre round solo zombie che camminano, poi arrivano gli Scuoiati e i corridori
+  (20% in più a round); nella giungla vita, numero, danno e velocità salgono dal 4° al 9° round fino al massimo.
+- Zombie fluidi: simulazione a passo fisso con disegno interpolato fra gli ultimi due passi.
 - Due mappe: La scuola e Il tempio nella giungla. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
   alberi con la chioma che sporge, palme e felci) e la mappa è piena di animaletti che scappano quando arrivi:
   pappagalli sulle palme, pipistrelli in grotta e nel tempio, lucciole, farfalle blu, rane sulle ninfee del fiume;

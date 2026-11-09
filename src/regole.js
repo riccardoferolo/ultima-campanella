@@ -80,11 +80,13 @@ export const R = Object.freeze({
   RINFORZI_FINALE_MAX: 10,
   PUNTI_VITTORIA: 5000,
 
-  GIUNGLA_VITA: 1.35,
-  GIUNGLA_ORDA: 1.3,
-  GIUNGLA_ANTICIPO_CORRIDORI: 3,
+  GIUNGLA_VITA: 1.45,
+  GIUNGLA_ORDA: 1.4,
   GIUNGLA_VIVI_MAX: 24,
-  GIUNGLA_DANNO: 1.15,
+  GIUNGLA_DANNO: 1.25,
+  GIUNGLA_VELOCITA: 1.12,
+  ROUND_TRANQUILLI: 3,
+  ROUND_PIENA_DIFFICOLTA: 9,
   ZOMBIE_VIVI_MAX_SCUOLA: 20,
   EMERGE: 1.6,
   CARICA_RELIQUIA: 12,
@@ -226,7 +228,7 @@ export const TIPI_ZOMBIE = Object.freeze({
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 
 export function pesiZombie(round) {
-  return { normale: 1, magro: round >= 2 ? 0.25 + Math.min(0.35, (round - 2) * 0.04) : 0 };
+  return { normale: 1, magro: round > R.ROUND_TRANQUILLI ? 0.25 + Math.min(0.35, (round - R.ROUND_TRANQUILLI - 1) * 0.04) : 0 };
 }
 
 export function tipoZombie(round, estratto) {
@@ -261,11 +263,16 @@ export function vitaZombie(round) {
 }
 
 export function quotaCorridori(round) {
-  if (round <= 2) return 0;
-  if (round === 3) return 0.25;
-  if (round === 4) return 0.5;
-  if (round < 8) return 0.8;
-  return 1;
+  if (round <= R.ROUND_TRANQUILLI) return 0;
+  return Math.min(1, (round - R.ROUND_TRANQUILLI) * 0.2);
+}
+
+export function intensitaGiungla(round) {
+  return Math.min(1, Math.max(0, (round - R.ROUND_TRANQUILLI) / (R.ROUND_PIENA_DIFFICOLTA - R.ROUND_TRANQUILLI)));
+}
+
+export function fattoreGiungla(massimo, round) {
+  return 1 + (massimo - 1) * intensitaGiungla(round);
 }
 
 export function dannoGranata(round) {

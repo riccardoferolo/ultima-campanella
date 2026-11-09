@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { R, ARMI, ARMI_CASSA, vitaZombie, faseDivoratore } from '../src/regole.js';
+import { R, ARMI, ARMI_CASSA, vitaZombie, faseDivoratore, quotaCorridori, pesiZombie, fattoreGiungla } from '../src/regole.js';
 import { ZONE, FINESTRE, PORTE, ACQUISTI, zonaDi, ostacoliPerGiocatori } from '../src/mappa.js';
 import { OGGETTI } from '../src/mappe/giungla.js';
 import { creaPartita, passo } from '../src/partita.js';
@@ -66,14 +66,15 @@ test('la giungla è grande, tutta collegata e ogni tana sta nella sua zona', () 
   assert.ok(ZONE.filter(q => !q.sala).length >= 12);
 });
 
-test('nella giungla gli zombie escono da terra, sono più duri e più numerosi', () => {
+test('nella giungla gli zombie escono da terra e al primo round sono lenti come a scuola', () => {
   const stato = creaPartita({ seme: 3, giocatori: [{ id: 'a', nome: 'A' }], mappa: 'giungla' });
   avanza(stato, R.PRIMO_ROUND_TRA + 0.1);
-  assert.ok(stato.daGenerare + stato.zombie.length >= Math.round(6 * R.GIUNGLA_ORDA));
+  assert.ok(stato.daGenerare + stato.zombie.length >= 6);
   avanza(stato, 2.5);
   const z = stato.zombie[0];
   assert.ok(z, 'nessuno zombie');
-  assert.equal(z.vitaMax, Math.round(vitaZombie(1) * R.GIUNGLA_VITA));
+  assert.equal(z.vitaMax, vitaZombie(1));
+  assert.equal(z.corre, false);
   assert.ok(['emerge', 'dentro', 'attacco'].includes(z.stato));
   const nuovo = creaPartita({ seme: 3, giocatori: [{ id: 'a', nome: 'A' }], mappa: 'giungla' });
   avanza(nuovo, R.PRIMO_ROUND_TRA + 1.2);
@@ -364,4 +365,21 @@ test('istantanea e protocollo portano lo stato della giungla', () => {
   assert.ok(valida({ t: 'az', a: { tipo: 'speciale', yaw: 0, pitch: 0 } }));
   assert.ok(valida({ t: 'inizia', seme: 3, mappa: 'giungla' }));
   assert.equal(valida({ t: 'inizia', seme: 3, mappa: 'luna' }), null);
+});
+
+test('i primi round sono tranquilli e lenti, poi la giungla diventa più dura e più veloce', () => {
+  for (let round = 1; round <= R.ROUND_TRANQUILLI; round++) {
+    assert.equal(quotaCorridori(round), 0);
+    assert.equal(pesiZombie(round).magro, 0);
+    assert.equal(fattoreGiungla(R.GIUNGLA_VITA, round), 1);
+  }
+  let prima = 0;
+  for (let round = R.ROUND_TRANQUILLI + 1; round <= R.ROUND_PIENA_DIFFICOLTA; round++) {
+    const ora = fattoreGiungla(R.GIUNGLA_ORDA, round);
+    assert.ok(ora > prima && quotaCorridori(round) > 0);
+    prima = ora;
+  }
+  assert.equal(fattoreGiungla(R.GIUNGLA_VITA, R.ROUND_PIENA_DIFFICOLTA), R.GIUNGLA_VITA);
+  assert.equal(fattoreGiungla(R.GIUNGLA_VELOCITA, 20), R.GIUNGLA_VELOCITA);
+  assert.equal(quotaCorridori(R.ROUND_PIENA_DIFFICOLTA), 1);
 });

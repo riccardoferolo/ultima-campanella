@@ -1,6 +1,7 @@
-import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseBoss, ASPETTI, PISTOLE_INIZIALI } from './regole.js';
+import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseBoss, ASPETTI } from './regole.js';
 import { NOMI_MAPPE } from './mappa.js';
 import { obiettivoGiungla, reliquieGiungla } from './storia.js';
+import { creaSalaScelte } from './salaScelte.js';
 
 const BOSS = Object.freeze(['divoratore', 'custode', 'guardiano', 'sciamano', 'preside']);
 const DURATA_RADIO_MS = 14000;
@@ -67,6 +68,9 @@ export function creaHud() {
   n.radice.append(sala, effetti, boss, missione, reliquie, radio);
   let chiaveSala = '';
   let chiaveEffetti = '';
+  let suScelta = () => {};
+  let miniature = null;
+  const scelte = creaSalaScelte(n.radice, { suScelta: scelta => suScelta(scelta) });
   let scadenzaAvviso = 0;
   let scadenzaSegno = 0;
   let puntiPrima = null;
@@ -123,6 +127,12 @@ export function creaHud() {
         sorso.style.transition = 'opacity 1.4s ease-out';
         sorso.style.opacity = '0';
       });
+    },
+    suScelta(fn) {
+      suScelta = fn;
+    },
+    miniature(m) {
+      miniature = m;
     },
     radio(righe) {
       radio.replaceChildren(...righe.map((r, i) => {
@@ -201,9 +211,10 @@ export function creaHud() {
       if (aTerra) n.terra.textContent = `SEI A TERRA — ${Math.ceil(io.timerTerra)} s\nil tuo amico deve rianimarti`;
       if (morto) n.terra.textContent = 'SEI MORTO — torni al prossimo round';
       n.rete.textContent = rete;
-      n.clicca.hidden = bloccato;
+      scelte.aggiorna({ vista, io, host, miniature });
+      n.clicca.hidden = bloccato || scelte.visibile;
       const inSala = vista.fase === 'attesa';
-      sala.hidden = !inSala;
+      sala.hidden = !inSala || scelte.visibile;
       if (inSala) {
         const conto = vista.conto === null ? null : Math.ceil(vista.conto);
         const chiave = `${conto}|${vista.mappa}|${host}|${vista.giocatori.map(g => `${g.nome}:${g.pronto}:${g.pistola}:${g.aspetto}`).join()}|${io?.pronto}`;
@@ -211,25 +222,6 @@ export function creaHud() {
           chiaveSala = chiave;
           const titolo = document.createElement('h3');
           titolo.textContent = conto === null ? "SALA D'ATTESA" : `SI PARTE TRA ${conto}`;
-          const scelte = document.createElement('div');
-          scelte.className = 'scelte';
-          const voce = (tasto, etichetta, valore, attiva = true) => {
-            const r = document.createElement('div');
-            r.className = attiva ? '' : 'spenta';
-            const t = document.createElement('kbd');
-            t.textContent = tasto;
-            const e = document.createElement('span');
-            e.textContent = etichetta;
-            const v = document.createElement('b');
-            v.textContent = valore;
-            r.append(t, e, v);
-            return r;
-          };
-          scelte.append(
-            voce('1', 'Pistola', ARMI[io?.pistola ?? PISTOLE_INIZIALI[0]].nome),
-            voce('2', 'Divisa', ASPETTI[io?.aspetto ?? 0]),
-            voce('3', 'Mappa', NOMI_MAPPE[vista.mappa] ?? vista.mappa, host),
-          );
           const righe = vista.giocatori.map(g => {
             const riga = document.createElement('div');
             riga.className = g.pronto ? 'pronto' : '';
@@ -237,8 +229,8 @@ export function creaHud() {
             return riga;
           });
           const nota = document.createElement('p');
-          nota.textContent = io?.pronto ? 'Invio: aspetta, non sono pronto' : host ? 'Scegli con 1, 2 e 3, poi INVIO quando sei pronto' : 'Scegli con 1 e 2 (la mappa la sceglie chi ha creato la stanza), poi INVIO';
-          sala.replaceChildren(titolo, scelte, ...righe, nota);
+          nota.textContent = `${NOMI_MAPPE[vista.mappa] ?? vista.mappa} · Invio per tornare alle scelte`;
+          sala.replaceChildren(titolo, ...righe, nota);
         }
       }
       const attivi = Object.entries(vista.effetti ?? {}).filter(([, s]) => s > 0);

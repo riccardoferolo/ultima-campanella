@@ -6,6 +6,10 @@ import { ARMI, modoRicarica } from '../regole.js';
 const RIPOSO = new THREE.Vector3(0.11, -0.095, -0.29);
 const MIRA = new THREE.Vector3(0, -0.068, -0.24);
 const DURATA_LAMPO = 0.05;
+const RINCULO_POMPA = 2.2;
+const LAMPO_POMPA = 2.1;
+const CALCIO_POMPA = 1;
+const CALCIO_ALTRE = 0.22;
 const SOSTEGNO_PISTOLA = new THREE.Vector3(-0.018, -0.05, 0.04);
 const COLORE_LAMPO = 0xfff3c4;
 const DURATA_FENDENTE = 0.32;
@@ -119,6 +123,8 @@ export function creaVista1p(materialiArmi) {
   let attuale = null;
   let rinculo = 0;
   let tempoLampo = 0;
+  let calcio = 0;
+  let lampoForte = false;
   let fendente = 0;
   let passo = 0;
   let tempo = 0;
@@ -152,10 +158,15 @@ export function creaVista1p(materialiArmi) {
         fendente = 1;
         return;
       }
-      rinculo = 1;
-      tempoLampo = DURATA_LAMPO;
+      lampoForte = ARMI[attuale]?.famiglia === 'pompa';
+      rinculo = lampoForte ? RINCULO_POMPA : 1;
+      calcio = lampoForte ? CALCIO_POMPA : CALCIO_ALTRE;
+      tempoLampo = DURATA_LAMPO * (lampoForte ? 1.6 : 1);
+      lampo.scale.setScalar((modelli.get(attuale)?.colore ? 0.24 : 0.18) * (lampoForte ? LAMPO_POMPA : 1));
       lampo.material.rotation = Math.random() * Math.PI;
     },
+    get calcio() { return calcio; },
+    get lampoForte() { return lampoForte; },
     bevi(tipo) {
       if (!bottiglie.has(tipo)) {
         const b = creaBottiglia(tipo);
@@ -258,6 +269,7 @@ export function creaVista1p(materialiArmi) {
       tempo += dt;
       modelli.get(attuale)?.gruppo.userData.anima?.(tempo);
       rinculo = Math.max(0, rinculo - dt * 9);
+      calcio = Math.max(0, calcio - dt * 6);
       tempoLampo = Math.max(0, tempoLampo - dt);
       lampo.visible = tempoLampo > 0;
       const base = mira ? MIRA : RIPOSO;

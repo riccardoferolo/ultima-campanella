@@ -102,6 +102,8 @@ const s = {
   colpiVisti: new Map(),
   giro: 0,
   mappaDaAprire: null,
+  vistaPrima: null,
+  ultimoTickHost: 0,
 };
 
 const io = { x: 0, z: 0, yaw: Math.PI, pitch: 0, pronto: false, tp: 0, colpi: 0, movimento: 0, corsa: false, inMira: false };
@@ -236,7 +238,7 @@ function leggiNome() {
   return nome;
 }
 
-async function iniziaPartita(seme, { daClic = false, mappa = 'scuola' } = {}) {
+async function iniziaPartita(seme, { mappa = 'scuola' } = {}) {
   const giro = ++s.giro;
   const scelte = new Map((s.partita?.giocatori ?? s.vista?.giocatori ?? []).map(g => [g.id, { pistola: g.pistola, aspetto: g.aspetto }]));
   s.fase = 'carico';
@@ -244,6 +246,7 @@ async function iniziaPartita(seme, { daClic = false, mappa = 'scuola' } = {}) {
   s.buffer = [];
   s.scarto = null;
   s.vista = null;
+  s.vistaPrima = null;
   s.mappaDaAprire = null;
   if (mondo?.mappa !== mappa) hud.avviso(`Si parte: ${NOMI_MAPPE[mappa] ?? mappa}…`, 'bene');
   let nuovo;
@@ -275,13 +278,12 @@ async function iniziaPartita(seme, { daClic = false, mappa = 'scuola' } = {}) {
   hud.mostra(true);
   comandi.attiva(true);
   document.activeElement?.blur();
-  if (daClic) comandi.blocca();
 }
 
-function partiComeHost(mappa = s.partita?.mappa ?? 'scuola', daClic = true) {
+function partiComeHost(mappa = s.partita?.mappa ?? 'scuola') {
   if (!s.sonoHost) return;
   const seme = semeCasuale();
-  iniziaPartita(seme, { daClic, mappa });
+  iniziaPartita(seme, { mappa });
   if (collegato()) s.coll.invia({ t: 'inizia', seme, mappa });
 }
 
@@ -555,6 +557,7 @@ function tickHost(dt, ora) {
     s.accumulo = Math.min(s.accumulo + dt, RECUPERO_MASSIMO_S);
     const eventi = [];
     while (s.accumulo >= R.PASSO) {
+      if (s.accumulo < 2 * R.PASSO) s.vistaPrima = espandi(faiIstantanea(p));
       const posizioni = {};
       if (io.pronto) posizioni[s.mioId] = { x: io.x, z: io.z, yaw: io.yaw, pitch: io.pitch, arma: armaAttiva(arsenale).tipo, colpi: io.colpi, tp: io.tp };
       for (const [id, o] of s.ospiti) if (o.remoto) posizioni[id] = o.remoto;
@@ -562,6 +565,7 @@ function tickHost(dt, ora) {
       eventi.push(...passo(p, R.PASSO, { posizioni, azioni }));
       s.accumulo -= R.PASSO;
     }
+    s.ultimoTickHost = ora;
     if (eventi.length && collegato()) s.coll.invia({ t: 'ev', eventi });
     suEventi(eventi);
   }
@@ -596,7 +600,14 @@ function tick() {
   if (s.fase !== 'gioco' && s.fase !== 'fine') return;
   if (s.sonoHost && s.partita) tickHost(dt, ora);
   else if (!s.sonoHost) tickOspite(ora);
-  if (s.sonoHost && s.mappaDaAprire && s.fase === 'gioco') partiComeHost(s.mappaDaAprire, false);
+  if (s.sonoHost && s.mappaDaAprire && s.fase === 'gioco') partiComeHost(s.mappaDaAprire);
+}
+
+function vistaHost(ora) {
+  if (!s.partita) return null;
+  const attuale = espandi(faiIstantanea(s.partita));
+  if (!s.vistaPrima || s.vistaPrima.tempo > attuale.tempo) return attuale;
+  return interpola(s.vistaPrima, attuale, (s.accumulo + (ora - s.ultimoTickHost) / 1000) / R.PASSO);
 }
 
 function vistaOspite(ora) {
@@ -927,7 +938,7 @@ function ciclo(ora) {
   ultimoFotogramma = ora;
   if (dt > 0) fps += (1 / dt - fps) * 0.05;
   if ((s.fase === 'gioco' || s.fase === 'fine') && mondo) {
-    const vista = s.sonoHost ? (s.partita ? espandi(faiIstantanea(s.partita)) : null) : vistaOspite(ora);
+    const vista = s.sonoHost ? vistaHost(ora) : vistaOspite(ora);
     const me = vista?.giocatori.find(g => g.id === s.mioId);
     if (vista && me) {
       s.vista = vista;
@@ -935,6 +946,7 @@ function ciclo(ora) {
       if ((vista.fase === 'fine' || vista.fase === 'vinta') && s.fase === 'gioco') mostraFine({ round: vista.round, vinto: vista.fase === 'vinta', giocatori: vista.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });
       const lettura = comandi.leggi();
       comandi.applicaVista(io);
+      if (vista.fase === 'attesa' && !me.pronto && comandi.bloccato) document.exitPointerLock();
       if (vista.fase === 'attesa' && (arsenale.armi.length !== me.armi.length || arsenale.armi.some((a, i) => a.tipo !== me.armi[i]))) allinea(arsenale, me.armi);
       if (locale.aspetto !== me.aspetto) {
         locale.aspetto = me.aspetto;
@@ -1003,6 +1015,18 @@ $('copia').addEventListener('click', async () => {
 });
 $('parti').addEventListener('click', () => partiComeHost());
 $('rigioca').addEventListener('click', () => partiComeHost());
+hud.suScelta(({ cosa, valore }) => {
+  if (s.fase !== 'gioco' || s.vista?.fase !== 'attesa') return;
+  audio.prepara();
+  audio.suona('scatto');
+  if (cosa === 'pronto') {
+    inviaAzione({ tipo: 'pronto', attivo: true });
+    comandi.blocca();
+    return;
+  }
+  if (cosa === 'mappa' && !s.sonoHost) return;
+  inviaAzione({ tipo: 'scegli', cosa, valore });
+});
 comandi.suBlocco(bloccato => {
   if (bloccato) audio.prepara();
 });
@@ -1022,6 +1046,7 @@ orologio.onmessage = tick;
 
 apriMondo('scuola').then(m => {
   mondo = m;
+  hud.miniature(Object.fromEntries(PISTOLE_INIZIALI.map(tipo => [tipo, m.miniatura(tipo)])));
   $('crea').disabled = false;
   $('crea').textContent = 'Crea una stanza';
   $('entra').disabled = false;

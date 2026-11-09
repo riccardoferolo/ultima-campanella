@@ -7,6 +7,7 @@ import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA } from
 import { caricaGiungla, costruisciGiungla } from './giungla3d.js';
 import { TINTE_ASPETTO } from './compagno3d.js';
 import { creaAnimali } from './animali3d.js';
+import { modelloArma } from './armi3d.js';
 import { caricaArmi, creaMaterialiArmi } from './armi3d.js';
 import { costruisciScuola } from './scuola3d.js';
 import { caricaZombi, creaGestoreZombi } from './zombi3d.js';
@@ -22,6 +23,7 @@ const FPS_ALTI = 58;
 const VERIFICA_OGNI_S = 1.5;
 const FOV = 72;
 const MARGINE_VISTA = 10;
+const LATO_MINI = 128;
 const FOV_MIRA = 52;
 const FOV_CANNOCCHIALE = 20;
 const ONDEGGIO = 0.01;
@@ -243,6 +245,15 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
   const bonus3d = creaBonus3d(scena);
   const segreti = giungla ? vuoto : creaSegreti(scena);
   const animali = creaAnimali(scena, mappa);
+  const scenaMini = new THREE.Scene();
+  scenaMini.environment = ambiente;
+  scenaMini.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.2));
+  const luceMini = new THREE.DirectionalLight(0xffffff, 3);
+  luceMini.position.set(1, 2, 3);
+  scenaMini.add(luceMini);
+  const cameraMini = new THREE.PerspectiveCamera(26, 2, 0.01, 20);
+  const bersaglioMini = new THREE.WebGLRenderTarget(LATO_MINI * 2, LATO_MINI);
+  const pixelMini = new Uint8Array(LATO_MINI * LATO_MINI * 2 * 4);
   usaMappa(mappaPrima);
   const zombi = creaGestoreZombi(scena, risorseZombi);
   const effetti = creaEffetti(scena);
@@ -313,14 +324,14 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
     const occhi = aTerra ? 0.45 : R.ALTEZZA_OCCHI;
     camera.position.set(io.x, occhi + Math.sin(passo) * ONDEGGIO * movimento * (inMira ? 0 : 1), io.z);
     camera.rotation.y = io.yaw + Math.PI;
-    camera.rotation.x = io.pitch;
+    camera.rotation.x = io.pitch + vista1p.calcio * vista1p.calcio * 0.06;
     camera.rotation.z = aTerra ? 0.35 : 0;
     const fov = cannocchiale ? FOV_CANNOCCHIALE : inMira ? FOV_MIRA : FOV;
     if (Math.abs(camera.fov - fov) > 0.1) {
       camera.fov += (fov - camera.fov) * Math.min(1, dt * 14);
       camera.updateProjectionMatrix();
     }
-    lampo.intensity = vista1p.lampoAcceso ? 14 : 0;
+    lampo.intensity = vista1p.lampoAcceso ? (vista1p.lampoForte ? 30 : 14) : 0;
     if (vista1p.lampoAcceso) lampo.color.setHex(vista1p.coloreLampo);
     const fuori = aperta(io.x, io.z);
     const fattore = Math.min(1, dt * 2);
@@ -360,6 +371,41 @@ export async function creaMondo(contenitore, mappa = mappaAttiva) {
     mappa,
     scena,
     renderer,
+    miniatura(tipo) {
+      const { gruppo } = modelloArma(tipo, materialiArmi);
+      const perno = new THREE.Group();
+      gruppo.rotation.y = Math.PI / 2;
+      perno.add(gruppo);
+      const scatola = new THREE.Box3().setFromObject(perno);
+      const centro = scatola.getCenter(new THREE.Vector3());
+      const misura = scatola.getSize(new THREE.Vector3());
+      gruppo.position.sub(centro);
+      scenaMini.add(perno);
+      const lungo = Math.max(misura.x, misura.y * 2.2, 0.2);
+      cameraMini.position.set(0, lungo * 0.12, lungo * 2.15);
+      cameraMini.lookAt(0, 0, 0);
+      renderer.setRenderTarget(bersaglioMini);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(scenaMini, cameraMini);
+      renderer.readRenderTargetPixels(bersaglioMini, 0, 0, LATO_MINI * 2, LATO_MINI, pixelMini);
+      renderer.setRenderTarget(null);
+      scenaMini.remove(perno);
+      const tela = document.createElement('canvas');
+      tela.width = LATO_MINI * 2;
+      tela.height = LATO_MINI;
+      const ctx = tela.getContext('2d');
+      const immagine = ctx.createImageData(LATO_MINI * 2, LATO_MINI);
+      const riga = LATO_MINI * 2 * 4;
+      for (let y = 0; y < LATO_MINI; y++) {
+        for (let i = 0; i < riga; i++) {
+          const v = pixelMini[(LATO_MINI - 1 - y) * riga + i];
+          immagine.data[y * riga + i] = i % 4 === 3 ? v : Math.round(255 * Math.min(1, (v / 255) ** (1 / 2.2) * 1.15));
+        }
+      }
+      ctx.putImageData(immagine, 0, 0);
+      return tela.toDataURL();
+    },
     tela: renderer.domElement,
     campanella: () => segreti.suona(),
     tingiManica(aspetto) {

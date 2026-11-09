@@ -1,5 +1,5 @@
 import {
-  R, ARMI, ARMI_CASSA, PISTOLE_INIZIALI, ASPETTI, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, attesaComparsa, tipoZombie,
+  R, ARMI, ARMI_CASSA, PISTOLE_INIZIALI, ASPETTI, PESI_CASSA, BEVANDE, TIPI_ZOMBIE, ELENCO_BONUS, BONUS, versionePotenziata, armaBase, zombieDelRound, vitaZombie, quotaCorridori, fattoreGiungla, attesaComparsa, tipoZombie,
   dannoGranata, moltiplicatoreBoss, faseCustode, faseBoss, saltiArco, fattoreOrda, armiPortate,
 } from './regole.js';
 import { passoCaso } from './caso.js';
@@ -768,9 +768,8 @@ function generaZombie(stato, { tipo: tipoVoluto = null, finestre: soloFinestre =
   const finestra = punto ? null : finestre[Math.floor(caso(stato) * finestre.length)];
   const tipo = tipoVoluto ?? tipoZombie(stato.round, caso(stato));
   const dati = TIPI_ZOMBIE[tipo];
-  const anticipo = inGiungla ? R.GIUNGLA_ANTICIPO_CORRIDORI : 0;
-  const corre = dati.boss ? false : correVoluto ?? (!!dati.corre || caso(stato) < quotaCorridori(stato.round + anticipo));
-  const vita = vitaVoluta ?? Math.round(vitaZombie(Math.max(1, stato.round)) * dati.vita * (dati.boss ? moltiplicatoreBoss(stato.giocatori.length) : 1) * (inGiungla ? R.GIUNGLA_VITA : 1));
+  const corre = dati.boss ? false : correVoluto ?? (!!dati.corre || caso(stato) < quotaCorridori(stato.round));
+  const vita = vitaVoluta ?? Math.round(vitaZombie(Math.max(1, stato.round)) * dati.vita * (dati.boss ? moltiplicatoreBoss(stato.giocatori.length) : 1) * (inGiungla ? fattoreGiungla(R.GIUNGLA_VITA, stato.round) : 1));
   const sorgente = punto ?? (finestra.tana ? finestra.interno : null);
   if (sorgente) {
     stato.zombie.push({
@@ -807,7 +806,7 @@ function avanzaFase(stato, dt, eventi) {
     stato.round += 1;
     stato.bonusRound = 0;
     stato.fase = 'gioco';
-    stato.daGenerare = Math.round(zombieDelRound(stato.round) * fattoreOrda(stato.giocatori.length) * (stato.giungla ? R.GIUNGLA_ORDA : 1));
+    stato.daGenerare = Math.round(zombieDelRound(stato.round) * fattoreOrda(stato.giocatori.length) * (stato.giungla ? fattoreGiungla(R.GIUNGLA_ORDA, stato.round) : 1));
     stato.attesaComparsa = 1;
     stato.presideTra = stato.missione && stato.round % R.OGNI_PRESIDE === 0 ? R.PRESIDE_DOPO : null;
     if (stato.giungla) giungla.inizioRound(stato, eventi);
@@ -886,7 +885,7 @@ function muoviZombie(stato, dt, eventi) {
       continue;
     }
     const lentezza = 1 - Math.min(0.85, z.gelo ?? 0);
-    const velocita = z.scatto > 0 ? R.VELOCITA_SCATTO * lentezza : (z.corre ? R.VELOCITA_CORRE : R.VELOCITA_CAMMINA) * dati.velocita * (furia ? 1.25 : 1) * lentezza;
+    const velocita = z.scatto > 0 ? R.VELOCITA_SCATTO * lentezza : (z.corre ? R.VELOCITA_CORRE : R.VELOCITA_CAMMINA) * dati.velocita * (furia ? 1.25 : 1) * lentezza * (stato.giungla ? fattoreGiungla(R.GIUNGLA_VELOCITA, stato.round) : 1);
     const portata = R.PORTATA_ZOMBIE * dati.portata;
     const finestra = finestraDi(z.finestra);
     if (z.stato === 'morto') {
@@ -943,7 +942,7 @@ function muoviZombie(stato, dt, eventi) {
       if (vicino) z.yaw = Math.atan2(vicino.g.x - z.x, vicino.g.z - z.z);
       if (z.timer > 0) continue;
       const bersaglio = stato.giocatori.find(g => g.id === z.bersaglio && g.stato === 'vivo');
-      if (bersaglio && distanza(bersaglio, z) <= portata + 0.4) ferisci(stato, bersaglio, eventi, R.DANNO_ZOMBIE * dati.danno * (stato.giungla ? R.GIUNGLA_DANNO : 1));
+      if (bersaglio && distanza(bersaglio, z) <= portata + 0.4) ferisci(stato, bersaglio, eventi, R.DANNO_ZOMBIE * dati.danno * (stato.giungla ? fattoreGiungla(R.GIUNGLA_DANNO, stato.round) : 1));
       z.stato = 'dentro';
       z.attesa = R.ATTESA_ATTACCO * (dati.attesa ?? 1) * (furia ? 0.7 : 1);
       continue;
