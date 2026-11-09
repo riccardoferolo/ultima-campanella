@@ -1,7 +1,14 @@
 import { ARMI } from './regole.js';
+import { creaMotore } from './suoni/motore.js';
+import { creaAmbiente } from './suoni/ambiente.js';
+import { RICETTE_ARMI, FAMIGLIE_SPARO } from './suoni/armi.js';
+import { RICETTE_ZOMBI, TIPI_LAMENTO } from './suoni/zombi.js';
+import { RICETTE_EVENTI } from './suoni/eventi.js';
+import { RICETTE_AMBIENTE } from './suoni/ambiente.js';
 
 const VOLUME = 0.5;
 const VOLUME_MUSICA = 0.32;
+const MANDATA_MUSICA = 0.12;
 const CHIAVE_MUSICA = 'campanella.musica';
 const ANTICIPO_S = 0.25;
 const PROGRAMMA_OGNI_MS = 60;
@@ -24,51 +31,52 @@ function salvaPreferenza(si) {
     return false;
   }
 }
-const SPARI = Object.freeze({
-  pistola: { durata: 0.18, filtro: 1800, volume: 0.6, botto: 110 },
-  revolver: { durata: 0.3, filtro: 1300, volume: 0.85, botto: 75 },
-  pompa: { durata: 0.45, filtro: 900, volume: 1, botto: 60 },
-  mitra: { durata: 0.12, filtro: 2200, volume: 0.45, botto: 130 },
-  assalto: { durata: 0.16, filtro: 1500, volume: 0.6, botto: 90 },
-  battaglia: { durata: 0.22, filtro: 1250, volume: 0.75, botto: 80 },
-  mitragliatrice: { durata: 0.2, filtro: 1100, volume: 0.7, botto: 70 },
-  precisione: { durata: 0.6, filtro: 2600, volume: 1, botto: 55 },
-  aliena: { durata: 0.3, filtro: 3000, volume: 0.35, botto: 0, raggio: true },
-});
+const RICETTE = Object.freeze({ ...RICETTE_ARMI, ...RICETTE_ZOMBI, ...RICETTE_EVENTI, ...RICETTE_AMBIENTE });
+const PRIMA_DA_PREPARARE = Object.freeze([
+  ...FAMIGLIE_SPARO.map(f => `sparo_${f}`), 'm_clic', 'm_clac', 'm_slitta', 'm_scivolo', 'm_bossolo', 'fendente_coltello',
+  'z_lamento', 'z_rantolo', 'z_ringhio', 'esplosione', 'm_guscio', 'm_pompa', 'm_otturatore', 'm_cricchetto',
+  'fendente_giada', 'fendente_sole', 'fendente_serpente', 'sparo_buco', 'sparo_gelo', 'sparo_arco', 'sparo_eco',
+  'z_gorgoglio', 'z_inspiro', 'z_urlo', 'm_sibilo', 'm_risucchio', 'm_tonfo', 'e_scatto', 'e_carica', 'e_radio', 'e_anima',
+  'e_pietra', 'e_evocazione', 'e_turbine', 'e_onda', 'e_veleno', 'esplosione_grande',
+]);
+const VOLUMI_SPARO = Object.freeze({ pistola: 0.55, revolver: 0.8, pompa: 0.9, mitra: 0.42, assalto: 0.55, battaglia: 0.65, mitragliatrice: 0.62, precisione: 0.9 });
+const ECO_SPARO = Object.freeze({ precisione: 0.5, pompa: 0.35, revolver: 0.3, battaglia: 0.22, mitragliatrice: 0.2, assalto: 0.15 });
+const FENDENTI = Object.freeze({ giada: 'fendente_giada', sole: 'fendente_sole', serpente: 'fendente_serpente' });
+const ALIENI = Object.freeze({ buco: ['sparo_buco', 0.6], gelo: ['sparo_gelo', 0.35], arco: ['sparo_arco', 0.5] });
+const CON_CARRELLO = new Set(['pistola', 'mitra', 'assalto', 'battaglia', 'mitragliatrice']);
+const DISTANZA_MASSIMA_LAMENTO = 26;
+const DISTANZA_MASSIMA_ESPLOSIONE = 40;
+const caso = (a, b) => a + Math.random() * (b - a);
 
-const SPARI_ALIENI = Object.freeze({
-  buco: (nota, soffio, d) => { nota(95, { durata: 0.9, tipo: 'sine', volume: 0.45, scendi: 32, destinazione: d }); nota(190, { durata: 0.6, tipo: 'sawtooth', volume: 0.07, scendi: 60, destinazione: d }); soffio({ durata: 0.8, da: 700, a: 140, tipo: 'bandpass', volume: 0.5, destinazione: d }); },
-  gelo: (nota, soffio, d) => { soffio({ durata: 0.16, da: 7000, a: 3200, tipo: 'highpass', volume: 0.22, destinazione: d }); },
-  arco: (nota, soffio, d) => { nota(1800, { durata: 0.14, tipo: 'sawtooth', volume: 0.12, scendi: 260, destinazione: d }); nota(62, { durata: 0.22, tipo: 'square', volume: 0.14, destinazione: d }); soffio({ durata: 0.28, da: 5200, a: 800, tipo: 'bandpass', volume: 0.6, destinazione: d }); },
-});
+function scegliPesato(elenco) {
+  let r = Math.random();
+  for (const voce of elenco) {
+    r -= voce[1];
+    if (r <= 0) return voce;
+  }
+  return elenco[0];
+}
 
 export function creaAudio() {
   let ctx = null;
   let uscita = null;
   let rumore = null;
+  let motore = null;
+  const ambiente = creaAmbiente();
 
   function prepara() {
     if (ctx) {
       if (ctx.state === 'suspended') ctx.resume();
       return;
     }
-    ctx = new AudioContext();
-    uscita = ctx.createGain();
-    uscita.gain.value = VOLUME;
-    uscita.connect(ctx.destination);
+    motore = creaMotore(RICETTE, VOLUME);
+    ctx = motore.ctx;
+    uscita = motore.uscita;
+    motore.banco.accoda(PRIMA_DA_PREPARARE);
+    ambiente.avvia(motore);
     rumore = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const dati = rumore.getChannelData(0);
     for (let i = 0; i < dati.length; i++) dati[i] = Math.random() * 2 - 1;
-    const vento = ctx.createBufferSource();
-    vento.buffer = rumore;
-    vento.loop = true;
-    const filtroVento = ctx.createBiquadFilter();
-    filtroVento.type = 'lowpass';
-    filtroVento.frequency.value = 220;
-    const volumeVento = ctx.createGain();
-    volumeVento.gain.value = 0.05;
-    vento.connect(filtroVento).connect(volumeVento).connect(uscita);
-    vento.start();
   }
 
   const pronto = () => ctx && ctx.state === 'running';
@@ -79,6 +87,9 @@ export function creaAudio() {
     musica.uscita = ctx.createGain();
     musica.uscita.gain.value = 0;
     musica.uscita.connect(uscita);
+    const mandataMusica = ctx.createGain();
+    mandataMusica.gain.value = MANDATA_MUSICA;
+    musica.uscita.connect(mandataMusica).connect(motore.riverbero);
     musica.filtro = ctx.createBiquadFilter();
     musica.filtro.type = 'lowpass';
     musica.filtro.frequency.value = 500;
@@ -195,18 +206,12 @@ export function creaAudio() {
     osc.stop(t + durata + 0.05);
   }
 
-  function spazio(distanza, angolo) {
-    const panner = ctx.createStereoPanner();
-    panner.pan.value = Math.max(-1, Math.min(1, Math.sin(angolo)));
-    const g = ctx.createGain();
-    g.gain.value = Math.max(0, 1 - distanza / 22);
-    panner.connect(g).connect(uscita);
-    return panner;
-  }
+  const buffer = (chiave, opzioni = {}) => motore.suona([{ chiave, velocita: caso(0.95, 1.05) }], { volume: 0.6, umido: 0.15, ...opzioni });
+  const dentroPartita = () => musica.stato !== 'calma' && musica.stato !== 'silenzio';
 
   const SUONI = {
     vuoto: () => nota(900, { durata: 0.04, tipo: 'square', volume: 0.12 }),
-    coltello: () => soffio({ durata: 0.18, da: 3000, a: 900, tipo: 'bandpass', volume: 0.5 }),
+    coltello: () => motore.suona([{ chiave: 'fendente_coltello', velocita: caso(0.92, 1.1) }], { volume: 0.5, umido: 0.06, pan: caso(-0.2, 0.2) }),
     carne: () => { soffio({ durata: 0.12, da: 700, a: 200, volume: 0.6 }); nota(90, { durata: 0.1, volume: 0.25, scendi: 50 }); },
     testa: () => { soffio({ durata: 0.16, da: 1200, a: 300, volume: 0.8 }); nota(1400, { durata: 0.06, tipo: 'triangle', volume: 0.12 }); },
     assaRotta: () => { soffio({ durata: 0.3, da: 1400, a: 300, tipo: 'bandpass', volume: 0.9 }); nota(120, { durata: 0.12, volume: 0.3, scendi: 70 }); },
@@ -235,14 +240,14 @@ export function creaAudio() {
     conto: () => nota(660, { durata: 0.15, tipo: 'square', volume: 0.15 }),
     bonusCompare: () => { [1046, 1318].forEach((f, i) => nota(f, { durata: 0.25, tipo: 'sine', volume: 0.15, ritardo: i * 0.1 })); },
     bonus: () => { [523, 784, 1046, 1568].forEach((f, i) => nota(f, { durata: 0.35, tipo: 'triangle', volume: 0.2, ritardo: i * 0.08 })); soffio({ durata: 0.8, da: 4000, a: 600, tipo: 'bandpass', volume: 0.25 }); },
-    bomba: () => { nota(45, { durata: 2.5, tipo: 'sawtooth', volume: 0.5, scendi: 25 }); soffio({ durata: 2.5, da: 1500, a: 60, volume: 1 }); },
+    bomba: () => buffer('esplosione_grande', { volume: 1, umido: 0.45, priorita: 3 }),
     frammento: () => { [1568, 2093, 2637].forEach((f, i) => nota(f, { durata: 0.6, tipo: 'sine', volume: 0.12, ritardo: i * 0.15 })); },
     segreto: () => { [262, 330, 392, 523, 392, 523, 659, 784, 1046].forEach((f, i) => nota(f, { durata: 0.5, tipo: 'triangle', volume: 0.16, ritardo: i * 0.18 })); soffio({ durata: 3, da: 200, a: 3000, tipo: 'bandpass', volume: 0.3 }); },
     campanella: () => { for (let i = 0; i < 6; i++) { nota(1175, { durata: 0.5, tipo: 'sine', volume: 0.18, ritardo: i * 0.16 }); nota(1760, { durata: 0.3, tipo: 'sine', volume: 0.08, ritardo: i * 0.16 }); } },
     lancio: () => { nota(1900, { durata: 0.03, tipo: 'square', volume: 0.08 }); soffio({ durata: 0.28, da: 2600, a: 600, tipo: 'bandpass', volume: 0.35, ritardo: 0.05 }); },
     boss: () => { nota(62, { durata: 1.8, tipo: 'sawtooth', volume: 0.35, scendi: 38 }); nota(93, { durata: 1.5, tipo: 'sawtooth', volume: 0.2, scendi: 52, ritardo: 0.1 }); soffio({ durata: 1.6, da: 900, a: 180, tipo: 'bandpass', volume: 0.7 }); },
-    urlo: () => { nota(118, { durata: 1.1, tipo: 'sawtooth', volume: 0.3, scendi: 58 }); nota(176, { durata: 0.9, tipo: 'sawtooth', volume: 0.15, scendi: 90 }); soffio({ durata: 1.1, da: 1600, a: 300, tipo: 'bandpass', volume: 0.7 }); },
-    scatto: () => { soffio({ durata: 0.7, da: 450, a: 110, volume: 0.8 }); nota(52, { durata: 0.7, volume: 0.45, scendi: 34 }); },
+    urlo: () => { buffer('z_urlo', { volume: 0.85, umido: 0.4 }); soffio({ durata: 1.1, da: 900, a: 200, volume: 0.25 }); },
+    scatto: () => (dentroPartita() ? buffer('e_carica', { volume: 0.8, umido: 0.3 }) : buffer('e_scatto', { volume: 0.35, umido: 0.04 })),
     bossUcciso: () => { [196, 247, 294, 392, 494].forEach((f, i) => nota(f, { durata: 0.6, tipo: 'triangle', volume: 0.18, ritardo: 0.4 + i * 0.12 })); nota(48, { durata: 1.6, tipo: 'sawtooth', volume: 0.4, scendi: 26 }); soffio({ durata: 1.6, da: 1200, a: 60, volume: 0.8 }); },
     fusibile: () => { nota(120, { durata: 0.25, tipo: 'square', volume: 0.07 }); [880, 1320, 1760].forEach((f, i) => nota(f, { durata: 0.35, tipo: 'triangle', volume: 0.16, ritardo: 0.1 + i * 0.1 })); },
     generatore: () => { nota(42, { durata: 2.8, tipo: 'sawtooth', volume: 0.22, scendi: 58 }); nota(84, { durata: 2.6, tipo: 'square', volume: 0.05, ritardo: 0.4 }); soffio({ durata: 2.2, da: 300, a: 900, tipo: 'bandpass', volume: 0.4 }); },
@@ -253,8 +258,15 @@ export function creaAudio() {
       soffio({ durata: 2.2, da: 1000, a: 150, tipo: 'bandpass', volume: 0.8, ritardo: 4.6 });
     },
     vittoria: () => { [262, 330, 392, 523, 659, 784, 1046].forEach((f, i) => nota(f, { durata: 0.5, tipo: 'triangle', volume: 0.2, ritardo: i * 0.14 })); [523, 659, 784].forEach(f => nota(f, { durata: 2.4, tipo: 'triangle', volume: 0.14, ritardo: 1.1 })); },
-    sfera: () => SPARI_ALIENI.buco(nota, soffio, uscita),
-    scarica: () => SPARI_ALIENI.arco(nota, soffio, uscita),
+    sfera: () => buffer('sparo_buco', { volume: 0.5, umido: 0.3 }),
+    scarica: () => buffer('sparo_arco', { volume: 0.45, umido: 0.25 }),
+    radio: () => buffer('e_radio', { volume: 0.45, umido: 0.05 }),
+    anima: () => buffer('e_anima', { volume: 0.6, umido: 0.4 }),
+    pietra: () => buffer('e_pietra', { volume: 0.8, umido: 0.35 }),
+    evocazione: () => buffer('e_evocazione', { volume: 0.8, umido: 0.4 }),
+    speciale_turbine: () => buffer('e_turbine', { volume: 0.75, umido: 0.25 }),
+    speciale_onda: () => buffer('e_onda', { volume: 0.85, umido: 0.3 }),
+    speciale_veleno: () => buffer('e_veleno', { volume: 0.75, umido: 0.3 }),
     buco: () => { nota(40, { durata: 2.4, tipo: 'sine', volume: 0.45, scendi: 70 }); soffio({ durata: 2.6, da: 120, a: 900, tipo: 'bandpass', volume: 0.55 }); },
     implosione: () => { soffio({ durata: 0.35, da: 200, a: 4000, tipo: 'bandpass', volume: 0.6 }); nota(46, { durata: 1.4, tipo: 'sawtooth', volume: 0.5, scendi: 24, ritardo: 0.3 }); soffio({ durata: 1.2, da: 2200, a: 60, volume: 1.1, ritardo: 0.3 }); },
     congelato: () => { nota(2600, { durata: 0.08, tipo: 'triangle', volume: 0.12 }); soffio({ durata: 0.35, da: 8000, a: 3000, tipo: 'highpass', volume: 0.35 }); },
@@ -262,53 +274,66 @@ export function creaAudio() {
     fine: () => { [196, 165, 131, 98].forEach((f, i) => nota(f, { durata: 1.2, tipo: 'sawtooth', volume: 0.18, ritardo: i * 0.6 })); },
   };
 
+  const PARTI_RICARICA = {
+    caricatore: () => [[0.2, 'm_clic', 0.5], [0.24, 'm_scivolo', 0.45], [0.5, 'm_scivolo', 0.2], [0.6, 'm_scivolo', 0.4], [0.64, 'm_clac', 0.8], [0.8, 'm_scivolo', 0.35], [0.84, 'm_slitta', 0.9]],
+    otturatore: () => [[0.2, 'm_clic', 0.5], [0.24, 'm_scivolo', 0.45], [0.6, 'm_scivolo', 0.4], [0.63, 'm_clac', 0.8], [0.74, 'm_otturatore', 0.9]],
+    tamburo: () => [[0.15, 'm_clic', 0.6], [0.2, 'm_scivolo', 0.3], ...[0, 1, 2, 3, 4, 5].map(i => [0.3 + caso(0, 0.12), 'm_bossolo', 0.25 + i * 0.02]), [0.62, 'm_scivolo', 0.35], [0.66, 'm_clac', 0.7], [0.78, 'm_clac', 0.8], [0.82, 'm_cricchetto', 0.6]],
+    capsula: () => [[0.3, 'm_sibilo', 0.5], [0.55, 'm_risucchio', 0.7], [0.62, 'm_tonfo', 0.6], [0.8, 'm_clac', 0.4]],
+  };
+
+  function partiCartucce(colpi) {
+    const giri = Math.max(1, Math.min(6, colpi));
+    const parti = [];
+    for (let i = 0; i < giri; i++) parti.push([0.12 + ((i + 0.55) / giri) * 0.68, 'm_guscio', 0.8]);
+    parti.push([0.86, 'm_pompa', 0.9]);
+    return parti;
+  }
+
   function ricaricaSuoni(modo, durata, colpi) {
-    const g = ctx.createGain();
-    g.connect(uscita);
-    const clic = (t, f = 1200) => nota(f, { durata: 0.035, tipo: 'square', volume: 0.12, ritardo: t * durata, destinazione: g });
-    const metallo = (t, da = 3200, a = 900, volume = 0.3) => soffio({ durata: 0.09, da, a, tipo: 'bandpass', volume, ritardo: t * durata, destinazione: g });
-    const tonfo = (t, f = 280) => nota(f, { durata: 0.06, tipo: 'square', volume: 0.22, scendi: f * 0.6, ritardo: t * durata, destinazione: g });
-    if (modo === 'caricatore' || modo === 'otturatore') {
-      clic(0.24);
-      metallo(0.25);
-      metallo(0.5, 6000, 2500, 0.18);
-      tonfo(0.62);
-      metallo(0.62, 2000, 600, 0.4);
-      if (modo === 'otturatore') {
-        [0.76, 0.8, 0.84, 0.88].forEach((t, i) => { clic(t, 700 + i * 120); metallo(t, 2600, 900, 0.2); });
-      } else {
-        clic(0.82, 900);
-        metallo(0.82, 2500, 700, 0.3);
-        tonfo(0.87, 420);
-      }
-    } else if (modo === 'tamburo') {
-      clic(0.18, 1500);
-      for (let i = 0; i < 6; i++) nota(3000 + Math.random() * 2500, { durata: 0.05, tipo: 'triangle', volume: 0.05, ritardo: (0.3 + i * 0.012) * durata, destinazione: g });
-      tonfo(0.66, 360);
-      metallo(0.66);
-      clic(0.78, 800);
-      metallo(0.78, 3000, 800, 0.35);
-    } else if (modo === 'cartucce') {
-      const giri = Math.max(1, Math.min(6, colpi));
-      for (let i = 0; i < giri; i++) {
-        const t = 0.12 + ((i + 0.55) / giri) * 0.68;
-        tonfo(t, 340);
-        metallo(t, 2200, 700, 0.22);
-      }
-      soffio({ durata: 0.16, da: 1400, a: 300, volume: 0.45, ritardo: 0.87 * durata, destinazione: g });
-      tonfo(0.88, 240);
-      tonfo(0.93, 380);
-    } else {
-      soffio({ durata: 0.3, da: 500, a: 90, volume: 0.5, ritardo: 0.55 * durata, destinazione: g });
-      nota(190, { durata: 0.3, volume: 0.25, scendi: 70, ritardo: 0.55 * durata, destinazione: g });
-      nota(110, { durata: 0.4, tipo: 'sawtooth', volume: 0.05, ritardo: 0.62 * durata, destinazione: g });
+    const parti = modo === 'cartucce' ? partiCartucce(colpi) : (PARTI_RICARICA[modo] ?? PARTI_RICARICA.caricatore)();
+    const voce = motore.apriVoce({ volume: 0.55, umido: 0.08, priorita: 3 });
+    if (!voce) return null;
+    for (const [t, chiave, volume] of parti) motore.aggiungi(voce, { chiave, ritardo: (t + caso(-0.015, 0.015)) * durata, velocita: caso(0.94, 1.06), volume });
+    return { ferma: () => motore.zittisci(voce, ctx.currentTime) };
+  }
+
+  function fendenteArma(dati, distanza, angolo) {
+    const chiave = FENDENTI[dati.reliquia] ?? 'fendente_coltello';
+    motore.suona([{ chiave, velocita: caso(0.9, 1.12) }], { distanza, angolo, volume: 0.6, umido: 0.12, riferimento: 2, pan: distanza > 0 ? null : caso(-0.15, 0.15) });
+  }
+
+  function stratiMeccanici(dati, famiglia) {
+    const strati = [];
+    const automatica = dati?.automatica;
+    const cadenza = dati?.cadenza ?? 0.5;
+    if (CON_CARRELLO.has(famiglia) && (!automatica || Math.random() < 0.35)) strati.push({ chiave: 'm_clic', ritardo: caso(0.012, 0.025), volume: 0.12, velocita: caso(0.9, 1.1) });
+    if (famiglia === 'pompa' && !automatica && cadenza >= 0.5) {
+      strati.push({ chiave: 'm_pompa', ritardo: cadenza * 0.38, volume: 0.35 }, { chiave: 'm_guscio', ritardo: cadenza * 0.38 + 0.3, volume: 0.1 });
+    } else if (famiglia === 'precisione' && cadenza >= 1) {
+      strati.push({ chiave: 'm_otturatore', ritardo: cadenza * 0.4, volume: 0.32 }, { chiave: 'm_bossolo', ritardo: cadenza * 0.4 + 0.25, volume: 0.1 });
+    } else if (famiglia !== 'revolver' && famiglia !== 'pompa' && Math.random() < (automatica ? 0.18 : 0.6)) {
+      strati.push({ chiave: 'm_bossolo', ritardo: caso(0.35, 0.6), volume: 0.1, velocita: caso(0.9, 1.1) });
     }
-    return {
-      ferma() {
-        g.gain.setValueAtTime(0, ctx.currentTime);
-        setTimeout(() => g.disconnect(), 100);
-      },
-    };
+    return strati;
+  }
+
+  function sparoArma(arma, distanza, angolo) {
+    const dati = ARMI[arma];
+    if (arma === 'coltello' || dati?.bianca) {
+      fendenteArma(dati ?? {}, distanza, angolo);
+      return;
+    }
+    const alieno = ALIENI[dati?.suono];
+    if (alieno) {
+      motore.suona([{ chiave: alieno[0], velocita: caso(0.94, 1.06) }], { distanza, angolo, volume: alieno[1], umido: 0.3, riferimento: 3 });
+      return;
+    }
+    const famiglia = VOLUMI_SPARO[dati?.famiglia] ? dati.famiglia : 'pistola';
+    const potenziata = dati?.potenziata;
+    const strati = [{ chiave: `sparo_${famiglia}`, velocita: caso(0.96, 1.04) * (potenziata ? 0.95 : 1), ritardo: caso(0, 0.004) }];
+    if (distanza === 0) strati.push(...stratiMeccanici(dati, famiglia));
+    if (ECO_SPARO[famiglia] && motore.esterno() && (!dati?.automatica || Math.random() < 0.2)) strati.push({ chiave: 'sparo_eco', ritardo: 0.05, volume: ECO_SPARO[famiglia], velocita: caso(0.92, 1.08) });
+    motore.suona(strati, { distanza, angolo, volume: VOLUMI_SPARO[famiglia] * caso(0.9, 1.05) * (potenziata ? 1.08 : 1), umido: 0.22, riferimento: 4, taglio: caso(14000, 20000), priorita: distanza === 0 ? 3 : 1.5 });
   }
 
   return {
@@ -337,50 +362,19 @@ export function creaAudio() {
       if (pronto()) SUONI[nome]?.();
     },
     sparo(arma, distanza = 0, angolo = 0) {
-      if (!pronto()) return;
-      const s = SPARI[ARMI[arma]?.famiglia] ?? SPARI.pistola;
-      const destinazione = distanza > 0 ? spazio(distanza, angolo) : uscita;
-      const alieno = SPARI_ALIENI[ARMI[arma]?.suono];
-      if (alieno) {
-        alieno(nota, soffio, destinazione);
-        return;
-      }
-      if (s.raggio) {
-        nota(1400, { durata: s.durata, tipo: 'square', volume: 0.12, scendi: 180, destinazione });
-        nota(700, { durata: s.durata * 1.4, tipo: 'sine', volume: 0.25, scendi: 90, destinazione });
-        soffio({ durata: 0.5, da: 900, a: 80, volume: 0.5, ritardo: 0.08, destinazione });
-        return;
-      }
-      soffio({ durata: s.durata, da: s.filtro * 2, a: s.filtro * 0.3, volume: s.volume, destinazione });
-      nota(s.botto, { durata: s.durata * 0.8, volume: s.volume * 0.6, scendi: s.botto * 0.4, destinazione });
+      if (pronto()) sparoArma(arma, distanza, angolo);
     },
     esplosione(distanza, angolo) {
-      if (!pronto() || distanza > 40) return;
-      const destinazione = distanza > 1 ? spazio(distanza * 0.55, angolo) : uscita;
-      nota(52, { durata: 1.3, tipo: 'sawtooth', volume: 0.6, scendi: 24, destinazione });
-      soffio({ durata: 1.5, da: 2400, a: 70, volume: 1.2, destinazione });
-      soffio({ durata: 0.25, da: 7000, a: 1500, tipo: 'highpass', volume: 0.45, destinazione });
+      if (!pronto() || distanza > DISTANZA_MASSIMA_ESPLOSIONE) return;
+      motore.suona([{ chiave: 'esplosione', velocita: caso(0.9, 1.06) }], { distanza: distanza > 1 ? distanza : 0, angolo, volume: 1, umido: 0.4, riferimento: 6, priorita: 3 });
     },
     lamento(distanza, angolo) {
-      if (!pronto() || distanza > 20) return;
-      const destinazione = spazio(distanza, angolo);
-      const base = 70 + Math.random() * 50;
-      const t = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(base, t);
-      osc.frequency.linearRampToValueAtTime(base * (0.7 + Math.random() * 0.5), t + 0.9);
-      const filtro = ctx.createBiquadFilter();
-      filtro.type = 'bandpass';
-      filtro.frequency.value = 400 + Math.random() * 300;
-      filtro.Q.value = 4;
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.001, t);
-      g.gain.linearRampToValueAtTime(0.35, t + 0.15);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 1);
-      osc.connect(filtro).connect(g).connect(destinazione);
-      osc.start(t);
-      osc.stop(t + 1.05);
+      if (!pronto() || distanza > DISTANZA_MASSIMA_LAMENTO) return;
+      const [chiave, , volume] = scegliPesato(TIPI_LAMENTO);
+      motore.suona([{ chiave, velocita: caso(0.85, 1.12), ritardo: caso(0, 0.08) }], { distanza, angolo, volume: volume * caso(0.8, 1.1), umido: 0.25, riferimento: 2.5, taglio: caso(5000, 12000), priorita: 0.8 });
+    },
+    ambiente(mappa, aperto) {
+      ambiente.richiedi(mappa, aperto);
     },
   };
 }
