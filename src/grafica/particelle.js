@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { quota } from '../mappa.js';
 
 const VERTICE = `
 attribute float dimensione;
@@ -68,8 +69,13 @@ export function creaNuvola(scena, texture, quante, additiva) {
   const tinta = new THREE.Color();
   let sporca = false;
 
+  let vittima = 0;
   function nuova(x, y, z, vx, vy, vz, colore, dimensione, durata, g) {
-    if (!libere.length) return;
+    if (!libere.length) {
+      if (!attive.length) return;
+      vittima = (vittima + 1) % attive.length;
+      libera(vittima);
+    }
     const i = libere.pop();
     posizioni.set([x, y, z], i * 3);
     velocita.set([vx, vy, vz], i * 3);
@@ -101,7 +107,7 @@ export function creaNuvola(scena, texture, quante, additiva) {
         const i = attive[k];
         vite[i] += dt;
         const p = i * 3;
-        if (vite[i] >= durate[i] || posizioni[p + 1] < 0) {
+        if (vite[i] >= durate[i] || posizioni[p + 1] < quota(posizioni[p], posizioni[p + 2]) - 0.3) {
           libera(k);
           sporca = true;
           continue;

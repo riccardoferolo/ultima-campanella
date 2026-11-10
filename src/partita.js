@@ -16,7 +16,9 @@ import { griglia, nuovoCalcolo, avanzaCalcolo, campoDa, direzione } from './navi
 
 const PRIMO_ROUND_TRA = 3;
 const TOLLERANZA_DISTANZA = 0.8;
-const DANNO_MASSIMO_COLPO = 2000;
+const DANNO_MASSIMO_COLPO = 8000;
+const INSEGUI_A_VISTA = 14;
+const CELLA_CAMPO = 0.5;
 const AGGIORNA_CAMPO_OGNI = 0.25;
 const CELLE_CAMPO_PER_PASSO = 20000;
 const RESTA_A_TERRA_DA_MORTO = 4;
@@ -153,10 +155,16 @@ function aggiornaPosizioni(stato, posizioni) {
   }
 }
 
+const legata = arma => !!(ARMI[arma]?.teschio || ARMI[arma]?.famiglia === 'reliquia');
+
 function prendiArma(stato, giocatore, arma, eventi, extra = {}) {
   if (!giocatore.armi.includes(arma)) {
     if (giocatore.armi.length < armiPortate(giocatore.bevande)) giocatore.armi.push(arma);
-    else giocatore.armi[giocatore.armi.indexOf(giocatore.armaAttiva)] = arma;
+    else {
+      const attiva = giocatore.armi.indexOf(giocatore.armaAttiva);
+      const posto = legata(giocatore.armaAttiva) && !legata(arma) ? giocatore.armi.findIndex(a => !legata(a)) : attiva;
+      giocatore.armi[posto >= 0 ? posto : attiva] = arma;
+    }
   }
   giocatore.armaAttiva = arma;
   eventi.push({ k: 'acquisto', a: giocatore.id, arma, armi: [...giocatore.armi], ...extra });
@@ -245,6 +253,7 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
       giocatore.vitaMax = R.VITA_FERRO;
       giocatore.vita = R.VITA_FERRO;
     }
+    if (bevanda.ragnatela) Object.assign(giocatore, { granate: R.RAGNATELA_GRANATE, ricaricaRagnatela: 0 });
     eventi.push({ k: 'bevanda', a: giocatore.id, bevanda: acquisto.bevanda });
     return;
   }
@@ -381,7 +390,7 @@ function aggiornaProiettili(stato, dt, eventi) {
     const x = p.x + p.vx * dt;
     const y = p.y + p.vy * dt;
     const z = p.z + p.vz * dt;
-    const zombie = stato.zombie.some(v => v.stato !== 'morto' && Math.hypot(v.x - x, v.z - z) < RAGGIO_PROIETTILE && y < 2.4);
+    const zombie = stato.zombie.some(v => v.stato !== 'morto' && Math.hypot(v.x - x, v.z - z) < RAGGIO_PROIETTILE && y > quota(v.x, v.z) - 0.2 && y < quota(v.x, v.z) + 2.4);
     if (p.volo > 0 && !zombie && !urta(x, z, y, ostacoli) && y > quota(x, z) + 0.15 && y < tetto(x, z, { cielo: false }) - 0.1) {
       Object.assign(p, { x, y, z });
       return true;
@@ -399,7 +408,9 @@ function aggiornaProiettili(stato, dt, eventi) {
 
 function aggiornaBuchi(stato, dt, eventi) {
   if (stato.buchi.length === 0) return;
-  const schermi = ostacoliPerGiocatori(new Set(stato.porte)).filter(s => (s.altezza ?? ALTEZZA_SOFFITTO) >= ALTEZZA_SCHERMO_ESPLOSIONE);
+  const ostacoli = ostacoliPerGiocatori(new Set(stato.porte));
+  const indice = indiceScatole(ostacoli);
+  const schermi = ostacoli.filter(s => (s.altezza ?? ALTEZZA_SOFFITTO) >= ALTEZZA_SCHERMO_ESPLOSIONE);
   stato.buchi = stato.buchi.filter(buco => {
     const giocatore = stato.giocatori.find(g => g.id === buco.da);
     buco.timer -= dt;
@@ -415,8 +426,11 @@ function aggiornaBuchi(stato, dt, eventi) {
       z.trattenuto = 0.15;
       if (d > 0.3) {
         const passo = Math.min(d - 0.3, R.BUCO_ATTRAZIONE * dt);
-        z.x += ((buco.x - z.x) / d) * passo;
-        z.z += ((buco.z - z.z) / d) * passo;
+        const dx = ((buco.x - z.x) / d) * passo;
+        const dz = ((buco.z - z.z) / d) * passo;
+        const nuova = muoviCerchio(z, dx, dz, R.RAGGIO_ZOMBIE, scatoleIntorno(indice, z, R.RAGGIO_ZOMBIE, dx, dz));
+        z.x = nuova.x;
+        z.z = nuova.z;
       }
       if (ferisci && giocatore && d < R.BUCO_CUORE) ferisciZombie(stato, giocatore, z, Math.round(vitaZombie(Math.max(1, stato.round)) * FERITA_BUCO), {}, eventi);
     }
@@ -585,6 +599,29 @@ function vittoria(stato, eventi, portaDaRiaprire = 'rifugio') {
   });
 }
 
+const conRagnatela = giocatore => giocatore.bevande.some(b => BEVANDE[b]?.ragnatela);
+
+function tessi(stato, punto, raggio, eventi) {
+  eventi.push({ k: 'ragnatela', x: Math.round(punto.x * 100) / 100, z: Math.round(punto.z * 100) / 100, raggio });
+  for (const z of stato.zombie) {
+    if (z.stato === 'morto' || z.stato === 'emerge' || z.stato === 'scavalca' || distanza(z, punto) > raggio || !stessoPiano(z, punto)) continue;
+    if (tipoDi(z).boss) {
+      z.gelo = Math.max(z.gelo ?? 0, R.GELO_BOSS_MAX);
+      continue;
+    }
+    z.ragnatela = R.RAGNATELA_DURATA;
+    if (z.stato === 'attacco') z.stato = 'dentro';
+  }
+}
+
+function ragnatelaDifensiva(stato, giocatore, eventi) {
+  if (!conRagnatela(giocatore) || giocatore.granate <= 0) return false;
+  giocatore.granate -= 1;
+  tessi(stato, giocatore, R.RAGNATELA_DIFESA, eventi);
+  eventi.push({ k: 'ragnatelaDifesa', a: giocatore.id });
+  return true;
+}
+
 function lancia(stato, giocatore, azione, eventi) {
   if (giocatore.granate <= 0) return;
   giocatore.granate -= 1;
@@ -592,7 +629,7 @@ function lancia(stato, giocatore, azione, eventi) {
   stato.granate.push({
     id: stato.prossimaGranata++, x: giocatore.x, y: quota(giocatore.x, giocatore.z) + R.ALTEZZA_OCCHI - 0.15, z: giocatore.z,
     vx: d.x * R.VELOCITA_LANCIO, vy: d.y * R.VELOCITA_LANCIO + R.SPINTA_LANCIO, vz: d.z * R.VELOCITA_LANCIO,
-    timer: R.MICCIA_GRANATA, da: giocatore.id,
+    timer: R.MICCIA_GRANATA, da: giocatore.id, ragnatela: conRagnatela(giocatore),
   });
   eventi.push({ k: 'lancio', a: giocatore.id });
 }
@@ -631,7 +668,8 @@ function aggiornaGranate(stato, dt, eventi) {
     }
     gr.y = y;
     if (gr.timer > 0) return true;
-    esplodi(stato, gr, ostacoli, eventi);
+    if (gr.ragnatela) tessi(stato, gr, R.RAGNATELA_RAGGIO, eventi);
+    else esplodi(stato, gr, ostacoli, eventi);
     return false;
   });
 }
@@ -837,7 +875,7 @@ function avanzaFase(stato, dt, eventi) {
     if (stato.giungla) giungla.inizioRound(stato, eventi);
     if (stato.teatro) teatro.inizioRound(stato, eventi, S);
     for (const g of stato.giocatori) {
-      if (g.stato === 'vivo' && stato.round > 1) g.granate = Math.min(R.GRANATE_MASSIME, g.granate + R.GRANATE_PER_ROUND);
+      if (g.stato !== 'morto' && stato.round > 1 && !conRagnatela(g)) g.granate = Math.min(R.GRANATE_MASSIME, g.granate + R.GRANATE_PER_ROUND);
       if (g.stato !== 'morto') continue;
       const partenza = PARTENZE[0];
       Object.assign(g, { stato: 'vivo', vita: R.VITA, vitaMax: R.VITA, x: partenza.x, z: partenza.z, armi: [g.pistola], armaAttiva: g.pistola, bevande: [], rianimando: false, teletrasporto: g.teletrasporto + 1, granate: R.GRANATE_INIZIALI });
@@ -892,7 +930,10 @@ function aggiornaCampo(stato, porte, dt) {
     stato.ricicloCampo = { distanze: stato.calcoloCampo.distanze, coda: stato.calcoloCampo.coda };
     stato.calcoloCampo = null;
   }
+  const chiave = vivi(stato).map(p => `${Math.floor(p.x / CELLA_CAMPO)},${Math.floor(p.z / CELLA_CAMPO)}`).join('|');
+  if (!stato.calcoloCampo && stato.campo && stato.attesaCampo <= 0 && stato.grigliaCampo === g && chiave === stato.chiaveCampo) stato.attesaCampo = AGGIORNA_CAMPO_OGNI;
   if (!stato.calcoloCampo && (!stato.campo || stato.attesaCampo <= 0 || stato.grigliaCampo !== g)) {
+    stato.chiaveCampo = chiave;
     stato.calcoloCampo = nuovoCalcolo(g, vivi(stato), stato.ricicloCampo ?? null);
     stato.grigliaCampo = g;
     stato.ricicloCampo = null;
@@ -925,6 +966,11 @@ function muoviZombie(stato, dt, eventi) {
     }
     if (z.scossa > 0 && z.stato !== 'morto') {
       z.scossa -= dt;
+      continue;
+    }
+    if (z.ragnatela > 0 && z.stato !== 'morto') {
+      z.ragnatela -= dt;
+      if (z.stato === 'attacco') z.stato = 'dentro';
       continue;
     }
     const lentezza = 1 - Math.min(0.85, z.gelo ?? 0);
@@ -985,7 +1031,7 @@ function muoviZombie(stato, dt, eventi) {
       if (vicino) z.yaw = Math.atan2(vicino.g.x - z.x, vicino.g.z - z.z);
       if (z.timer > 0) continue;
       const bersaglio = stato.giocatori.find(g => g.id === z.bersaglio && g.stato === 'vivo');
-      if (bersaglio && distanza(bersaglio, z) <= portata + 0.4) ferisci(stato, bersaglio, eventi, R.DANNO_ZOMBIE * dati.danno * (stato.giungla ? fattoreGiungla(R.GIUNGLA_DANNO, stato.round) : 1));
+      if (bersaglio && distanza(bersaglio, z) <= portata + 0.4 && !ragnatelaDifensiva(stato, bersaglio, eventi)) ferisci(stato, bersaglio, eventi, R.DANNO_ZOMBIE * dati.danno * (stato.giungla ? fattoreGiungla(R.GIUNGLA_DANNO, stato.round) : 1));
       z.stato = 'dentro';
       z.attesa = R.ATTESA_ATTACCO * (dati.attesa ?? 1) * (furia ? 0.7 : 1);
       continue;
@@ -1002,7 +1048,7 @@ function muoviZombie(stato, dt, eventi) {
     const preda = dati.finale ? scatto(stato, z, dt, ostacoli, eventi) : null;
     const verso = preda
       ? { x: (preda.x - z.x) / (distanza(preda, z) || 1), z: (preda.z - z.z) / (distanza(preda, z) || 1) }
-      : vicino && vicino.d < 1.5 ? { x: (vicino.g.x - z.x) / vicino.d, z: (vicino.g.z - z.z) / vicino.d } : direzione(stato.campo, z.x, z.z);
+      : vicino && vicino.d < 1.5 ? { x: (vicino.g.x - z.x) / vicino.d, z: (vicino.g.z - z.z) / vicino.d } : direzione(stato.campo, z.x, z.z) ?? versoAVista(stato, z);
     if (!verso) continue;
     const passoX = verso.x * velocita * dt;
     const passoZ = verso.z * velocita * dt;
@@ -1013,6 +1059,16 @@ function muoviZombie(stato, dt, eventi) {
   }
   separa(stato.zombie.filter(z => z.stato === 'dentro' || z.stato === 'arriva' || z.stato === 'assi'));
   stato.zombie = stato.zombie.filter(z => z.stato !== 'morto' || z.timer > 0);
+}
+
+function versoAVista(stato, z) {
+  let migliore = null;
+  for (const g of vivi(stato)) {
+    const d = distanza(g, z);
+    if (d < 0.05 || d > INSEGUI_A_VISTA || !stessoPiano(g, z) || (migliore && d >= migliore.d)) continue;
+    migliore = { d, x: (g.x - z.x) / d, z: (g.z - z.z) / d };
+  }
+  return migliore;
 }
 
 function scatto(stato, z, dt, ostacoli, eventi) {
@@ -1043,10 +1099,16 @@ function separa(zombie) {
     for (let j = i + 1; j < zombie.length; j++) {
       const a = zombie[i];
       const b = zombie[j];
-      const dx = b.x - a.x;
-      const dz = b.z - a.z;
-      const d = Math.hypot(dx, dz);
-      if (d >= SEPARAZIONE || d < 1e-6) continue;
+      let dx = b.x - a.x;
+      let dz = b.z - a.z;
+      let d = Math.hypot(dx, dz);
+      if (d >= SEPARAZIONE) continue;
+      if (d < 1e-6) {
+        const angolo = ((a.id * 7 + b.id * 13) % 360) * (Math.PI / 180);
+        dx = Math.cos(angolo) * 1e-3;
+        dz = Math.sin(angolo) * 1e-3;
+        d = 1e-3;
+      }
       const spinta = (SEPARAZIONE - d) / 2;
       const fermaA = a.stato === 'assi';
       const fermaB = b.stato === 'assi';
@@ -1064,8 +1126,8 @@ function ferisci(stato, giocatore, eventi, danno = R.DANNO_ZOMBIE) {
   Object.assign(giocatore, { stato: 'terra', vita: 0, timerTerra: R.TEMPO_A_TERRA, bevande: [], vitaMax: R.VITA, progressoRianimazione: 0, rianimando: false });
   eventi.push({ k: 'aTerra', a: giocatore.id });
   if (giocatore.armi.length <= armiPortate()) return;
-  const legate = giocatore.armi.filter(a => ARMI[a]?.teschio);
-  giocatore.armi = [...giocatore.armi.filter(a => !ARMI[a]?.teschio).slice(0, armiPortate() - legate.length), ...legate];
+  const legate = giocatore.armi.filter(legata);
+  giocatore.armi = [...giocatore.armi.filter(a => !legata(a)).slice(0, Math.max(0, armiPortate() - legate.length)), ...legate];
   if (!giocatore.armi.includes(giocatore.armaAttiva)) giocatore.armaAttiva = giocatore.armi[0];
   eventi.push({ k: 'armi', a: giocatore.id, armi: [...giocatore.armi], arma: giocatore.armaAttiva });
 }
@@ -1073,6 +1135,14 @@ function ferisci(stato, giocatore, eventi, danno = R.DANNO_ZOMBIE) {
 function aggiornaGiocatori(stato, dt, eventi) {
   for (const g of stato.giocatori) {
     g.attesaAssa = Math.max(0, g.attesaAssa - dt);
+    if (g.stato === 'vivo' && conRagnatela(g) && g.granate < R.RAGNATELA_GRANATE) {
+      g.ricaricaRagnatela = (g.ricaricaRagnatela ?? 0) + dt;
+      if (g.ricaricaRagnatela >= R.RAGNATELA_OGNI) {
+        g.ricaricaRagnatela = 0;
+        g.granate += 1;
+        eventi.push({ k: 'ragnatelaPronta', a: g.id });
+      }
+    }
     if (g.stato === 'vivo' && stato.tempo - g.ultimoDanno > R.RIGENERA_DOPO) {
       g.vita = Math.min(g.vitaMax, g.vita + R.RIGENERA_AL_SECONDO * dt);
     }

@@ -27,8 +27,9 @@ function inGioco() {
 }
 
 test('sei bibite, ognuna con la sua macchinetta in una zona vera', () => {
-  assert.equal(Object.keys(BEVANDE).length, 6);
-  for (const b of Object.keys(BEVANDE)) {
+  const comuni = Object.keys(BEVANDE).filter(b => !BEVANDE[b].mappa);
+  assert.equal(comuni.length, 6);
+  for (const b of comuni) {
     const macchina = ACQUISTI.find(a => a.tipo === 'bevanda' && a.bevanda === b);
     assert.ok(macchina, `${b} senza macchinetta`);
     assert.ok(ZONE.some(z => z.id === macchina.zona), b);

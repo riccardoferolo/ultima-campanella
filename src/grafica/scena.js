@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { R } from '../regole.js';
-import { ZONE, ATMOSFERA, mappaAttiva, usaMappa, quota } from '../mappa.js';
+import { R, ARMI } from '../regole.js';
+import { ZONE, ATMOSFERA, ACQUISTI, mappaAttiva, usaMappa, quota } from '../mappa.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA, TEXTURE_TEATRO, TEXTURE_PALUDE } from './texture.js';
 import { caricaGiungla, costruisciGiungla } from './giungla3d.js';
@@ -17,6 +17,7 @@ import { caricaZombi, creaGestoreZombi } from './zombi3d.js';
 import { caricaPersonaggi, creaCompagno } from './compagno3d.js';
 import { caricaOggetti, costruisciArredi, costruisciSala, creaBonus3d, creaSegreti } from './extra3d.js';
 import { creaEffetti } from './effetti.js';
+import { creaRagnatele } from './palude/ragnatele3d.js';
 import { creaVista1p } from './vista1p.js';
 
 const CONTROLLI_PRIMA_DI_SCENDERE = 3;
@@ -141,9 +142,10 @@ function creaGranate3d(scena) {
   const verde = new THREE.MeshStandardMaterial({ color: 0x3f4a2c, roughness: 0.55, metalness: 0.25 });
   const metallo = new THREE.MeshStandardMaterial({ color: 0x9a9a92, roughness: 0.35, metalness: 0.85 });
   const visibili = new Map();
-  function crea() {
+  const nera = new THREE.MeshStandardMaterial({ color: 0x0d0909, roughness: 0.35, metalness: 0.3, emissive: 0x7a0a10, emissiveIntensity: 0.5 });
+  function crea(ragnatela) {
     const g = new THREE.Group();
-    const c = new THREE.Mesh(corpo, verde);
+    const c = new THREE.Mesh(corpo, ragnatela ? nera : verde);
     const t = new THREE.Mesh(tappo, metallo);
     t.position.y = RAGGIO_BOMBA * 1.25 + 0.012;
     const l = new THREE.Mesh(leva, metallo);
@@ -158,7 +160,7 @@ function creaGranate3d(scena) {
       const presenti = new Set();
       for (const gr of granate ?? []) {
         presenti.add(gr.id);
-        const g = visibili.get(gr.id) ?? crea();
+        const g = visibili.get(gr.id) ?? crea(gr.ragnatela);
         visibili.set(gr.id, g);
         const prima = g.position.clone();
         g.position.set(gr.x, gr.y, gr.z);
@@ -247,6 +249,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   ]);
   const mappaPrima = mappaAttiva;
   usaMappa(mappa);
+  const bevandeMappa = [...new Set(ACQUISTI.filter(q => q.tipo === 'bevanda').map(q => q.bevanda))];
   const materialiArmi = creaMaterialiArmi(texture, libreria);
   const vuoto = { aggiorna() {}, suona() {} };
   const mondoMappa = giungla
@@ -282,11 +285,13 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const zombi = creaGestoreZombi(scena, risorseZombi);
   const effetti = creaEffetti(scena);
   const granate3d = creaGranate3d(scena);
+  const ragnatele = creaRagnatele(scena);
   const vuoto3d = creaVuoto3d(scena, effetti);
   const vista1p = creaVista1p(materialiArmi);
   vista1p.scena.environment = ambiente;
   vista1p.scena.environmentIntensity = 0.5;
   vista1p.mostra('pistola');
+  vista1p.precarica(mappa === 'palude' ? Object.keys(ARMI).filter(t => ARMI[t].teschio) : [], bevandeMappa);
   precompila(renderer, scena, camera, [...[...risorseZombi.values()].map(r => clonaScheletro(r.modello)), ...personaggi.map(p => clonaScheletro(p.modello))]);
   precompila(renderer, vista1p.scena, vista1p.camera, []);
   const compagni = new Map();
@@ -392,6 +397,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
     mondoMappa.aggiorna(vista, dt, tempo, camera.position);
     zombi.aggiorna(vista, dt);
     granate3d.aggiorna(vista.granate, dt);
+    ragnatele.aggiorna(vista, dt);
     vuoto3d.aggiorna(vista, dt);
     bonus3d.aggiorna(vista, dt);
     segreti.aggiorna(vista, dt);
@@ -489,8 +495,8 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
       zombi.nascondi(id);
       effetti.ghiaccio(new THREE.Vector3(x, 1, z));
     },
-    fulmine(punti) {
-      effetti.fulmine(punti.map(p => new THREE.Vector3(p.x, p.y, p.z)));
+    fulmine(punti, colore) {
+      effetti.fulmine(punti.map(p => new THREE.Vector3(p.x, p.y, p.z)), colore);
     },
     decapita(id) {
       const punto = zombi.decapita(id);
@@ -499,10 +505,12 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
       effetti.sangue(punto, SU);
     },
     effetti,
+    ragnatela: (x, z, raggio) => ragnatele.scoppio(x, z, raggio),
     svuota() {
       suoloVista = null;
       zombi.svuota();
       granate3d.svuota();
+      ragnatele.svuota();
       vuoto3d.svuota();
       effetti.svuota();
       bonus3d.svuota();

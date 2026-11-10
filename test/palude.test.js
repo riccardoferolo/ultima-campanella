@@ -8,7 +8,7 @@ import { valida } from '../src/rete/protocollo.js';
 import { griglia, campoVerso, distanzaCampo } from '../src/navigazione.js';
 import { dentroScatola } from '../src/fisica.js';
 import { interazioneVicina } from '../src/interazioni.js';
-import { GRATA_LABORATORIO, RADICI } from '../src/palude.js';
+import { GRATA_LABORATORIO, RADICI, PASSO } from '../src/palude.js';
 import { MISSIONE } from '../src/mappe/palude.js';
 
 const PASSO_FUGA = 0.25;
@@ -247,7 +247,10 @@ test('una porta aperta mentre il percorso si calcola entra subito nel percorso d
   const oltre = { x: -46, z: -24 };
   stato.porte.push(...PORTE.filter(p => p.id !== RADICI).map(p => p.id));
   avanza(stato, 1);
-  for (let i = 0; i < 60 && !stato.calcoloCampo; i++) avanza(stato, R.PASSO);
+  for (let i = 0; i < 60 && !stato.calcoloCampo; i++) {
+    stato.giocatori[0].x += i % 2 ? -0.6 : 0.6;
+    avanza(stato, R.PASSO);
+  }
   assert.ok(stato.calcoloCampo, 'nessun calcolo in corso');
   const prima = distanzaCampo(stato.campo, oltre.x, oltre.z);
   assert.ok(Number.isFinite(prima));
@@ -257,26 +260,61 @@ test('una porta aperta mentre il percorso si calcola entra subito nel percorso d
   assert.ok(passi * R.PASSO < 0.2, `percorso aggiornato dopo ${passi} passi`);
 });
 
-test('implosione: costa tre anime, uccide il bersaglio e ferisce chi gli sta intorno; le uccisioni ridanno anime', () => {
+test('raggio del Teschio: un tocco costa un’anima e uccide solo lo zombie colpito; le uccisioni ridanno anime', () => {
   const stato = conTeschio();
   const g = stato.giocatori[0];
   stato.round = 5;
   const bersaglio = zombieA(stato, g.x, g.z - 10, { vita: 5000, vitaMax: 5000 });
   const vicino = zombieA(stato, g.x + 1.5, g.z - 10, { vita: 300, vitaMax: 300 });
-  const lontano = zombieA(stato, g.x + 8, g.z - 10, { vita: 300, vitaMax: 300 });
   const eventi = avanza(stato, R.PASSO, { azioni: [{ da: 'a', tipo: 'teschio', zombie: bersaglio.id }] });
-  assert.ok(eventi.some(e => e.k === 'implosioneTeschio'));
+  assert.ok(eventi.some(e => e.k === 'raggioTeschio' && e.ucciso));
   assert.equal(bersaglio.stato, 'morto');
-  assert.equal(vicino.stato, 'morto');
-  assert.equal(lontano.stato, 'dentro');
-  assert.equal(g.anime, R.TESCHIO_ANIME_INIZIALI - R.TESCHIO_COSTO + 2);
-  g.anime = 2;
-  const altro = zombieA(stato, g.x, g.z - 5);
-  avanza(stato, R.PASSO, { azioni: [{ da: 'a', tipo: 'teschio', zombie: altro.id }] });
-  assert.equal(altro.stato, 'dentro', 'senza anime non implode');
+  assert.equal(vicino.stato, 'dentro', 'il raggio base non fa danni intorno');
+  assert.equal(g.anime, R.TESCHIO_ANIME_INIZIALI - R.TESCHIO_COSTO_RAGGIO + 1);
+  avanza(stato, R.TESCHIO_ATTESA_RAGGIO + 0.05);
+  g.anime = 0;
+  avanza(stato, R.PASSO, { azioni: [{ da: 'a', tipo: 'teschio', zombie: vicino.id }] });
+  assert.equal(vicino.stato, 'dentro', 'senza anime non spara');
   g.anime = R.TESCHIO_ANIME_MAX;
-  uccidi(stato, altro);
+  uccidi(stato, vicino);
   assert.equal(g.anime, R.TESCHIO_ANIME_MAX, 'le anime hanno un massimo');
+});
+
+test('carica del Teschio: tenendo premuto gli zombie davanti levitano e dopo tre secondi esplodono', () => {
+  const stato = conTeschio();
+  const g = stato.giocatori[0];
+  Object.assign(g, { x: 0, z: 5, yaw: 0, anime: R.TESCHIO_ANIME_MAX });
+  const davantiA = [zombieA(stato, 0, 11), zombieA(stato, 1, 14), zombieA(stato, -1, 17)];
+  const dietro = zombieA(stato, 0, 2.6, { trattenuto: 99 });
+  avanza(stato, R.PASSO, { azioni: [{ da: 'a', tipo: 'teschio', carica: true }] });
+  assert.equal(g.anime, R.TESCHIO_ANIME_MAX - R.TESCHIO_COSTO);
+  avanza(stato, 1);
+  for (const z of davantiA) assert.ok(z.levita > 0, `lo zombie ${z.id} levita`);
+  assert.ok(!(dietro.levita > 0), 'chi sta alle spalle resta a terra');
+  const ist = JSON.parse(JSON.stringify(faiIstantanea(stato)));
+  assert.notEqual(valida({ t: 'st', g: 1, ist }), null, 'lo snapshot con zombie sollevati resta valido');
+  const vista = espandi(ist);
+  assert.ok(vista.palude.levitati[davantiA[0].id].p > 0, 'il client vede la levitazione');
+  const eventi = avanza(stato, R.TESCHIO_DURATA_CARICA);
+  const scoppio = eventi.find(e => e.k === 'esplosioneTeschio');
+  assert.equal(scoppio?.punti.length, 3);
+  for (const z of davantiA) assert.equal(z.stato, 'morto');
+  assert.equal(dietro.stato, 'dentro');
+});
+
+test('carica del Teschio: lasciando prima dei tre secondi gli zombie ricadono vivi', () => {
+  const stato = conTeschio();
+  const g = stato.giocatori[0];
+  Object.assign(g, { x: 0, z: 5, yaw: 0, anime: R.TESCHIO_ANIME_MAX });
+  const z = zombieA(stato, 0, 11);
+  avanza(stato, R.PASSO, { azioni: [{ da: 'a', tipo: 'teschio', carica: true }] });
+  avanza(stato, 1.5);
+  assert.ok(z.levita > 0);
+  avanza(stato, R.PASSO, { azioni: [{ da: 'a', tipo: 'teschio', carica: false }] });
+  avanza(stato, R.TESCHIO_DURATA_CARICA);
+  assert.equal(z.stato, 'dentro');
+  assert.equal(z.levita, 0);
+  assert.deepEqual(stato.palude.cariche, {});
 });
 
 test('le radici bruciano solo col Teschio in mano e tre anime; munizioni e potenziatore non toccano il Teschio', () => {
@@ -316,23 +354,27 @@ test('istantanea e protocollo portano anime, altare e colpo del Teschio', () => 
 
 const tutteAperte = stato => stato.porte.push(...PORTE.filter(p => !p.chiusa && !stato.porte.includes(p.id)).map(p => p.id));
 const scegli = (stato, elemento, id = 'a') => {
-  metti(stato, davanti(acquisto(`santuario-${elemento}`)), id);
-  return compra(stato, `santuario-${elemento}`, id);
+  metti(stato, davanti(acquisto(`reliquia-${elemento}`)), id);
+  return compra(stato, `reliquia-${elemento}`, id);
 };
 
-test('elementi: uno a testa e nessuno lo sceglie due volte', () => {
-  const stato = conTeschio([{ id: 'a', nome: 'A' }, { id: 'b', nome: 'B' }]);
+test('reliquie: i piedistalli del tempio danno una reliquia a testa, solo a chi ha il Teschio', () => {
+  const stato = conTeschio([{ id: 'a', nome: 'A' }, { id: 'b', nome: 'B' }, { id: 'c', nome: 'C' }]);
   tutteAperte(stato);
-  assert.ok(scegli(stato, 'fuoco', 'a').some(e => e.k === 'elementoScelto'));
+  const c = stato.giocatori.find(g => g.id === 'c');
+  Object.assign(c, { armi: [c.armi[0]], armaAttiva: c.armi[0] });
+  assert.ok(scegli(stato, 'fuoco', 'a').some(e => e.k === 'reliquiaPresa'));
   scegli(stato, 'fuoco', 'b');
-  assert.equal(stato.palude.elementi.fuoco.da, 'a', 'il fuoco resta di chi lo ha preso');
+  assert.equal(stato.palude.elementi.fuoco.da, 'a', 'la reliquia resta di chi la prende');
   scegli(stato, 'ghiaccio', 'a');
-  assert.equal(stato.palude.elementi.ghiaccio.da, '', 'chi ha un elemento non ne prende un altro');
+  assert.equal(stato.palude.elementi.ghiaccio.da, '', 'una reliquia a testa');
   scegli(stato, 'ghiaccio', 'b');
   assert.equal(stato.palude.elementi.ghiaccio.da, 'b');
+  scegli(stato, 'vento', 'c');
+  assert.equal(stato.palude.elementi.vento.da, '', 'senza Teschio il piedistallo dorme');
 });
 
-test('prova del fuoco: tre bracieri col Teschio, quindici uccisioni vicino ai bracieri, poi l’infusione', () => {
+test('Cuore di Brace: tre bracieri, dodici uccisioni, difesa nella fornace, statua accesa, infusione e Teschio di Fuoco', () => {
   const stato = conTeschio();
   tutteAperte(stato);
   const g = stato.giocatori[0];
@@ -345,28 +387,51 @@ test('prova del fuoco: tre bracieri col Teschio, quindici uccisioni vicino ai br
   }
   const el = stato.palude.elementi.fuoco;
   assert.deepEqual(el.oggetti, [true, true, true]);
-  assert.equal(el.passo, 1);
+  assert.equal(el.passo, PASSO.ANIME);
   const braciere = acquisto('prova-fuoco-1').posizione;
   uccidi(stato, zombieA(stato, braciere.x + 12, braciere.z + 1));
   assert.equal(el.contatore, 0, 'lontano dai bracieri non conta');
   for (let i = 0; i < R.ELEMENTO_UCCISIONI; i++) uccidi(stato, zombieA(stato, braciere.x + 2, braciere.z + 1));
-  assert.equal(el.passo, 2);
+  assert.equal(el.passo, PASSO.DIFESA);
+  const fornace = acquisto('difesa-fuoco');
+  metti(stato, davanti(fornace));
+  assert.ok(compra(stato, fornace.id).some(e => e.k === 'reliquiaPosata'));
+  avanza(stato, R.RELIQUIA_DIFESA / 2);
+  const morso = zombieA(stato, fornace.posizione.x + 0.5, fornace.posizione.z, { trattenuto: 99 });
+  const meta = el.progresso;
+  avanza(stato, 2);
+  assert.ok(el.progresso < meta, 'uno zombie sulla reliquia la consuma');
+  stato.zombie = stato.zombie.filter(z => z !== morso);
+  metti(stato, { x: 20, z: 60 });
+  const fermo = el.progresso;
+  avanza(stato, 2);
+  assert.equal(el.progresso, fermo, 'senza nessuno vicino la carica si ferma');
+  metti(stato, davanti(fornace));
+  avanza(stato, R.RELIQUIA_DIFESA);
+  assert.equal(el.passo, PASSO.RIPORTA);
+  assert.ok(scegli(stato, 'fuoco').some(e => e.k === 'statuaAccesa'));
+  assert.equal(el.passo, PASSO.ACCESA);
   g.armaAttiva = 'teschio';
+  scegli(stato, 'fuoco');
+  assert.equal(el.passo, PASSO.INFUSIONE);
+  assert.ok(!g.armi.includes('teschio'), 'il Teschio resta sul piedistallo');
+  avanza(stato, R.RELIQUIA_INFUSIONE + 0.1);
+  assert.equal(el.passo, PASSO.PRONTO);
   const eventi = scegli(stato, 'fuoco');
   assert.ok(eventi.some(e => e.k === 'elementoInfuso'));
   assert.equal(g.armaAttiva, 'teschioFuoco');
   assert.ok(g.armi.includes('teschioFuoco') && !g.armi.includes('teschio'));
 });
 
-test('le altre prove contano le uccisioni giuste: laboratorio, mausoleo, passerelle', () => {
+test('le altre reliquie contano le uccisioni giuste: tempio, mausoleo, passerelle', () => {
   const stato = conTeschio([{ id: 'a', nome: 'A' }, { id: 'b', nome: 'B' }, { id: 'c', nome: 'C' }]);
   tutteAperte(stato);
   scegli(stato, 'ghiaccio', 'a');
   scegli(stato, 'vuoto', 'b');
   scegli(stato, 'vento', 'c');
-  for (const e of ['ghiaccio', 'vuoto', 'vento']) Object.assign(stato.palude.elementi[e], { passo: 1, oggetti: [true, true, true] });
-  metti(stato, { x: -35, z: 0 }, 'a');
-  uccidi(stato, zombieA(stato, -36, -2), 'a');
+  for (const e of ['ghiaccio', 'vuoto', 'vento']) Object.assign(stato.palude.elementi[e], { passo: PASSO.ANIME, oggetti: [true, true, true] });
+  metti(stato, { x: -40, z: -12 }, 'a');
+  uccidi(stato, zombieA(stato, -40, -14), 'a');
   uccidi(stato, zombieA(stato, 0, 10), 'a');
   assert.equal(stato.palude.elementi.ghiaccio.contatore, 1);
   uccidi(stato, zombieA(stato, -50, 43), 'b');
@@ -383,8 +448,7 @@ function elementale(elemento) {
   const stato = conTeschio();
   tutteAperte(stato);
   scegli(stato, elemento);
-  Object.assign(stato.palude.elementi[elemento], { passo: 2, oggetti: [true, true, true] });
-  stato.giocatori[0].armaAttiva = 'teschio';
+  Object.assign(stato.palude.elementi[elemento], { passo: PASSO.PRONTO, oggetti: [true, true, true] });
   scegli(stato, elemento);
   Object.assign(stato.giocatori[0], { anime: R.TESCHIO_ANIME_MAX, x: 0, z: 10 });
   stato.round = 4;
@@ -394,8 +458,8 @@ const colpisciTeschio = (stato, zombie) => avanza(stato, R.PASSO, { azioni: [{ d
 
 test('Ghiaccio: congela chi sta intorno, poi le statue si frantumano', () => {
   const stato = elementale('ghiaccio');
-  const bersaglio = zombieA(stato, 0, 2);
-  const vicini = [zombieA(stato, 2, 2, { vita: 9000, vitaMax: 9000 }), zombieA(stato, -2, 3, { vita: 9000, vitaMax: 9000 })];
+  const bersaglio = zombieA(stato, 0, 5);
+  const vicini = [zombieA(stato, 2, 5, { vita: 9000, vitaMax: 9000 }), zombieA(stato, -2, 6, { vita: 9000, vitaMax: 9000 })];
   colpisciTeschio(stato, bersaglio);
   assert.equal(bersaglio.stato, 'morto');
   for (const z of vicini) assert.ok(z.gelato > 0, 'congelato');
@@ -405,8 +469,8 @@ test('Ghiaccio: congela chi sta intorno, poi le statue si frantumano', () => {
 
 test('Fuoco: incendia il gruppo, brucia nel tempo e lascia una chiazza che si spegne', () => {
   const stato = elementale('fuoco');
-  const bersaglio = zombieA(stato, 0, 2);
-  const vicino = zombieA(stato, 2, 2, { vita: 900, vitaMax: 900 });
+  const bersaglio = zombieA(stato, 0, 5);
+  const vicino = zombieA(stato, 2, 5, { vita: 900, vitaMax: 900 });
   colpisciTeschio(stato, bersaglio);
   assert.ok(vicino.ardore > 0);
   assert.equal(stato.palude.fuochi.length, 1);
@@ -417,15 +481,15 @@ test('Fuoco: incendia il gruppo, brucia nel tempo e lascia una chiazza che si sp
   assert.equal(stato.palude.fuochi.length, 0);
 });
 
-test('Vuoto: apre un buco nero che risucchia e implode', () => {
+test('Vuoto: il raggio implode e risucchia chi è vicino; la carica apre un buco nero', () => {
   const stato = elementale('vuoto');
-  const bersaglio = zombieA(stato, 0, 2);
-  const lontano = zombieA(stato, 5, 2, { vita: 50, vitaMax: 50 });
+  const bersaglio = zombieA(stato, 0, 5);
+  const vicino = zombieA(stato, 3, 5, { vita: 50, vitaMax: 50 });
   colpisciTeschio(stato, bersaglio);
+  assert.equal(vicino.stato, 'morto');
+  avanza(stato, R.PASSO, { azioni: [{ da: 'a', tipo: 'teschio', carica: true }] });
   assert.equal(stato.buchi.length, 1);
   assert.equal(stato.buchi[0].raggio, R.VUOTO_RAGGIO);
-  avanza(stato, R.BUCO_DURATA + 0.2);
-  assert.equal(lontano.stato, 'morto');
 });
 
 test('Vento: l’onda d’urto scaraventa via e stordisce', () => {
@@ -462,7 +526,24 @@ test('istantanea e protocollo portano elementi, fuochi e zombie in fiamme', () =
   assert.notEqual(valida({ t: 'st', g: 3, ist }), null);
   const vista = espandi(ist);
   assert.equal(vista.palude.elementi.fuoco.da, 'a');
-  assert.equal(vista.palude.elementi.fuoco.passo, 3);
+  assert.equal(vista.palude.elementi.fuoco.passo, PASSO.FATTO);
   assert.equal(vista.palude.fuochi.length, 1);
   assert.ok(vista.palude.ardenti.length >= 1);
+});
+
+test('una reliquia posata e lasciata sola torna a chi la porta e il round può finire', () => {
+  const stato = conTeschio();
+  tutteAperte(stato);
+  scegli(stato, 'vento');
+  const el = stato.palude.elementi.vento;
+  Object.assign(el, { passo: PASSO.DIFESA, oggetti: [true, true, true] });
+  const cerchio = acquisto('difesa-vento');
+  metti(stato, davanti(cerchio));
+  compra(stato, cerchio.id);
+  assert.ok(el.posata);
+  metti(stato, { x: 0, z: 58 });
+  const eventi = avanza(stato, R.RELIQUIA_ABBANDONO + 0.5);
+  assert.ok(eventi.some(e => e.k === 'reliquiaAbbandonata'));
+  assert.equal(el.posata, false);
+  assert.equal(el.passo, PASSO.DIFESA, 'il passo resta da rifare');
 });

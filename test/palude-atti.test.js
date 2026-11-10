@@ -48,15 +48,16 @@ test('capanna: il miasma ferisce, le bombole esplodono col Teschio e liberano l�
   metti(stato, MISSIONE.MIASMA);
   assert.ok(avanza(stato, 1.1).some(e => e.k === 'ferito' && e.a === 'a'), 'il miasma non fa male');
   metti(stato, vicinoA(MISSIONE.BOMBOLE[0], 0, 6));
-  g.armaAttiva = g.armi[0];
+  const armi = g.armi;
+  Object.assign(g, { armi: [armi[0]], armaAttiva: armi[0] });
   azione(stato, { tipo: 'teschio', oggetto: 'bombola-0' });
-  assert.equal(stato.palude.sigilli.bombole[0], false, 'senza Teschio in mano non esplode');
-  g.armaAttiva = 'teschio';
+  assert.equal(stato.palude.sigilli.bombole[0], false, 'senza Teschio non esplode');
+  Object.assign(g, { armi, armaAttiva: armi[0] });
   const eventi = azione(stato, { tipo: 'teschio', oggetto: 'bombola-0' });
   assert.ok(eventi.some(e => e.k === 'bombola' && e.indice === 0));
-  assert.equal(g.anime, R.TESCHIO_ANIME_MAX - R.TESCHIO_COSTO);
+  assert.equal(g.anime, R.TESCHIO_ANIME_MAX - R.TESCHIO_COSTO_RAGGIO);
   azione(stato, { tipo: 'teschio', oggetto: 'bombola-0' });
-  assert.equal(g.anime, R.TESCHIO_ANIME_MAX - R.TESCHIO_COSTO, 'una bombola esplode una volta sola');
+  assert.equal(g.anime, R.TESCHIO_ANIME_MAX - R.TESCHIO_COSTO_RAGGIO, 'una bombola esplode una volta sola');
   for (const i of [1, 2]) {
     g.anime = R.TESCHIO_ANIME_MAX;
     metti(stato, vicinoA(MISSIONE.BOMBOLE[i], 0, 6));
@@ -321,8 +322,18 @@ test('fase 3: solo il Teschio carico al massimo la ferisce; con l’ultimo colpo
   assert.equal(stato.palude.tana.fase, 4);
   assert.ok(stato.zombie.every(z => z.stato === 'morto'));
   const fine = avanza(stato, 8);
-  assert.ok(fine.some(e => e.k === 'vittoria'));
-  assert.equal(stato.fase, 'vinta');
+  assert.ok(fine.some(e => e.k === 'missioneCompiuta'), 'missione compiuta');
+  assert.ok(!fine.some(e => e.k === 'vittoria'), 'la partita non finisce');
+  assert.equal(stato.fase, 'intervallo');
+  assert.equal(stato.palude.tana.fase, 5);
+  for (const g of stato.giocatori) assert.ok(g.z > -98, `${g.id} è tornato nella palude`);
+  const round = stato.round;
+  avanza(stato, R.INTERVALLO + 0.2);
+  assert.equal(stato.fase, 'gioco');
+  assert.equal(stato.round, round + 1, 'riparte il round successivo');
+  metti(stato, davanti(acquisto('varco')));
+  compra(stato, 'varco');
+  assert.equal(stato.fase, 'gioco', 'nella tana non si torna');
 });
 
 test('istantanea e protocollo portano totem, tana, colpi, pozze e ragnatele', () => {

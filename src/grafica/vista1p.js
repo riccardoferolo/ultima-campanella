@@ -149,6 +149,7 @@ export function creaVista1p(materialiArmi) {
     attuale = tipo;
   }
 
+  const morbido = { cambio: 0, corsa: 0, mira: 0 };
   return {
     scena,
     camera,
@@ -164,6 +165,24 @@ export function creaVista1p(materialiArmi) {
       tempoLampo = DURATA_LAMPO * (lampoForte ? 1.6 : 1);
       lampo.scale.setScalar((modelli.get(attuale)?.colore ? 0.24 : 0.18) * (lampoForte ? LAMPO_POMPA : 1));
       lampo.material.rotation = Math.random() * Math.PI;
+    },
+    precarica(tipi, bevande) {
+      for (const tipo of tipi) {
+        if (modelli.has(tipo)) continue;
+        const m = modelloArma(tipo, materialiArmi);
+        m.gruppo.visible = false;
+        supporto.add(m.gruppo);
+        modelli.set(tipo, m);
+      }
+      for (const tipo of bevande) {
+        if (bottiglie.has(tipo)) continue;
+        const b = creaBottiglia(tipo);
+        b.gruppo.position.set(0.004, -0.115, 0.012);
+        b.gruppo.scale.setScalar(0.9);
+        b.gruppo.visible = false;
+        presaBottiglia.add(b.gruppo);
+        bottiglie.set(tipo, b);
+      }
     },
     get calcio() { return calcio; },
     get lampoForte() { return lampoForte; },
@@ -265,6 +284,9 @@ export function creaVista1p(materialiArmi) {
       return posa;
     },
     aggiorna({ dt, movimento, mira, ricarica, cambio, coltellata, corsa, colpiRicarica = 0 }) {
+      morbido.cambio += (cambio - morbido.cambio) * Math.min(1, dt * 16);
+      morbido.corsa += ((corsa ? 1 : 0) - morbido.corsa) * Math.min(1, dt * 10);
+      morbido.mira += ((mira ? 1 : 0) - morbido.mira) * Math.min(1, dt * 14);
       passo += dt * (corsa ? 14 : 9) * movimento;
       tempo += dt;
       modelli.get(attuale)?.gruppo.userData.anima?.(tempo);
@@ -278,13 +300,13 @@ export function creaVista1p(materialiArmi) {
       const posa = ricarica > 0 && modelli.has(attuale) ? this.posaRicarica(ricarica, colpiRicarica) : null;
       supporto.position.set(
         posizione.x + Math.cos(passo) * 0.012 * movimento * bob + (posa?.spinta.x ?? 0),
-        posizione.y + Math.abs(Math.sin(passo)) * 0.014 * movimento * bob - cambio * 0.3 - (corsa ? 0.04 : 0) + (posa?.spinta.y ?? 0),
+        posizione.y + Math.abs(Math.sin(passo)) * 0.014 * movimento * bob - morbido.cambio * 0.3 - morbido.corsa * 0.04 + (posa?.spinta.y ?? 0),
         posizione.z + rinculo * 0.05 + (posa?.spinta.z ?? 0),
       );
       fendente = Math.max(0, fendente - dt / DURATA_FENDENTE);
       const arco = fendente > 0 ? Math.sin((1 - fendente) * Math.PI) : 0;
       const verso = fendente > 0 ? 0.9 - (1 - fendente) * 1.8 : 0;
-      supporto.rotation.set(rinculo * 0.12 + (posa?.beccheggio ?? 0) - arco * 0.35, (corsa ? 0.5 : 0) + (mira ? 0 : 0.06) + verso * arco, (posa?.rollio ?? 0) - arco * 0.6);
+      supporto.rotation.set(rinculo * 0.12 + (posa?.beccheggio ?? 0) - arco * 0.35, morbido.corsa * 0.5 + (1 - morbido.mira) * 0.06 + verso * arco, (posa?.rollio ?? 0) - arco * 0.6);
       supporto.position.x -= arco * 0.08;
       supporto.scale.setScalar(posa?.scala ?? 1);
       const modello = modelli.get(attuale);

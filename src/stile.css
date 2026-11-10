@@ -148,6 +148,8 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 .punti div { font-size: 30px; color: var(--oro); }
 .punti div.altro { font-size: 22px; color: #9fc4e8; }
 .punti div span { color: var(--tenue); font-size: 18px; margin-right: 8px; }
+.punti .righe { display: grid; gap: 2px; justify-items: end; }
+.punti .guadagni:empty { display: none; }
 .punti .guadagno { color: var(--oro); font-size: 20px; animation: sale 0.9s ease-out forwards; }
 @keyframes sale { to { transform: translateY(-24px); opacity: 0; } }
 .arma { display: grid; justify-items: end; }
@@ -159,6 +161,7 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 .sorso { position: absolute; inset: 0; opacity: 0; background: radial-gradient(ellipse at center, transparent 35%, var(--colore, #fff) 120%); mix-blend-mode: screen; }
 .granate { display: flex; gap: 5px; min-height: 14px; }
 .granate i { width: 10px; height: 13px; border-radius: 50% 50% 45% 45%; background: #5f6d40; border: 1px solid #000; display: block; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.35); }
+.granate.ragnatela i { border-radius: 50%; width: 12px; height: 12px; background: radial-gradient(circle at 50% 55%, #e0262f 0 22%, #140707 26%); border-color: #c0141c; box-shadow: 0 0 6px rgba(224, 38, 47, 0.7); }
 .boss { position: absolute; top: 34px; left: 50%; transform: translateX(-50%); width: min(520px, 70vw); text-align: center; }
 .boss[hidden] { display: none; }
 .boss b { display: block; font-family: 'Creepster', cursive; font-weight: 400; font-size: 30px; color: var(--sangue-chiaro); letter-spacing: 0.04em; }
@@ -218,6 +221,7 @@ button.primario:hover:not(:disabled) { background: #cf1a16; }
 #sala h3 { margin: 0 0 6px; font-family: 'Creepster', 'VT323', cursive; font-weight: 400; font-size: 34px; color: #7ff0d6; letter-spacing: 0.06em; }
 #sala .pronto { color: var(--verde); }
 #sala p { margin: 8px 0 0; color: var(--tenue); font-size: 19px; }
+#effetti.sotto-boss { top: 96px; }
 #effetti { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
 #effetti span {
   padding: 2px 10px; border: 1px solid var(--colore); border-radius: 4px; color: var(--colore);

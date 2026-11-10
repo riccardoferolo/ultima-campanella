@@ -7,6 +7,11 @@ import { texturaTesto } from './texture.js';
 
 const URL_PERSONAGGI = Object.freeze(['./modelli/soldato.glb']);
 const DISSOLVENZA = 0.2;
+const SALTO_COMPAGNO = 3;
+const SEGUI_COMPAGNO = 14;
+const MUOVE_SOPRA = 0.8;
+const FERMO_SOTTO = 0.35;
+const CORSA_SOPRA = 5.2;
 
 function etichetta(testo, colore) {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -71,6 +76,7 @@ export function creaCompagno(scena, nome, materialiArmi, personaggio) {
   radice.add(nomeSprite, allarme);
   scena.add(radice);
   const posizioneMano = new THREE.Vector3();
+  const visto = { x: 0, z: 0, yaw: 0, velocita: 0, pronto: false, muove: false };
 
   function suona(nomeAzione) {
     if (attuale === nomeAzione || !azioni.has(nomeAzione)) return;
@@ -91,10 +97,20 @@ export function creaCompagno(scena, nome, materialiArmi, personaggio) {
         }
       }
       radice.visible = g.stato !== 'morto';
-      radice.position.set(g.x, quota(g.x, g.z), g.z);
-      radice.rotation.y = g.yaw;
+      const salto = !visto.pronto || Math.hypot(g.x - visto.x, g.z - visto.z) > SALTO_COMPAGNO;
+      const segui = salto ? 1 : 1 - Math.exp(-dt * SEGUI_COMPAGNO);
+      const prima = { x: visto.x, z: visto.z };
+      visto.x += (g.x - visto.x) * segui;
+      visto.z += (g.z - visto.z) * segui;
+      visto.yaw += Math.atan2(Math.sin(g.yaw - visto.yaw), Math.cos(g.yaw - visto.yaw)) * segui;
+      visto.pronto = true;
+      const passo = salto || dt <= 0 ? 0 : Math.hypot(visto.x - prima.x, visto.z - prima.z) / dt;
+      visto.velocita += (passo - visto.velocita) * Math.min(1, dt * 8);
+      visto.muove = visto.muove ? visto.velocita > FERMO_SOTTO : visto.velocita > MUOVE_SOPRA;
+      radice.position.set(visto.x, quota(visto.x, visto.z), visto.z);
+      radice.rotation.y = visto.yaw;
       const aTerra = g.stato === 'terra';
-      suona(aTerra ? 'fermo' : g.inMovimento ? (g.corsa ? 'corre' : 'cammina') : 'fermo');
+      suona(aTerra ? 'fermo' : visto.muove ? (g.corsa || visto.velocita > CORSA_SOPRA ? 'corre' : 'cammina') : 'fermo');
       mixer.update(dt);
       postura.rotation.x = aTerra ? -Math.PI / 2 : 0;
       postura.position.y = aTerra ? 0.25 : 0;

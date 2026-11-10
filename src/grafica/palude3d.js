@@ -1,17 +1,18 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { ALTEZZA_SOFFITTO, ZONE, MURI, RECINZIONI, OSTACOLI, FINESTRE, PORTE, ACQUISTI, CARTELLO_PRONTI } from '../mappa.js';
+import { ALTEZZA_SOFFITTO, ZONE, MURI, RECINZIONI, OSTACOLI, FINESTRE, PORTE, ACQUISTI, CARTELLO_PRONTI, quota } from '../mappa.js';
 import { INTERNE } from '../mappe/palude.js';
 import { R } from '../regole.js';
 import { texturaTesto } from './texture.js';
 import { creaCaso } from './caso-grafica.js';
 import { scatolaUV, orientamento } from './scuola3d.js';
 import { creaMacchine } from './macchine3d.js';
-import { creaTeschio } from './teschio3d.js';
 import { istanzeACelle } from './celle.js';
 import { creaMissione } from './palude/missione3d.js';
 import { creaTana } from './palude/tana3d.js';
 import { preparaRagni } from './palude/ragni3d.js';
+import { creaTerreno } from './palude/terreno3d.js';
+import { creaTempio } from './palude/tempio3d.js';
 
 const BLOCCO = 48;
 const LATO_VEGETAZIONE = 64;
@@ -23,7 +24,8 @@ const ALTEZZA_PORTONE = 2.9;
 const ALTEZZA_RADICI = 3.2;
 const DAVANZALE = 0.9;
 const ARCHITRAVE = 2.3;
-const ALBERI_SFONDO = 170;
+const ALBERI_SFONDO = 340;
+const SPONDA_ALBERI = 16;
 const NINFEE = 260;
 const LUCCIOLE = 280;
 const SCIE_ANIME = 12;
@@ -34,7 +36,8 @@ const LUCI = Object.freeze([
   { x: 0, z: 10, y: 2.6, colore: 0xffa95a, intensita: 10, portata: 18, tremola: true },
   { x: 49, z: 33, y: 3.2, colore: 0xffc27a, intensita: 12, portata: 18, tremola: true },
   { x: 0, z: -10, y: 3.3, colore: 0xffd29a, intensita: 6, portata: 24, segheria: true },
-  { x: -46, z: -4, y: 3.3, colore: 0x6dffb0, intensita: 13, portata: 26 },
+  { x: -46, z: -4, y: 1.2, colore: 0x9dffc0, intensita: 30, portata: 30 },
+  { x: -38, z: -10, y: 0.2, colore: 0xffb070, intensita: 10, portata: 14, tremola: true },
   { x: 38, z: -9, y: 3.2, colore: 0xff9a4a, intensita: 12, portata: 18 },
   { x: 0, z: -50, y: 4.5, colore: 0x9fd8c0, intensita: 12, portata: 26 },
   { x: -47, z: -50, y: 2.4, colore: 0xb07cff, intensita: 11, portata: 20 },
@@ -52,7 +55,7 @@ const CARTELLI = Object.freeze([
   { righe: ['SEGHERIA'], x: 0, y: 3.15, z: 2.25, verso: { x: 0, z: 1 }, l: 2 },
   { righe: ['DISTILLERIA'], x: 38, y: 3.15, z: 4.25, verso: { x: 0, z: 1 }, l: 2.2 },
   { righe: ['BARACCHE'], x: 49, y: 3.15, z: 40.25, verso: { x: 0, z: 1 }, l: 2 },
-  { righe: ['LABORATORIO', 'ACCESSO RISERVATO'], x: -19.75, y: 2.85, z: -10, verso: { x: 1, z: 0 }, l: 2, a: 0.6 },
+  { righe: ['TEMPIO SEPOLTO', 'NON SCENDERE'], x: -19.75, y: 2.85, z: -10, verso: { x: 1, z: 0 }, l: 2, a: 0.6 },
   { righe: ['TORRE RADIO'], x: 59, y: 2.1, z: 4.3, verso: { x: 0, z: 1 }, l: 2 },
   { righe: ['NON ENTRARE'], x: -46, y: 2.6, z: -21.75, verso: { x: 0, z: -1 }, l: 1.6 },
 ]);
@@ -325,7 +328,7 @@ function geometriaRoccia(caso) {
   return g;
 }
 
-function geometrieCipresso() {
+function geometrieCipresso(dettaglio = 1) {
   const tronco = new THREE.CylinderGeometry(0.28, 0.75, 9, 10, 6, true).translate(0, 4.5, 0);
   const p = tronco.attributes.position;
   for (let i = 0; i < p.count; i++) {
@@ -338,7 +341,7 @@ function geometrieCipresso() {
   tronco.computeVertexNormals();
   const chiome = [];
   for (const [x, y, z, s] of [[0, 8.6, 0, 1.9], [1.1, 7.6, 0.4, 1.5], [-1, 7.9, -0.6, 1.6], [0.3, 6.9, -1.1, 1.3], [-0.5, 9.4, 0.6, 1.2]]) {
-    chiome.push(new THREE.IcosahedronGeometry(1, 1).scale(s * 1.35, s * 0.55, s * 1.35).translate(x, y, z));
+    chiome.push(new THREE.IcosahedronGeometry(1, dettaglio).scale(s * 1.35, s * 0.55, s * 1.35).translate(x, y, z));
   }
   const chioma = mergeGeometries(chiome);
   const fili = [];
@@ -348,6 +351,29 @@ function geometrieCipresso() {
   }
   const barba = mergeGeometries(fili);
   return { tronco, chioma, barba };
+}
+
+function geometrieQuercia(dettaglio = 1) {
+  const pezzi = [new THREE.CylinderGeometry(0.42, 0.95, 4.2, 12, 4, true).translate(0, 2.1, 0)];
+  const rami = [[0.4, 3.4, 0, 1.1, 0.5], [-0.3, 3.1, 0.3, -0.9, 0.6], [0.1, 3.7, -0.4, 0.3, -1.2], [-0.2, 3.5, -0.2, -0.4, -1]];
+  for (const [x, y, z, dx, dz] of rami) {
+    const lungo = Math.hypot(dx, dz) * 3.2;
+    const ramo = new THREE.CylinderGeometry(0.12, 0.26, lungo, 7).translate(0, lungo / 2, 0);
+    ramo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx, 1.1, dz).normalize()));
+    pezzi.push(ramo.translate(x, y, z));
+  }
+  const tronco = mergeGeometries(pezzi.map(g => (g.index ? g.toNonIndexed() : g)));
+  const chiome = [];
+  for (const [x, y, z, s] of [[0, 7.2, 0, 2.6], [2.6, 6.6, 1, 2], [-2.4, 6.8, 0.8, 2.1], [0.8, 6.4, -2.6, 1.9], [-1.2, 7.8, -1.4, 1.7], [1.6, 7.9, 1.8, 1.6]]) {
+    chiome.push(new THREE.IcosahedronGeometry(1, dettaglio).scale(s * 1.25, s * 0.62, s * 1.25).translate(x, y, z));
+  }
+  const fili = [];
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2;
+    const r = 2 + (k % 3) * 1.1;
+    fili.push(new THREE.PlaneGeometry(0.9, 2.4 + (k % 2) * 0.8).translate(0, -1.3, 0).rotateY(a).translate(Math.cos(a) * r, 6 + (k % 2) * 0.6, Math.sin(a) * r));
+  }
+  return { tronco, chioma: mergeGeometries(chiome), barba: mergeGeometries(fili) };
 }
 
 function geometriaCanne(largo = 1.3, alto = 1.7) {
@@ -418,8 +444,9 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
 
   const pali = [];
   const paletti = [];
+  creaTerreno(scena, { reali });
   for (const zona of ZONE) {
-    if (zona.grotta) continue;
+    if (zona.grotta || zona.tempio) continue;
     const interna = INTERNE.has(zona.id);
     if (interna) {
       const pavimento = zona.pavimento === 'cemento' ? mat.cemento : zona.sala ? mat.assi : mat.legno;
@@ -445,23 +472,30 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
       }
       continue;
     }
-    pianoUV(mat.fango, zona.x0, zona.z0, zona.x1, zona.z1, 0, 4);
+    if (!zona.aperto || zona.pavimento !== 'fango') pianoUV(mat.fango, zona.x0, zona.z0, zona.x1, zona.z1, 0, 4);
   }
 
   const canne = [];
+  const sponde = { cespugli: [], felci: [], tronchi: [] };
   for (const s of RECINZIONI) {
     const orizz = s.x1 - s.x0 >= s.z1 - s.z0;
     const lungo = orizz ? s.x1 - s.x0 : s.z1 - s.z0;
     const cx = (s.x0 + s.x1) / 2;
     const cz = (s.z0 + s.z1) / 2;
     if (s.tipo === 'riva') {
-      cubo(mat.fango, s.x0, -0.7, s.z0, s.x1, 0.03, s.z1, 3);
       const fuoriX = orizz ? 0 : (inZona(cx + 0.8, cz) ? -1 : 1);
       const fuoriZ = orizz ? (inZona(cx, cz + 0.8) ? -1 : 1) : 0;
-      for (let t = caso() * 0.6; t < lungo; t += 0.7 + caso() * 0.5) {
-        const x = orizz ? s.x0 + t : cx + fuoriX * (0.3 + caso() * 0.9);
-        const z = orizz ? cz + fuoriZ * (0.3 + caso() * 0.9) : s.z0 + t;
-        canne.push(matrice(x, LIVELLO_ACQUA, z, caso() * Math.PI, 0.8 + caso() * 0.6, 0.8 + caso() * 0.7, 0.8 + caso() * 0.6));
+      const suolo = (x, z) => Math.max(LIVELLO_ACQUA, quota(x, z)) - 0.05;
+      for (let t = caso() * 0.6; t < lungo; t += 0.55 + caso() * 0.45) {
+        const x = orizz ? s.x0 + t : cx + fuoriX * (0.3 + caso() * 1.6);
+        const z = orizz ? cz + fuoriZ * (0.3 + caso() * 1.6) : s.z0 + t;
+        canne.push(matrice(x, suolo(x, z), z, caso() * Math.PI, 0.9 + caso() * 0.7, 0.9 + caso() * 0.8, 0.9 + caso() * 0.7));
+        const xb = x + fuoriX * (0.6 + caso() * 1.4);
+        const zb = z + fuoriZ * (0.6 + caso() * 1.4);
+        const scelta = caso();
+        if (scelta < 0.4) sponde.cespugli.push(matrice(xb, suolo(xb, zb), zb, caso() * 6, 1 + caso() * 0.7));
+        else if (scelta < 0.65) sponde.felci.push(matrice(xb, suolo(xb, zb), zb, caso() * 6, 0.9 + caso() * 0.6));
+        else if (scelta < 0.69) sponde.tronchi.push(matrice(xb, suolo(xb, zb) + 0.1, zb, orizz ? caso() * 0.4 : Math.PI / 2 + caso() * 0.4, 1, 1, 1, 0.08));
       }
       continue;
     }
@@ -477,7 +511,7 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
 
   const tipoMuro = s => (s.tipo === 'cemento' ? mat.cemento : mat.assi);
   for (const s of MURI) {
-    if (s.tipo === 'grotta') continue;
+    if (s.tipo === 'grotta' || s.tipo === 'tempio' || s.tipo === 'spondaTempio') continue;
     const alto = s.tipo === 'capanna' ? 2.6 : H;
     cubo(tipoMuro(s), s.x0, 0, s.z0, s.x1, alto, s.z1, 2);
     if (s.tipo === 'cemento') continue;
@@ -513,7 +547,7 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
   const assiMesh = istanze(scena, new THREE.BoxGeometry(1, 0.17, 0.05), mat.assi, assiFinestre);
   const nascosta = new THREE.Matrix4().makeScale(0, 0, 0);
 
-  const pozze = FINESTRE.filter(f => f.tana).map(f => matrice(f.interno.x, 0.025, f.interno.z, caso() * 6, 0.8 + caso() * 0.3));
+  const pozze = FINESTRE.filter(f => f.tana && f.acqua).map(f => matrice(f.interno.x, quota(f.interno.x, f.interno.z) + 0.025, f.interno.z, caso() * 6, 0.8 + caso() * 0.3));
   istanze(scena, new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), pozza, pozze);
 
   const porte = new Map();
@@ -527,7 +561,18 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
     const gruppo = new THREE.Group();
     gruppo.position.set(p.centro.x, 0, p.centro.z);
     gruppo.rotation.y = orizz ? 0 : Math.PI / 2;
-    if (p.tipo === 'cancello') {
+    if (p.tipo === 'macerie') {
+      const pezzi = { corteccia: [], assi: [], metallo: [] };
+      const metti = (chiave, g, x, y, z, rx, ry, rz) => pezzi[chiave].push(g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(1, 1, 1))));
+      for (let k = 0; k < 4; k++) metti('corteccia', new THREE.CylinderGeometry(0.17 + caso() * 0.06, 0.2 + caso() * 0.06, lungo + 0.9, 8).rotateZ(Math.PI / 2), (caso() - 0.5) * 0.4, 0.2 + k * 0.32, (caso() - 0.5) * 0.35, 0, (caso() - 0.5) * 0.35, 0);
+      for (const lato of [-1, 1]) metti('assi', scatolaUV(0.8, 0.7, 0.7, 1), lato * (lungo / 2 - 0.3), 1.6, (caso() - 0.5) * 0.3, 0, caso(), (caso() - 0.5) * 0.4);
+      for (let k = 0; k < 5; k++) metti('assi', scatolaUV(0.22, 2.1, 0.05, 1.5), -lungo / 2 + 0.3 + (k * (lungo - 0.6)) / 4, 1.05, 0.32, 0, 0, (caso() - 0.5) * 0.7);
+      metti('metallo', new THREE.TorusGeometry(0.28, 0.012, 4, 20).scale(lungo * 1.2, 1, 1).rotateY(Math.PI / 2).rotateZ(Math.PI / 2), 0, 2.05, 0, 0, 0, 0);
+      const pila = new THREE.Group();
+      for (const [chiave, geometrie] of Object.entries(pezzi)) pila.add(new THREE.Mesh(mergeGeometries(geometrie.map(g => (g.index ? g.toNonIndexed() : g))), mat[chiave]));
+      gruppo.add(pila);
+      porte.set(p.id, { tipo: p.tipo, gruppo, pila, apertura: 0 });
+    } else if (p.tipo === 'cancello') {
       const anta = new THREE.Group();
       anta.position.x = -lungo / 2;
       for (let x = 0.2; x < lungo; x += 0.36) {
@@ -595,15 +640,17 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
   };
 
   const { tronco, chioma, barba } = geometrieCipresso();
+  const quercia = geometrieQuercia();
+  const lontano = { cipresso: geometrieCipresso(0), quercia: geometrieQuercia(0), cipressi: [], querce: [] };
   const alberi = [];
+  const querce = [];
   const rocce = [];
   const pietra = geometriaRoccia(caso);
   const lapidi = [];
   let motore = null;
-  const vasche = [];
   let faro = null;
-  let altare = null;
   for (const o of OSTACOLI) {
+    if (o.base !== undefined) continue;
     const cx = (o.x0 + o.x1) / 2;
     const cz = (o.z0 + o.z1) / 2;
     const l = o.x1 - o.x0;
@@ -611,7 +658,10 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
     const lungoX = l >= p;
     switch (o.tipo) {
       case 'cipresso':
-        alberi.push(matrice(cx, 0, cz, caso() * 6, 0.9 + caso() * 0.35));
+        alberi.push(matrice(cx, quota(cx, cz) - 0.15, cz, caso() * 6, 0.9 + caso() * 0.35));
+        break;
+      case 'quercia':
+        querce.push(matrice(cx, quota(cx, cz) - 0.2, cz, caso() * 6, 0.85 + caso() * 0.3));
         break;
       case 'casse':
         posa('wooden_military_crate', modelli, cx, cz, 0.3, 1.1);
@@ -712,63 +762,8 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
         cubo(mat.metallo, o.x0, 0, o.z0, o.x1, o.altezza, o.z1, 1);
         cubo(mat.metallo, o.x0 - 0.03, o.altezza, o.z0 - 0.03, o.x1 + 0.03, o.altezza + 0.06, o.z1 + 0.03, 1);
         break;
-      case 'santuario':
-        cubo(mat.muschio, o.x0, 0, o.z0, o.x1, o.altezza, o.z1, 1);
-        cubo(mat.muschio, o.x0 - 0.12, o.altezza - 0.1, o.z0 - 0.12, o.x1 + 0.12, o.altezza, o.z1 + 0.12, 1);
-        break;
       case 'pilastro':
         cubo(mat.legno, o.x0, 0, o.z0, o.x1, H, o.z1, 2);
-        break;
-      case 'altare':
-        cubo(mat.muschio, o.x0, 0, o.z0, o.x1, o.altezza, o.z1, 1);
-        for (let k = 0; k < 6; k++) {
-          const a = (k / 6) * Math.PI * 2;
-          const x = cx + Math.cos(a) * (l / 2 + 0.25);
-          const z = cz + Math.sin(a) * (p / 2 + 0.25);
-          pezzo(mat.nero, new THREE.CylinderGeometry(0.04, 0.05, 0.4 + caso() * 0.3, 8), x, 0.25, z);
-          pezzo(mat.candela, new THREE.SphereGeometry(0.035, 6, 4), x, 0.5 + caso() * 0.12, z);
-        }
-        {
-          const { gruppo } = creaTeschio({});
-          gruppo.scale.setScalar(4.4);
-          const quota = o.altezza + 0.2;
-          gruppo.position.set(cx, quota, cz);
-          gruppo.rotation.y = Math.PI;
-          const bagliore = new THREE.Sprite(new THREE.SpriteMaterial({ map: alone, color: 0x6dff8a, transparent: true, opacity: 0.15, depthWrite: false, blending: THREE.AdditiveBlending }));
-          bagliore.position.set(cx, quota, cz);
-          scena.add(gruppo, bagliore);
-          const materialeScia = new THREE.SpriteMaterial({ map: alone, color: 0x9dffb0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-          const scie = Array.from({ length: SCIE_ANIME }, () => {
-            const sprite = new THREE.Sprite(materialeScia.clone());
-            sprite.visible = false;
-            sprite.scale.setScalar(0.45);
-            scena.add(sprite);
-            return { sprite, t: 1, da: new THREE.Vector3() };
-          });
-          altare = { gruppo, bagliore, scie, quota, centro: new THREE.Vector3(cx, quota, cz), anime: 0 };
-        }
-        break;
-      case 'vasca': {
-        const g = new THREE.Group();
-        const vetro = new THREE.Mesh(new THREE.CylinderGeometry(l / 2 - 0.1, l / 2 - 0.1, o.altezza, 18, 1, true), mat.vetro);
-        vetro.position.y = o.altezza / 2;
-        const liquido = new THREE.Mesh(new THREE.CylinderGeometry(l / 2 - 0.16, l / 2 - 0.16, o.altezza * 0.8, 18), mat.liquido);
-        liquido.position.y = o.altezza * 0.4;
-        g.add(vetro, liquido);
-        g.position.set(cx, 0, cz);
-        scena.add(g);
-        for (const y of [0.05, o.altezza]) pezzo(mat.metallo, new THREE.TorusGeometry(l / 2 - 0.08, 0.06, 6, 20).rotateX(Math.PI / 2), cx, y, cz);
-        vasche.push(g);
-        break;
-      }
-      case 'gabbia':
-        cubo(mat.metallo, o.x0, 0, o.z0, o.x1, 0.1, o.z1, 1);
-        cubo(mat.metallo, o.x0, o.altezza - 0.08, o.z0, o.x1, o.altezza, o.z1, 1);
-        for (let k = 0; k <= 6; k++) {
-          for (const [x, z] of [[o.x0 + (l * k) / 6, o.z0], [o.x0 + (l * k) / 6, o.z1], [o.x0, o.z0 + (p * k) / 6], [o.x1, o.z0 + (p * k) / 6]]) {
-            pezzo(mat.metallo, new THREE.CylinderGeometry(0.02, 0.02, o.altezza, 5), x, o.altezza / 2, z);
-          }
-        }
         break;
       case 'botte':
         posa('barrel_03', oggetti, cx, cz, caso() * 6);
@@ -832,15 +827,28 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
   istanze(scena, new THREE.BoxGeometry(0.7, 0.9, 0.16), mat.muschio, lapidi);
   istanze(scena, pietra, mat.roccia, rocce);
 
+  const distanzaZone = (x, z) => Math.min(...ZONE.filter(q => q.id !== 'sala' && q.id !== 'tana').map(q => Math.hypot(Math.max(q.x0 - x, 0, x - q.x1), Math.max(q.z0 - z, 0, z - q.z1))));
   for (let i = 0; i < ALBERI_SFONDO; i++) {
     const x = -100 + caso() * 195;
     const z = -100 + caso() * 190;
-    if (inZona(x, z, 2.5) || (x < -92 && Math.abs(z) < 16)) continue;
-    alberi.push(matrice(x, LIVELLO_ACQUA, z, caso() * 6, 0.9 + caso() * 0.6));
+    const d = distanzaZone(x, z);
+    if (d < 2.8 || (x < -92 && Math.abs(z) < 16) || (d > SPONDA_ALBERI && caso() < 0.55)) continue;
+    const y = Math.max(LIVELLO_ACQUA, quota(x, z)) - 0.2;
+    const vicino = d < SPONDA_ALBERI * 0.5;
+    if (caso() < 0.3) (vicino ? querce : lontano.querce).push(matrice(x, y, z, caso() * 6, 0.8 + caso() * 0.45));
+    else (vicino ? alberi : lontano.cipressi).push(matrice(x, y, z, caso() * 6, 0.9 + caso() * 0.6));
   }
   istanze(scena, tronco, mat.corteccia, alberi);
   istanze(scena, chioma, mat.foglie, alberi);
   istanze(scena, barba, mat.barba, alberi);
+  istanze(scena, quercia.tronco, mat.corteccia, querce);
+  istanze(scena, quercia.chioma, mat.foglie, querce);
+  istanze(scena, quercia.barba, mat.barba, querce);
+  istanze(scena, lontano.cipresso.tronco, mat.corteccia, lontano.cipressi);
+  istanze(scena, lontano.cipresso.chioma, mat.foglie, lontano.cipressi);
+  istanze(scena, lontano.quercia.tronco, mat.corteccia, lontano.querce);
+  istanze(scena, lontano.quercia.chioma, mat.foglie, lontano.querce);
+  istanze(scena, new THREE.CylinderGeometry(0.22, 0.26, 3.4, 8).rotateZ(Math.PI / 2), mat.corteccia, sponde.tronchi);
   diradabili(scena, geometriaCanne(), mat.canne, canne);
   istanze(scena, new THREE.CylinderGeometry(0.12, 0.14, 1.8, 6), mat.legno, pali);
   istanze(scena, new THREE.BoxGeometry(0.12, 1, 0.12), mat.legno, paletti);
@@ -867,12 +875,12 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
       const bordo = Math.min(x - zona.x0, zona.x1 - x, z - zona.z0, zona.z1 - z) < 2.2;
       if (occupato(x, z) || (!bordo && caso() < 0.75)) continue;
       const scelta = caso();
-      (scelta < 0.45 ? vegetazione.felci : scelta < 0.7 ? vegetazione.cespugli : vegetazione.erba).push(matrice(x, 0, z, caso() * 6, 0.7 + caso() * 0.6));
+      (scelta < 0.45 ? vegetazione.felci : scelta < 0.7 ? vegetazione.cespugli : vegetazione.erba).push(matrice(x, quota(x, z), z, caso() * 6, 0.7 + caso() * 0.6));
     }
   }
   const pianta = mappa => new THREE.MeshStandardMaterial({ map: mappa, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.9 });
-  diradabili(scena, geometriaFelce(), pianta(texturaFelce()), vegetazione.felci);
-  diradabili(scena, geometriaCanne(1.6, 1.3), pianta(texturaCespuglio()), vegetazione.cespugli);
+  diradabili(scena, geometriaFelce(), pianta(texturaFelce()), [...vegetazione.felci, ...sponde.felci]);
+  diradabili(scena, geometriaCanne(1.6, 1.3), pianta(texturaCespuglio()), [...vegetazione.cespugli, ...sponde.cespugli]);
   diradabili(scena, geometriaCanne(0.9, 0.55), pianta(texturaErba()), vegetazione.erba);
 
   const glowPos = [];
@@ -906,8 +914,8 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
   for (let i = 0; i < LUCCIOLE; i++) {
     const q = zoneAperte[Math.floor(caso() * zoneAperte.length)];
     basi[i * 3] = q.x0 - 3 + caso() * (q.x1 - q.x0 + 6);
-    basi[i * 3 + 1] = 0.6 + caso() * 2.6;
     basi[i * 3 + 2] = q.z0 - 3 + caso() * (q.z1 - q.z0 + 6);
+    basi[i * 3 + 1] = Math.max(LIVELLO_ACQUA, quota(basi[i * 3], basi[i * 3 + 2])) + 0.6 + caso() * 2.6;
   }
   const posLucciole = new Float32Array(basi);
   lucciole.setAttribute('position', new THREE.BufferAttribute(posLucciole, 3));
@@ -937,12 +945,12 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
     const cassa = oggetti.get('old_military_crate')?.clone();
     if (cassa) {
       cassa.scale.setScalar(0.55);
-      cassa.position.set(a.posizione.x, 0, a.posizione.z);
+      cassa.position.set(a.posizione.x, quota(a.posizione.x, a.posizione.z), a.posizione.z);
       orientamento(cassa, a.verso);
       scena.add(cassa);
     }
     const scritta = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshBasicMaterial({ map: texturaTesto(['MUNIZIONI'], { larghezza: 128, altezza: 32, sfondo: '#2a3320', colore: '#e8e0a0', font: 'bold 18px monospace' }) }));
-    scritta.position.set(a.posizione.x + a.verso.x * 0.36, 0.95, a.posizione.z + a.verso.z * 0.36);
+    scritta.position.set(a.posizione.x + a.verso.x * 0.36, quota(a.posizione.x, a.posizione.z) + 0.95, a.posizione.z + a.verso.z * 0.36);
     orientamento(scritta, a.verso);
     scena.add(scritta);
   }
@@ -956,7 +964,7 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
   const vicinoA = (a, tipi) => OSTACOLI.filter(o => tipi.includes(o.tipo)).map(o => ({ x: (o.x0 + o.x1) / 2, z: (o.z0 + o.z1) / 2 })).find(c => Math.hypot(c.x - a.posizione.x, c.z - a.posizione.z) < 2.2);
   const segnali = ACQUISTI.filter(a => a.tipo === 'oggettoElemento').map(a => {
     const colore = COLORI_ELEMENTI[a.elemento];
-    const punto = vicinoA(a, ['braciere', 'ghiacciaia', 'vasca', 'lapide']) ?? { x: a.posizione.x - a.verso.x * 0.55, z: a.posizione.z - a.verso.z * 0.55 };
+    const punto = vicinoA(a, ['braciere', 'ghiacciaia', 'lapide']) ?? { x: a.posizione.x - a.verso.x * 0.55, z: a.posizione.z - a.verso.z * 0.55 };
     const bagliore = fiamma(colore);
     bagliore.position.set(punto.x, QUOTE_SEGNALE[a.elemento], punto.z);
     const segnale = { a, bagliore, fiamme: [], rotore: null };
@@ -981,16 +989,6 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
       segnale.rotore = rotore;
     }
     return segnale;
-  });
-  const santuari = OSTACOLI.filter(o => o.tipo === 'santuario').map(o => {
-    const colore = COLORI_ELEMENTI[o.elemento];
-    const cristallo = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), new THREE.MeshStandardMaterial({ color: 0x101010, emissive: colore, emissiveIntensity: 0.6, roughness: 0.2, flatShading: true }));
-    cristallo.scale.set(1, 1.6, 1);
-    cristallo.position.set((o.x0 + o.x1) / 2, o.altezza + 0.6, (o.z0 + o.z1) / 2);
-    scena.add(cristallo);
-    const bagliore = fiamma(colore);
-    bagliore.position.copy(cristallo.position);
-    return { elemento: o.elemento, cristallo, bagliore };
   });
   const chiazze = Array.from({ length: 8 }, () => {
     const gruppo = new THREE.Group();
@@ -1024,18 +1022,20 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
   orientamento(cartello, CARTELLO_PRONTI.verso);
   scena.add(cartello);
 
+  const tempio = creaTempio(scena, { mat, reali, alone, pezzo, cubo, statico });
   const luci = Array.from({ length: luciAccese }, () => {
     const luce = new THREE.PointLight(0xffffff, 0, 10, 1.4);
     scena.add(luce);
     return { luce, fonte: null, accensione: 0 };
   });
+  const fonti = [...LUCI, ...tempio.luci];
   let attesaLuci = 0;
   const vicinanza = (punto, f) => (f.x - punto.x) ** 2 + (f.z - punto.z) ** 2;
   function aggiornaLuci(vista, dt, tempo, punto) {
     attesaLuci -= dt;
     if (punto && attesaLuci <= 0) {
       attesaLuci = SCEGLI_LUCI_OGNI_S;
-      const vicine = [...LUCI].sort((a, b) => vicinanza(punto, a) - vicinanza(punto, b)).slice(0, luciAccese);
+      const vicine = fonti.filter(f => !f.elemento || tempio.statuaAccesa(vista, f.elemento)).sort((a, b) => vicinanza(punto, a) - vicinanza(punto, b)).slice(0, luciAccese);
       const libere = luci.filter(l => !vicine.includes(l.fonte));
       for (const f of vicine) {
         if (luci.some(l => l.fonte === f)) continue;
@@ -1051,7 +1051,9 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
       const f = l.fonte;
       if (!f) continue;
       l.accensione = Math.min(1, l.accensione + dt / ACCENSIONE_LUCE_S);
-      const forza = f.segheria
+      const forza = f.elemento
+        ? f.intensita * (0.85 + Math.sin(tempo * 2.2) * 0.15)
+        : f.segheria
         ? (vista.corrente ? 16 : 4 + (Math.sin(tempo * 13.7) > 0.9 ? 0 : 2))
         : f.intensita * (f.tremola ? 0.85 + Math.sin(tempo * 9 + f.x) * 0.08 + Math.sin(tempo * 23 + f.z) * 0.06 : 1);
       l.luce.intensity = forza * l.accensione;
@@ -1073,21 +1075,12 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
       });
       if (sg.rotore) sg.rotore.rotation.z += dt * (attivo ? 9 : 0.6);
     }
-    for (const sa of santuari) {
-      const el = elementi?.[sa.elemento];
-      const forza = el?.passo === 3 ? 2.6 : el?.da ? 1.4 : 0.5;
-      sa.cristallo.material.emissiveIntensity = forza + Math.sin(tempo * 2 + forza) * 0.2;
-      sa.cristallo.rotation.y += dt * (0.4 + forza * 0.3);
-      sa.cristallo.position.y = 1.7 + Math.sin(tempo * 1.4) * 0.05;
-      sa.bagliore.material.opacity = 0.2 + forza * 0.25;
-      sa.bagliore.scale.setScalar(0.8 + forza * 0.6);
-    }
     const fuochi = vista.palude?.fuochi ?? [];
     chiazze.forEach((g, i) => {
       const f = fuochi[i];
       g.visible = !!f;
       if (!f) return;
-      g.position.set(f.x, 0, f.z);
+      g.position.set(f.x, quota(f.x, f.z), f.z);
       g.scale.setScalar(Math.min(1, f.timer / 2 + 0.3));
       g.children.forEach((sprite, k) => { sprite.scale.set(1, 1.2 + Math.sin(tempo * 11 + k) * 0.35, 1); });
     });
@@ -1097,34 +1090,10 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
       if (n >= fiammeZombie.length || !ardenti.has(z.id) || z.stato === 'morto') continue;
       const sprite = fiammeZombie[n++];
       sprite.visible = true;
-      sprite.position.set(z.x + Math.sin(tempo * 7 + z.id) * 0.08, 1.1 + Math.sin(tempo * 11 + z.id) * 0.1, z.z);
+      sprite.position.set(z.x + Math.sin(tempo * 7 + z.id) * 0.08, quota(z.x, z.z) + 1.1 + Math.sin(tempo * 11 + z.id) * 0.1, z.z);
       sprite.scale.set(0.9, 1.6 + Math.sin(tempo * 13 + z.id) * 0.3, 1);
     }
     for (; n < fiammeZombie.length; n++) fiammeZombie[n].visible = false;
-  }
-
-  function aggiornaAltare(anime, dt, tempo) {
-    const pieno = Math.min(1, anime / R.ANIME_ALTARE);
-    altare.bagliore.material.opacity = 0.15 + pieno * 0.7;
-    altare.bagliore.scale.setScalar(0.6 + pieno * 1.8 + (pieno >= 1 ? Math.sin(tempo * 4) * 0.2 : 0));
-    altare.gruppo.position.y = altare.quota + (pieno >= 1 ? 0.35 + Math.sin(tempo * 2) * 0.06 : 0);
-    altare.gruppo.rotation.y = Math.PI + (pieno >= 1 ? tempo * 0.8 : 0);
-    for (let n = Math.min(4, anime - altare.anime); n > 0; n--) {
-      const libera = altare.scie.find(s => s.t >= 1);
-      if (!libera) break;
-      const angolo = caso() * Math.PI * 2;
-      libera.da.set(altare.centro.x + Math.cos(angolo) * (1.5 + caso() * 2), 0.9, altare.centro.z + Math.sin(angolo) * (1.5 + caso() * 2));
-      libera.t = 0;
-      libera.sprite.visible = true;
-    }
-    altare.anime = anime;
-    for (const s of altare.scie) {
-      if (s.t >= 1) continue;
-      s.t = Math.min(1, s.t + dt / DURATA_SCIA);
-      s.sprite.position.lerpVectors(s.da, altare.gruppo.position, s.t * s.t);
-      s.sprite.material.opacity = Math.sin(s.t * Math.PI);
-      s.sprite.visible = s.t < 1;
-    }
   }
 
   const missione = creaMissione(scena, { mat, alone, pezzo, cubo });
@@ -1153,7 +1122,7 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
       }
       lucciole.attributes.position.needsUpdate = true;
       aggiornaLuci(vista, dt, tempo, punto);
-      if (altare) aggiornaAltare(vista.palude?.altare ?? 0, dt, tempo);
+      tempio.aggiorna(vista, dt, tempo);
       aggiornaElementi(vista, dt, tempo);
       missione.aggiorna(vista, dt, tempo);
       tana.aggiorna(vista, dt, tempo);
@@ -1185,6 +1154,11 @@ export function costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli
         const aperta = vista.porte.has(p.id);
         porta.apertura = aperta ? Math.min(1, porta.apertura + dt * (porta.tipo === 'radici' ? 0.5 : 1.4)) : Math.max(0, porta.apertura - dt * 2.5);
         if (porta.tipo === 'cancello') porta.anta.rotation.y = porta.apertura * 1.75;
+        else if (porta.tipo === 'macerie') {
+          porta.pila.position.y = -porta.apertura * porta.apertura * 2.6;
+          porta.pila.rotation.x = porta.apertura * 0.5;
+          porta.gruppo.visible = porta.apertura < 1;
+        }
         else if (porta.tipo === 'radici') {
           porta.gruppo.scale.set(1, Math.max(0.001, 1 - porta.apertura), 1);
           porta.gruppo.visible = porta.apertura < 1;

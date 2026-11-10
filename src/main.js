@@ -10,7 +10,7 @@ import { CORPO, colpisciZombie, direzioneDa, disperdi, esplosione, primoMuro, ra
 import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi } from './arsenale.js';
 import { DURATA_BEVUTA } from './grafica/vista1p.js';
 import { illuminaTeschio } from './grafica/teschio3d.js';
-import { ARMA_ELEMENTO, PROVE, bersagliPalude, invischiato } from './palude.js';
+import { ARMA_ELEMENTO, bersagliPalude, invischiato } from './palude.js';
 import { eventoPalude, trofeoPalude } from './palude/eventi.js';
 import { interazioneVicina } from './interazioni.js';
 import { creaPartita, passo, aggiungiGiocatore, rimuoviGiocatore } from './partita.js';
@@ -29,7 +29,10 @@ const LOCALE = PARAMETRI.has('locale');
 const SOLO_RISERVA = PARAMETRI.has('riserva');
 const CHIAVE_NOME = 'campanella.nome';
 const ISTANTANEE_OGNI_MS = { diretto: 50, riserva: 100 };
-const RITARDO_VISTA_S = { diretto: 0.1, riserva: 0.22 };
+const RITARDO_VISTA_S = { diretto: 0.15, riserva: 0.25 };
+const BLOCCO_PRONTO_MS = 1500;
+const ZOOM_MIRA = Math.tan((52 * Math.PI) / 360) / Math.tan((72 * Math.PI) / 360);
+const ZOOM_CANNOCCHIALE = Math.tan((20 * Math.PI) / 360) / Math.tan((72 * Math.PI) / 360);
 const GIOCATORE_OGNI_MS = 33;
 const PING_OGNI_MS = 1000;
 const CIAO_OGNI_MS = 1000;
@@ -120,7 +123,7 @@ const s = {
 
 const io = { x: 0, z: 0, yaw: Math.PI, pitch: 0, pronto: false, tp: 0, colpi: 0, movimento: 0, corsa: false, inMira: false };
 const arsenale = creaArsenale();
-const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null, caricaTeschio: 0 };
+const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null, caricaTeschio: 0, teschio: null, prossimoRaggio: 0 };
 const cacheScatole = new Map();
 
 const collegato = () => s.coll && (s.coll.modo === 'diretto' || s.coll.modo === 'riserva');
@@ -425,13 +428,10 @@ function suEventi(eventi) {
       case 'scatto': audio.suona('scatto'); break;
       case 'sfera': if (!perMe) audio.suona('sfera'); break;
       case 'buco': audio.suona('buco'); break;
-      case 'implosioneTeschio': implosioneTeschio(e); break;
+      case 'raggioTeschio': raggioTeschio(e); break;
+      case 'esplosioneTeschio': esplosioneTeschio(e); break;
       case 'altarePronto': audio.suona('segreto'); hud.avviso("L'altare è sazio: prendete il Teschio di Malakor!", 'bene'); break;
-      case 'teschio': hud.avviso(perMe ? 'Teschio di Malakor: tieni premuto per caricarlo, rilascia sullo zombie' : `${nomeDi(e.a)} ha il Teschio di Malakor`, 'bene'); break;
-      case 'elementoScelto': audio.suona('segreto'); hud.avviso(perMe ? `Il Teschio è legato al ${PROVE[e.elemento].nome}: ${PROVE[e.elemento].oggetti}` : `${nomeDi(e.a)} ha scelto il ${PROVE[e.elemento].nome}`, 'bene'); break;
-      case 'oggettoElemento': if (perMe) { audio.suona('frammento'); hud.avviso(`${PROVE[e.elemento].nome}: ${e.fatti}/3`, 'bene'); } break;
-      case 'provaElemento': if (perMe) { audio.suona('fusibile'); hud.avviso(e.passo === 1 ? `${PROVE[e.elemento].nome}: ora ${PROVE[e.elemento].anime}` : `${PROVE[e.elemento].nome} pronto: tornate al santuario ${PROVE[e.elemento].luogo}`, 'bene'); } break;
-      case 'elementoInfuso': audio.suona('potenziata'); hud.avviso(perMe ? `Il tuo Teschio ora è di ${PROVE[e.elemento].nome}!` : `${nomeDi(e.a)} ha il Teschio di ${PROVE[e.elemento].nome}`, 'bene'); break;
+      case 'teschio': hud.avviso(perMe ? 'Teschio di Malakor: tocca per il raggio, tieni premuto per sollevare e far esplodere gli zombie' : `${nomeDi(e.a)} ha il Teschio di Malakor`, 'bene'); break;
       case 'radiciBruciate': audio.suona('implosione'); hud.avviso('Le radici bruciano: la passerella dello sciamano è libera', 'bene'); break;
       case 'implosione':
         mondo.effetti.esplosione({ x: e.x, y: e.y, z: e.z }, 'energia', 0xb06cff);
@@ -626,9 +626,10 @@ function tickHost(dt, ora) {
     if (eventi.length && collegato()) s.coll.invia({ t: 'ev', eventi });
     suEventi(eventi);
   }
-  if (collegato() && ora - s.ultimaIstantanea >= ISTANTANEE_OGNI_MS[modoRete()]) {
+  const ogni = ISTANTANEE_OGNI_MS[modoRete()];
+  if (collegato() && ora - s.ultimaIstantanea >= ogni) {
     s.coll.invia({ t: 'st', g: s.semeCorrente, ist: faiIstantanea(p) }, { veloce: true });
-    s.ultimaIstantanea = ora;
+    s.ultimaIstantanea = Math.max(s.ultimaIstantanea + ogni, ora - ogni);
   }
 }
 
@@ -701,7 +702,7 @@ function muovi(lettura, me, dt) {
   }
   io.inMira = vivo && lettura.mira && arsenale.ricarica === 0;
   const preso = invischiato(s.vista, s.mioId);
-  io.corsa = vivo && !preso && lettura.corsa && lettura.avanti > 0 && !io.inMira;
+  io.corsa = vivo && !preso && lettura.corsa && lettura.avanti > 0 && !io.inMira && !lettura.sparo;
   const lunghezza = Math.hypot(lettura.avanti, lettura.lato);
   io.movimento = vivo && !preso && lunghezza > 0 ? 1 : 0;
   if (!io.movimento) return;
@@ -748,7 +749,6 @@ function colpisciDiMischia(bersagli, danno, extra) {
 
 function colpoDiColtello(vista) {
   audio.suona('coltello');
-  mondo.spara();
   const vicini = bersagliDiMischia(vista, COLTELLO.portata, COLTELLO.arco, COLPITI_COLTELLO);
   if (vicini.length) {
     colpisciDiMischia(vicini, dannoColtello(vista.round), { coltello: true });
@@ -887,7 +887,10 @@ function usaArmi(lettura, me, vista, dt) {
     locale.suonoRicarica.ferma();
     locale.suonoRicarica = null;
   }
-  if (me.stato !== 'vivo' || s.fase !== 'gioco') return;
+  if (me.stato !== 'vivo' || s.fase !== 'gioco') {
+    annullaTeschio();
+    return;
+  }
   for (const azione of lettura.azioni) {
     if (azione === 'pronto') {
       if (vista.fase === 'attesa') inviaAzione({ tipo: 'pronto', attivo: !me.pronto });
@@ -911,12 +914,12 @@ function usaArmi(lettura, me, vista, dt) {
     usaTeschio(lettura, me, vista, dt);
     return;
   }
-  locale.caricaTeschio = 0;
+  annullaTeschio();
   const vuole = locale.sparoForzato || (arma.automatica || arma.bianca ? lettura.sparo : lettura.sparoPremuto);
   locale.sparoForzato = false;
-  if (!vuole || io.corsa) return;
+  if (!vuole) return;
   if (armaAttiva(arsenale).caricatore === 0) {
-    if (!avviaRicarica(me) && performance.now() / 1000 - locale.ultimoVuoto > VUOTO_OGNI_S) {
+    if (arsenale.ricarica === 0 && !avviaRicarica(me) && performance.now() / 1000 - locale.ultimoVuoto > VUOTO_OGNI_S) {
       audio.suona('vuoto');
       locale.ultimoVuoto = performance.now() / 1000;
     }
@@ -929,52 +932,108 @@ function usaArmi(lettura, me, vista, dt) {
   if (armaAttiva(arsenale).caricatore === 0) avviaRicarica(me);
 }
 
-function implosioneTeschio(e) {
-  if (e.imploso) mondo.nascondiZombie(e.zombie);
-  const centro = { x: e.x, y: 1, z: e.z };
-  const colore = ARMI[ARMA_ELEMENTO[e.elemento] ?? 'teschio'].colore;
-  mondo.effetti.risucchio(centro, 3, 24);
+const coloreTeschio = elemento => ARMI[ARMA_ELEMENTO[elemento] ?? 'teschio'].colore;
+
+function puntoGiocatore(id) {
+  if (id === s.mioId) return mondo.bocca();
+  const g = s.vista?.giocatori.find(q => q.id === id);
+  return g ? { x: g.x, y: suolo(g.x, g.z) + R.ALTEZZA_OCCHI - 0.25, z: g.z } : null;
+}
+
+function scoppioTeschio(x, z, elemento, forte) {
+  const centro = { x, y: suolo(x, z) + 1.2, z };
+  const colore = coloreTeschio(elemento);
   mondo.effetti.esplosione(centro, 'energia', colore);
-  mondo.effetti.esplosione({ x: e.x, y: 1.6, z: e.z }, 'energia', 0xffffff);
-  if (e.elemento === 'ghiaccio') {
-    mondo.effetti.ghiaccio(centro);
-    audio.suona('congelato');
-  } else if (e.elemento === 'fuoco') {
-    mondo.effetti.esplosione(centro, 'fuoco', 0xff7a2a);
-    mondo.effetti.esplosione({ x: e.x, y: 0.4, z: e.z }, 'fuoco', 0xffc070);
-  } else if (e.elemento === 'vento') {
-    for (let i = 0; i < 6; i++) mondo.effetti.sangue(centro, { x: Math.cos(i), y: 0.3, z: Math.sin(i) });
-    audio.suona('scarica');
-  } else if (!e.elemento) mondo.effetti.esplosione({ x: e.x, y: 0.5, z: e.z }, 'fuoco', 0x5f8a2a);
-  mondo.effetti.ossa(centro, 18);
-  for (const [x, z] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) mondo.effetti.sangue(centro, { x, y: 0.8, z });
-  mondo.effetti.macchia(e.x, e.z);
-  audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z), Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
+  if (forte) mondo.effetti.risucchio(centro, 2.4, 14);
+  if (elemento === 'ghiaccio') mondo.effetti.ghiaccio(centro);
+  else if (elemento === 'fuoco') mondo.effetti.esplosione({ x, y: centro.y - 0.6, z }, 'fuoco', 0xff7a2a);
+  else if (elemento === 'vento') for (let i = 0; i < 6; i++) mondo.effetti.sangue(centro, { x: Math.cos(i), y: 0.4, z: Math.sin(i) });
+  else if (!elemento) mondo.effetti.esplosione({ x, y: centro.y - 0.5, z }, 'fuoco', 0x5f8a2a);
+  mondo.effetti.ossa(centro, forte ? 18 : 10);
+  mondo.effetti.sangue(centro, { x: 0, y: 1, z: 0 }, 14);
+  mondo.effetti.macchia(x, z);
+}
+
+function raggioTeschio(e) {
+  const da = puntoGiocatore(e.da);
+  const a = { x: e.x, y: suolo(e.x, e.z) + 1.3, z: e.z };
+  if (da && e.da !== s.mioId) mondo.fulmine([da, a], coloreTeschio(e.elemento));
+  if (e.ucciso) mondo.nascondiZombie(e.zombie);
+  scoppioTeschio(e.x, e.z, e.elemento, false);
+  if (e.elemento === 'ghiaccio') audio.suona('congelato');
+  else if (e.elemento) audio.suona('scarica');
+}
+
+function esplosioneTeschio(e) {
+  for (const [x, z] of e.punti) scoppioTeschio(x, z, e.elemento, true);
+  if (e.centro) {
+    const [x, z] = e.centro;
+    mondo.effetti.esplosione({ x, y: suolo(x, z) + 1.3, z }, 'energia', 0xb06cff);
+    mondo.effetti.risucchio({ x, y: suolo(x, z) + 1.3, z }, 6, 30);
+  }
+  const vicino = [...e.punti, ...(e.centro ? [e.centro] : [])].reduce((m, [x, z]) => Math.min(m, Math.hypot(x - io.x, z - io.z)), 30);
+  audio.esplosione(vicino, 0);
   audio.suona('implosione');
+  if (e.elemento === 'ghiaccio') audio.suona('frantumato');
+}
+
+function annullaTeschio() {
+  if (locale.teschio?.carica) inviaAzione({ tipo: 'teschio', carica: false });
+  locale.teschio = null;
+  locale.caricaTeschio = 0;
 }
 
 function usaTeschio(lettura, me, vista, dt) {
-  const affamato = (me.anime ?? 0) < R.TESCHIO_COSTO;
-  if (lettura.sparo && !io.corsa && arsenale.cambio === 0 && !affamato) {
-    locale.caricaTeschio = Math.min(1, locale.caricaTeschio + dt / R.TESCHIO_CARICA);
+  const libero = arsenale.cambio === 0;
+  if (lettura.sparoPremuto && libero) locale.teschio = { premuto: 0, carica: false, finita: false, inizio: 0 };
+  const tenuto = locale.teschio;
+  if (!tenuto) {
+    locale.caricaTeschio = 0;
     return;
   }
-  if (lettura.sparoPremuto && affamato) hud.avviso('Il Teschio ha fame: uccidi per dargli anime');
-  if (!lettura.sparo && locale.caricaTeschio >= 1) scagliaTeschio(vista);
-  if (!lettura.sparo) locale.caricaTeschio = 0;
+  if (lettura.sparo) {
+    tenuto.premuto += dt;
+    if (!tenuto.carica && !tenuto.finita && !tenuto.affamato && tenuto.premuto >= R.TESCHIO_TOCCO) {
+      if ((me.anime ?? 0) < R.TESCHIO_COSTO) {
+        tenuto.affamato = true;
+        hud.avviso(`Il Teschio ha fame: servono ${R.TESCHIO_COSTO} anime per sollevare gli zombie`);
+      } else if (libero) {
+        tenuto.finita = true;
+        Object.assign(tenuto, { carica: true, inizio: tenuto.premuto });
+        inviaAzione({ tipo: 'teschio', carica: true });
+        audio.suona('evocazione');
+      }
+    }
+    if (!tenuto.carica) return;
+    locale.caricaTeschio = Math.min(1, (tenuto.premuto - tenuto.inizio) / R.TESCHIO_DURATA_CARICA);
+    if (!libero) inviaAzione({ tipo: 'teschio', carica: false });
+    if (!libero || locale.caricaTeschio >= 1) tenuto.carica = false;
+    return;
+  }
+  if (tenuto.carica) inviaAzione({ tipo: 'teschio', carica: false });
+  else if (!tenuto.finita && lettura.sparoRilasciato) scagliaRaggio(vista, me);
+  locale.teschio = null;
+  locale.caricaTeschio = 0;
 }
 
-function scagliaTeschio(vista) {
-  const origine = { x: io.x, y: R.ALTEZZA_OCCHI, z: io.z };
-  const colpo = colpisciZombie(origine, direzioneDa(io.yaw, io.pitch), [...mondo.bersagli(vista), ...bersagliPalude(vista)], scatole(vista.porte, true), R.TESCHIO_PORTATA);
-  if (colpo.id === null) {
-    hud.avviso('Il Teschio non trova nessuno da divorare');
+function scagliaRaggio(vista, me) {
+  if ((me.anime ?? 0) < R.TESCHIO_COSTO_RAGGIO) {
+    hud.avviso('Il Teschio ha fame: uccidi per dargli anime');
     audio.suona('vuoto');
     return;
   }
-  inviaAzione(typeof colpo.id === 'string' ? { tipo: 'teschio', oggetto: colpo.id } : { tipo: 'teschio', zombie: colpo.id });
+  const adesso = performance.now() / 1000;
+  if (adesso < (locale.prossimoRaggio ?? 0)) return;
+  locale.prossimoRaggio = adesso + R.TESCHIO_ATTESA_RAGGIO;
+  const origine = { x: io.x, y: suolo(io.x, io.z) + R.ALTEZZA_OCCHI, z: io.z };
+  const d = direzioneDa(io.yaw, io.pitch);
+  const colpo = colpisciZombie(origine, d, [...mondo.bersagli(vista), ...bersagliPalude(vista)], scatole(vista.porte, true), R.TESCHIO_PORTATA);
+  const lungo = Math.min(colpo.t, R.TESCHIO_PORTATA);
   mondo.spara();
   audio.suona('teschio');
+  mondo.fulmine([mondo.bocca(), { x: origine.x + d.x * lungo, y: origine.y + d.y * lungo, z: origine.z + d.z * lungo }], ARMI[armaAttiva(arsenale).tipo].colore);
+  if (colpo.id === null) return;
+  inviaAzione(typeof colpo.id === 'string' ? { tipo: 'teschio', oggetto: colpo.id } : { tipo: 'teschio', zombie: colpo.id });
 }
 
 function scegliInSala(tasto, me, vista) {
@@ -1060,7 +1119,7 @@ function ciclo(ora) {
       if ((vista.fase === 'fine' || vista.fase === 'vinta') && s.fase === 'gioco') mostraFine({ round: vista.round, vinto: vista.fase === 'vinta', giocatori: vista.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });
       const lettura = comandi.leggi();
       comandi.applicaVista(io);
-      if (vista.fase === 'attesa' && !me.pronto && comandi.bloccato) document.exitPointerLock();
+      if (vista.fase === 'attesa' && !me.pronto && comandi.bloccato && performance.now() - (locale.prontoChiesto ?? 0) > BLOCCO_PRONTO_MS) document.exitPointerLock();
       if (vista.fase === 'attesa' && (arsenale.armi.length !== me.armi.length || arsenale.armi.some((a, i) => a.tipo !== me.armi[i]))) allinea(arsenale, me.armi);
       if (locale.aspetto !== me.aspetto) {
         locale.aspetto = me.aspetto;
@@ -1072,9 +1131,10 @@ function ciclo(ora) {
       suoniAmbiente(vista, dt);
       audio.ambiente?.(mappaAttiva, ZONE.some(z => z.aperto && io.x >= z.x0 && io.x <= z.x1 && io.z >= z.z0 && io.z <= z.z1));
       audio.musica(statoMusica(vista), Math.min(1, vista.round / 12));
-      const ferito = vista.giocatori.find(g => g.id !== s.mioId && g.stato === 'terra');
+      const ferito = vista.giocatori.filter(g => g.id !== s.mioId && g.stato === 'terra').sort((a, b) => Math.hypot(a.x - io.x, a.z - io.z) - Math.hypot(b.x - io.x, b.z - io.z))[0];
       const tipo = armaAttiva(arsenale).tipo;
       const cannocchiale = io.inMira && ARMI[tipo].mirino === true;
+      comandi.zoom(cannocchiale ? ZOOM_CANNOCCHIALE : io.inMira ? ZOOM_MIRA : 1);
       illuminaTeschio(locale.caricaTeschio);
       mondo.disegna(vista, {
         io, mioId: s.mioId, dt, arma: tipo, movimento: io.movimento, corsa: io.corsa, inMira: io.inMira, cannocchiale,
@@ -1135,6 +1195,7 @@ hud.suScelta(({ cosa, valore }) => {
   audio.prepara();
   audio.suona('scatto');
   if (cosa === 'pronto') {
+    locale.prontoChiesto = performance.now();
     inviaAzione({ tipo: 'pronto', attivo: true });
     comandi.blocca();
     return;
@@ -1194,6 +1255,7 @@ if (import.meta.env.DEV) {
       locale.sparoForzato = true;
     },
     azione: a => inviaAzione(a),
+    raggioTeschio: () => scagliaRaggio(s.vista, s.vista.giocatori.find(g => g.id === s.mioId)),
     pronto: () => mondo !== null,
     mondo: () => mondo,
     audio,

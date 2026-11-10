@@ -32,6 +32,25 @@ const cellaDi = (g, x, z) => [Math.floor((x - g.x0) / CELLA), Math.floor((z - g.
 const centroCella = (g, c, r) => [g.x0 + (c + 0.5) * CELLA, g.z0 + (r + 0.5) * CELLA];
 const dentro = (g, c, r) => c >= 0 && r >= 0 && c < g.colonne && r < g.righe;
 
+const RAGGIO_RICERCA = 4;
+
+function celleLibereVicine(g, c, r) {
+  if (g.libera[r * g.colonne + c]) return [[c, r, 0]];
+  for (let raggio = 1; raggio <= RAGGIO_RICERCA; raggio++) {
+    const trovate = [];
+    for (let dr = -raggio; dr <= raggio; dr++) {
+      for (let dc = -raggio; dc <= raggio; dc++) {
+        if (Math.max(Math.abs(dc), Math.abs(dr)) !== raggio) continue;
+        const cc = c + dc;
+        const rr = r + dr;
+        if (dentro(g, cc, rr) && g.libera[rr * g.colonne + cc]) trovate.push([cc, rr, Math.hypot(dc, dr)]);
+      }
+    }
+    if (trovate.length) return trovate;
+  }
+  return [];
+}
+
 export function nuovoCalcolo(g, bersagli, riciclo = null) {
   const totale = g.colonne * g.righe;
   const distanze = riciclo?.distanze?.length === totale ? riciclo.distanze.fill(Infinity) : new Float32Array(totale).fill(Infinity);
@@ -40,8 +59,12 @@ export function nuovoCalcolo(g, bersagli, riciclo = null) {
   for (const { x, z } of bersagli) {
     const [c, r] = cellaDi(g, x, z);
     if (!dentro(g, c, r)) continue;
-    distanze[r * g.colonne + c] = 0;
-    coda[fine++] = r * g.colonne + c;
+    for (const [cc, rr, d] of celleLibereVicine(g, c, r)) {
+      const i = rr * g.colonne + cc;
+      if (d >= distanze[i]) continue;
+      distanze[i] = d;
+      coda[fine++] = i;
+    }
   }
   return { g, distanze, coda, testa: 0, fine };
 }

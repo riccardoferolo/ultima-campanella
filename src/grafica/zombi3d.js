@@ -4,6 +4,7 @@ import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.
 import { TESTA } from '../colpi.js';
 import { quota } from '../mappa.js';
 import { PROCEDURALI, decoraBruto } from './palude/ragni3d.js';
+import { creaOcchi, altezzaLevitazione } from './palude/occhi3d.js';
 
 const DISSOLVENZA = 0.25;
 const AFFONDA_DOPO = 2.6;
@@ -161,8 +162,25 @@ function logica(z, siMuove) {
   return z.variante % 2 ? 'cammina2' : 'cammina';
 }
 
+const sfereModelli = new WeakMap();
+function sfereDi(risorsa) {
+  if (!sfereModelli.has(risorsa)) {
+    const sfere = [];
+    risorsa.modello.traverse(o => {
+      if (!o.isSkinnedMesh) return;
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      const sfera = o.geometry.boundingSphere.clone();
+      sfera.radius *= 1.8;
+      sfere.push(sfera);
+    });
+    sfereModelli.set(risorsa, sfere);
+  }
+  return sfereModelli.get(risorsa);
+}
+
 export function creaGestoreZombi(scena, risorse) {
   const zombi = new Map();
+  const occhi = creaOcchi(scena);
 
   function creaProcedurale(z, risorsa) {
     const radice = new THREE.Group();
@@ -192,11 +210,16 @@ export function creaGestoreZombi(scena, risorse) {
         o.material = Array.isArray(o.material) ? o.material.map(m => materiali.get(m) ?? m) : materiali.get(o.material) ?? o.material;
       });
     }
+    const sfere = sfereDi(risorsa);
+    let k = 0;
     corpo.traverse(o => {
       if (!o.isSkinnedMesh) return;
       o.frustumCulled = true;
-      o.computeBoundingSphere();
-      o.boundingSphere.radius *= 1.8;
+      o.boundingSphere = sfere[k++]?.clone() ?? null;
+      if (!o.boundingSphere) {
+        o.computeBoundingSphere();
+        o.boundingSphere.radius *= 1.8;
+      }
     });
     radice.add(corpo);
     const aloni = dati.fiamme
@@ -280,16 +303,21 @@ export function creaGestoreZombi(scena, risorse) {
     voce.mixer.timeScale = gelo >= 1 ? 0 : 1 - gelo * 0.6;
   }
 
-  function sospendi(voce, z, buchi, dt) {
+  function sospendi(voce, z, buchi, levitato, dt) {
     let voluto = 0;
     if ((!voce.dati.alto || voce.dati.sollevabile) && z.stato !== 'morto') {
       for (const b of buchi) {
         const d = Math.hypot(z.x - b.x, z.z - b.z);
         if (d < b.raggio) voluto = Math.max(voluto, SOLLEVA * (1 - d / b.raggio) + 0.2);
       }
+      if (levitato) voluto = Math.max(voluto, altezzaLevitazione(levitato.p));
     }
     voce.sollevato += (voluto - voce.sollevato) * Math.min(1, dt * (voluto > voce.sollevato ? 3 : 6));
-    if (voluto > 0) voce.giro += dt * 4;
+    if (voluto > 0) voce.giro += dt * (levitato ? 0.9 : 4);
+    else if (voce.giro !== 0) {
+      const resto = Math.atan2(Math.sin(voce.giro), Math.cos(voce.giro));
+      voce.giro = Math.abs(resto) < 0.02 ? 0 : resto * Math.max(0, 1 - dt * 4);
+    }
     return voce.sollevato;
   }
 
@@ -297,6 +325,7 @@ export function creaGestoreZombi(scena, risorse) {
     const voce = zombi.get(id);
     if (!voce) return;
     scena.remove(voce.radice);
+    occhi.togli(id);
     voce.chiudi?.();
     voce.mixer.stopAllAction();
     voce.mixer.uncacheRoot(voce.corpo);
@@ -308,6 +337,8 @@ export function creaGestoreZombi(scena, risorse) {
     aggiorna(vista, dt) {
       const vivi = new Set();
       const buchi = vista.buchi ?? [];
+      const levitati = vista.palude?.levitati ?? null;
+      const tempo = performance.now() / 1000;
       for (const z of vista.zombie) {
         vivi.add(z.id);
         const voce = zombi.get(z.id) ?? crea(z);
@@ -315,7 +346,8 @@ export function creaGestoreZombi(scena, risorse) {
         voce.ultimaPosizione.set(z.x, z.z);
         suona(voce, logica(z, spostamento > 0.2 * dt));
         voce.emerso = z.stato === 'emerge' ? (voce.emerso ?? 0) + dt : R_EMERSO;
-        const alto = sospendi(voce, z, buchi, dt) - SALITA * (1 - Math.min(1, voce.emerso / R_EMERSO));
+        const levitato = levitati?.[z.id] ?? null;
+        const alto = sospendi(voce, z, buchi, levitato, dt) - SALITA * (1 - Math.min(1, voce.emerso / R_EMERSO));
         const suolo = quota(z.x, z.z);
         voce.radice.position.set(z.x, suolo + alto, z.z);
         for (let i = 0; i < voce.aloni.length; i++) {
@@ -331,9 +363,11 @@ export function creaGestoreZombi(scena, risorse) {
         } else voce.tempoMorto = 0;
         if (z.vita < voce.vitaPrima && z.stato !== 'morto') scuoti(voce, 0.45 + (voce.vitaPrima - z.vita) / 40);
         voce.vitaPrima = z.vita;
+        if (levitato) voce.mixer.timeScale = Math.min(voce.mixer.timeScale, 0.3);
         voce.mixer.update(dt);
         postura(voce, dt);
         voce.anima?.(z, dt, vista);
+        occhi.aggiorna(z.id, z.stato === 'morto' ? null : voce.testa, z.yaw + voce.giro, levitato, tempo);
       }
       for (const id of [...zombi.keys()]) if (!vivi.has(id)) rimuovi(id);
     },
@@ -342,7 +376,7 @@ export function creaGestoreZombi(scena, risorse) {
       return vista.zombie.filter(z => z.stato !== 'morto').map(z => {
         const voce = zombi.get(z.id);
         const dati = risorse.get(z.tipo)?.dati ?? MODELLI.normale;
-        const base = quota(z.x, z.z);
+        const base = voce ? voce.radice.position.y + (dati.procedurale ? voce.corpo.position.y : 0) : quota(z.x, z.z);
         const forma = { id: z.id, x: z.x, z: z.z, base, alto: dati.alto, raggio: dati.raggio, raggioTesta: dati.raggioTesta };
         if (voce?.testa) {
           voce.testa.getWorldPosition(punto);
@@ -372,6 +406,7 @@ export function creaGestoreZombi(scena, risorse) {
     },
     svuota() {
       for (const id of [...zombi.keys()]) rimuovi(id);
+      occhi.svuota();
     },
   };
 }

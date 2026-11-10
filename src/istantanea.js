@@ -35,7 +35,8 @@ export function faiIstantanea(stato) {
     fr: [...(stato.frammenti ?? [])],
     cp: stato.campanella ? 1 : 0,
     co: stato.conto === null || stato.conto === undefined ? -1 : r2(stato.conto),
-    gr: (stato.granate ?? []).map(gr => [gr.id, r2(gr.x), r2(gr.y), r2(gr.z)]),
+    gr: (stato.granate ?? []).map(gr => (gr.ragnatela ? [gr.id, r2(gr.x), r2(gr.y), r2(gr.z), 1] : [gr.id, r2(gr.x), r2(gr.y), r2(gr.z)])),
+    rg: stato.zombie.filter(z => z.ragnatela > 0 && z.stato !== 'morto').map(z => z.id),
     pj: (stato.proiettili ?? []).map(p => [p.id, r2(p.x), r2(p.y), r2(p.z)]),
     bh: (stato.buchi ?? []).map(b => [b.id, r2(b.x), r2(b.y), r2(b.z), r2(Math.max(0, b.timer)), r2(b.raggio)]),
     m: stato.missione
@@ -77,7 +78,8 @@ export function espandi(ist) {
     giungla: espandiGiungla(ist),
     teatro: espandiTeatro(ist),
     palude: espandiPalude(ist),
-    granate: (ist.gr ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
+    granate: (ist.gr ?? []).map(([id, x, y, z, ragnatela]) => ({ id, x, y, z, ragnatela: !!ragnatela })),
+    ragnatele: new Set(ist.rg ?? []),
     proiettili: (ist.pj ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),
     buchi: (ist.bh ?? []).map(([id, x, y, z, timer, raggio]) => ({ id, x, y, z, timer, raggio })),
     missione: {
@@ -115,7 +117,7 @@ function interpolaGranate(prima, dopo, t) {
   const vecchie = new Map(prima.map(g => [g.id, g]));
   return dopo.map(g => {
     const v = vecchie.get(g.id);
-    return v ? { id: g.id, x: lineare(v.x, g.x, t), y: lineare(v.y, g.y, t), z: lineare(v.z, g.z, t) } : g;
+    return v ? { ...g, x: lineare(v.x, g.x, t), y: lineare(v.y, g.y, t), z: lineare(v.z, g.z, t) } : g;
   });
 }
 

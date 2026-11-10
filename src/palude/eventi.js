@@ -1,4 +1,5 @@
 import { R } from '../regole.js';
+import { PROVE, PASSO } from './reliquie.js';
 
 const LUOGHI_TOTEM = Object.freeze({ capanna: 'della capanna', cimitero: 'del cimitero', rapide: 'delle rapide' });
 const COLORI_COLPO = Object.freeze({ scarica: 0x9fdcff, acido: 0x7dff3a, tela: 0xf2f2e8, pioggia: 0x9dff4a });
@@ -88,6 +89,67 @@ export function eventoPalude(e, { hud, audio, mondo, perMe, nomeDi, io }) {
       }
       return true;
     }
+    case 'reliquiaPresa':
+      audio.suona('segreto');
+      hud.avviso(perMe ? `Reliquia presa: ${PROVE[e.elemento].reliquia}. Ora ${PROVE[e.elemento].oggetti}` : `${nomeDi(e.a)} ha preso la reliquia del ${PROVE[e.elemento].nome}`, 'bene');
+      return true;
+    case 'oggettoElemento':
+      if (perMe) {
+        audio.suona('frammento');
+        hud.avviso(`${PROVE[e.elemento].reliquia}: ${e.fatti}/3`, 'bene');
+      }
+      return true;
+    case 'provaElemento':
+      if (perMe) {
+        audio.suona('fusibile');
+        const prova = PROVE[e.elemento];
+        hud.avviso(e.passo === PASSO.ANIME ? `${prova.reliquia}: ora ${prova.anime}` : e.passo === PASSO.DIFESA ? `${prova.reliquia}: ${prova.difesa}` : `La reliquia del ${prova.nome} è carica: riportala al suo piedistallo nel tempio`, 'bene');
+      }
+      return true;
+    case 'reliquiaPosata':
+      audio.suona('evocazione');
+      if (perMe) hud.avviso(`Difendi la reliquia del ${PROVE[e.elemento].nome}: restale vicino e non farla toccare agli zombie`);
+      return true;
+    case 'reliquiaAbbandonata':
+      if (perMe) hud.avviso(`Nessuno difendeva la reliquia del ${PROVE[e.elemento].nome}: è tornata con te, posala di nuovo nel cerchio`);
+      return true;
+    case 'statuaAccesa':
+      audio.suona('potenzia');
+      hud.avviso(perMe ? `La statua del ${PROVE[e.elemento].nome} si accende: posale davanti il Teschio` : `La statua del ${PROVE[e.elemento].nome} si è accesa`, 'bene');
+      return true;
+    case 'infusione':
+      audio.suona('anima');
+      if (perMe) hud.avviso(`La statua infonde il ${PROVE[e.elemento].nome} nel Teschio…`, 'bene');
+      return true;
+    case 'infusioneFinita':
+      audio.suona('segreto');
+      if (perMe) hud.avviso(`Il Teschio di ${PROVE[e.elemento].nome} è pronto sul piedistallo!`, 'bene');
+      return true;
+    case 'elementoInfuso':
+      audio.suona('potenziata');
+      hud.avviso(perMe ? `Il tuo Teschio ora è di ${PROVE[e.elemento].nome}!` : `${nomeDi(e.a)} ha il Teschio di ${PROVE[e.elemento].nome}`, 'bene');
+      return true;
+    case 'missioneCompiuta': {
+      audio.suona('vittoria');
+      const minuti = Math.floor(e.durata / 60);
+      const secondi = String(e.durata % 60).padStart(2, '0');
+      hud.avviso(`MISSIONE COMPIUTA: Arachne è sepolta (${minuti}:${secondi}). ${trofeoPalude()} I round continuano: resistete!`, 'bene');
+      return true;
+    }
+    case 'ragnatela':
+      mondo.ragnatela(e.x, e.z, e.raggio);
+      for (let i = 0; i < 3; i++) effetti.esplosione(punto(e.x + (Math.random() - 0.5) * e.raggio, 0.6, e.z + (Math.random() - 0.5) * e.raggio), 'energia', 0xf2efe2);
+      audio.suona('congelato');
+      return true;
+    case 'ragnatelaDifesa':
+      if (perMe) hud.avviso('La Vedova ti protegge: la tela intrappola chi ti ha colpito', 'bene');
+      return true;
+    case 'ragnatelaPronta':
+      if (perMe) {
+        audio.suona('frammento');
+        hud.avviso('Una nuova granata ragnatela è pronta', 'bene');
+      }
+      return true;
     case 'invischiato':
       if (perMe) {
         audio.suona('congelato');

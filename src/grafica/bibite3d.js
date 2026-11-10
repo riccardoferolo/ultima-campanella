@@ -10,6 +10,7 @@ export const MARCHI = Object.freeze({
   raffica: { nome: 'RAFFICA', slogan: 'Il grilletto non dorme', icona: 'proiettili' },
   scatto: { nome: 'SCATTO', slogan: 'Gambe da lepre', icona: 'ala' },
   tasca: { nome: 'TASCA', slogan: "Ce n'è sempre una in più", icona: 'tasca' },
+  vedova: { nome: 'VEDOVA', slogan: 'La tela ti protegge', icona: 'ragno', scocca: 0x0c0909, fondo: 0x2a0406 },
 });
 
 const marchioDi = tipo => ({ ...MARCHI[tipo], ...(NOMI.marchi?.[tipo] ?? {}) });
@@ -90,6 +91,30 @@ const ICONE = {
       ctx.stroke();
     }
   },
+  ragno(ctx) {
+    ctx.lineWidth = 0.09;
+    ctx.lineCap = 'round';
+    for (const lato of [-1, 1]) {
+      for (let k = 0; k < 4; k++) {
+        const a = -0.9 + k * 0.55;
+        ctx.beginPath();
+        ctx.moveTo(lato * 0.12, -0.05 + k * 0.08);
+        ctx.quadraticCurveTo(lato * 0.62, a - 0.35, lato * (0.85 + (k % 2) * 0.1), a + 0.25);
+        ctx.stroke();
+      }
+    }
+    ctx.beginPath();
+    ctx.ellipse(0, -0.28, 0.2, 0.24, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, 0.38, 0.36, 0.52, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff2a2a';
+    ctx.beginPath();
+    for (const [x, y] of [[-0.16, 0.12], [0.16, 0.12], [0, 0.38], [0.16, 0.64], [-0.16, 0.64], [0, 0.38]]) ctx.lineTo(x, y);
+    ctx.closePath();
+    ctx.fill();
+  },
   tasca(ctx) {
     ctx.beginPath();
     ctx.roundRect(-0.8, -0.45, 1.6, 1.4, 0.25);
@@ -140,11 +165,11 @@ function scritta(ctx, testo, x, y, dimensione, colore, bordo = '#000') {
 function texturaPannello(tipo) {
   const marchio = marchioDi(tipo);
   const colore = new THREE.Color(BEVANDE[tipo].colore);
-  const chiaro = esadecimale(colore.clone().lerp(new THREE.Color(0xffffff), 0.35).getHex());
+  const chiaro = esadecimale(marchio.fondo ? 0x111111 : colore.clone().lerp(new THREE.Color(0xffffff), 0.35).getHex());
   const scuro = esadecimale(colore.clone().multiplyScalar(0.25).getHex());
   return tela(512, 512, (ctx, l, a) => {
     const g = ctx.createLinearGradient(0, 0, 0, a);
-    g.addColorStop(0, esadecimale(colore.getHex()));
+    g.addColorStop(0, esadecimale(marchio.fondo ?? colore.getHex()));
     g.addColorStop(1, scuro);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, l, a);
@@ -260,7 +285,7 @@ export function creaBottiglia(tipo) {
 export function creaDistributore(tipo) {
   const r = risorse(tipo);
   const macchina = new THREE.Group();
-  const scocca = new THREE.MeshStandardMaterial({ color: r.colore.clone().multiplyScalar(0.35), metalness: 0.55, roughness: 0.32 });
+  const scocca = new THREE.MeshStandardMaterial({ color: marchioDi(tipo).scocca ?? r.colore.clone().multiplyScalar(0.35), metalness: 0.55, roughness: 0.32 });
   const corpo = new THREE.Mesh(new RoundedBoxGeometry(LARGO, ALTO, FONDO, 3, 0.035), scocca);
   corpo.position.y = ALTO / 2;
   const insegna = new THREE.Mesh(new RoundedBoxGeometry(LARGO + 0.04, 0.26, FONDO + 0.04, 3, 0.03), [scocca, scocca, scocca, scocca, new THREE.MeshBasicMaterial({ map: texturaInsegna(tipo) }), scocca]);
@@ -268,7 +293,7 @@ export function creaDistributore(tipo) {
   const pannello = new THREE.Mesh(new THREE.PlaneGeometry(LARGO - 0.1, 0.8), new THREE.MeshBasicMaterial({ map: texturaPannello(tipo) }));
   pannello.position.set(0, 0.62, FONDO / 2 + 0.003);
   const vetrinaZ = FONDO / 2 + PROFONDITA_VETRINA / 2;
-  const fondale = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.88), new THREE.MeshBasicMaterial({ color: r.colore.clone().lerp(new THREE.Color(0xffffff), 0.15).multiplyScalar(0.8) }));
+  const fondale = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.88), new THREE.MeshBasicMaterial({ color: marchioDi(tipo).fondo ? new THREE.Color(0x3a0608) : r.colore.clone().lerp(new THREE.Color(0xffffff), 0.15).multiplyScalar(0.8) }));
   fondale.position.set(-0.13, 1.5, FONDO / 2 + 0.003);
   const ripiani = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.012, 0.14), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.8, roughness: 0.3 }));
   const bottiglie = new THREE.InstancedMesh(r.bottiglia, r.vetro, 12);

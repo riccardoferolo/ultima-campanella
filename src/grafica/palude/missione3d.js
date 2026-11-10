@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { MISSIONE } from '../../mappe/palude.js';
+import { quota } from '../../mappa.js';
 import { AMULETO, VARCO } from '../../palude.js';
 import { creaCaso } from '../caso-grafica.js';
 import { texturaRune, texturaPericolo, texturaRagnatela } from './tele.js';
@@ -385,7 +386,7 @@ export function creaMissione(scena, { mat, alone, pezzo, cubo }) {
       const colore = COLORI_COLPO[c.tipo] ?? 0xffffff;
       a.m.material.color.setHex(colore);
       a.pieno.material.color.setHex(colore);
-      a.m.position.set(c.x, 0.06, c.z);
+      a.m.position.set(c.x, quota(c.x, c.z) + 0.06, c.z);
       a.m.scale.setScalar(c.raggio);
       const urgenza = 1 - Math.min(1, c.timer / 1.3);
       a.m.material.opacity = 0.5 + Math.sin(tempo * (8 + urgenza * 20)) * 0.3;
@@ -397,7 +398,7 @@ export function creaMissione(scena, { mat, alone, pezzo, cubo }) {
       const p = elenco[i];
       m.visible = !!p;
       if (!p) return;
-      m.position.set(p.x, 0.05, p.z);
+      m.position.set(p.x, quota(p.x, p.z) + 0.05, p.z);
       m.scale.setScalar(p.raggio * Math.min(1, p.timer / 0.6 + 0.2));
       m.material.emissiveIntensity = 0.5 + Math.sin(tempo * 6 + p.id) * 0.2;
     });

@@ -318,6 +318,27 @@ function cambiaFase(stato, arachne, eventi, S) {
   eventi.push({ k: 'arachneSoffitto', servono });
 }
 
+export const MISSIONE_COMPIUTA = 5;
+
+function missioneCompiuta(stato, eventi, S) {
+  const tana = stato.palude.tana;
+  Object.assign(tana, { fase: MISSIONE_COMPIUTA, azione: '', timer: 0, acqua: 0, vulnerabile: 0 });
+  svuotaColpi(stato.palude);
+  stato.zombie = [];
+  stato.giocatori.forEach((g, i) => {
+    S.aggiungiPunti(stato, g, R.PUNTI_VITTORIA);
+    if (g.stato === 'morto') return;
+    const p = MISSIONE.PARTENZE_RITORNO[i % MISSIONE.PARTENZE_RITORNO.length];
+    Object.assign(g, { stato: 'vivo', vita: g.vitaMax, x: p.x, z: p.z, yaw: 0, rianimando: false, progressoRianimazione: 0, teletrasporto: g.teletrasporto + 1 });
+  });
+  const durata = Math.round(stato.finale?.tempo ?? 0);
+  Object.assign(stato, { fase: 'intervallo', timerFase: R.INTERVALLO, daGenerare: 0, granate: [], proiettili: [], buchi: [], finale: null });
+  eventi.push({
+    k: 'missioneCompiuta', round: stato.round, durata,
+    giocatori: stato.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })),
+  });
+}
+
 function crollo(stato, eventi) {
   const tana = stato.palude.tana;
   Object.assign(tana, { fase: 4, azione: 'crollo', timer: OUTRO, outro: OUTRO });
@@ -347,7 +368,7 @@ export function aggiornaFinale(stato, dt, eventi, S) {
   if (tana.fase === 4) {
     tana.outro -= dt;
     tana.timer = tana.outro;
-    if (tana.outro <= 0) S.vittoria(stato, eventi);
+    if (tana.outro <= 0) missioneCompiuta(stato, eventi, S);
     return;
   }
   const arachne = stato.zombie.find(z => z.tipo === 'arachne' && z.stato !== 'morto');
@@ -381,12 +402,14 @@ export function descriviVarco(io, vista, spezzati, totali) {
     return { costo: 0, testo: `Premi F per bruciare la membrana col Teschio [${COSTO_MEMBRANA} anime]` };
   }
   if (vista.fase === 'finale') return nessuno('');
+  if (tana.fase === MISSIONE_COMPIUTA) return nessuno('La tana di Arachne è crollata: il varco è chiuso per sempre');
   if (!prontiAlSalto(vista)) return nessuno('Radunatevi tutti qui, vivi e ognuno col suo Teschio, per saltare nella tana');
   return { costo: 0, testo: 'Premi F per saltare nella tana di Arachne (non si torna indietro)' };
 }
 
 export function obiettivoTana(vista, mioId) {
   const tana = vista.palude.tana;
+  if (tana.fase === MISSIONE_COMPIUTA) return `Missione compiuta · resistete ai round finché potete (round ${vista.round})`;
   if (tana.fase === 4) return 'La volta crolla su Arachne!';
   if (tana.fase === 1) {
     if (tana.azione === 'cala') return 'Arachne scende dal soffitto…';

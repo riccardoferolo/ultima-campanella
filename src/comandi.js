@@ -1,11 +1,16 @@
 const SENSIBILITA = 0.0022;
+const SOGLIA_ROTELLA = 60;
+const ATTESA_ROTELLA_MS = 160;
 const PITCH_MASSIMO = 1.45;
 const TASTI_GIOCO = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyR', 'KeyF', 'KeyV', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Enter', 'NumpadEnter', 'KeyG', 'KeyM', 'KeyE']);
 
 export function creaComandi(superficie) {
   const premuti = new Set();
-  const stato = { dyaw: 0, dpitch: 0, sparo: false, sparoPremuto: false, mira: false, fPremuto: false, fRilasciato: false, azioni: [] };
+  const stato = { dyaw: 0, dpitch: 0, sparo: false, sparoPremuto: false, sparoRilasciato: false, mira: false, fPremuto: false, fRilasciato: false, azioni: [] };
   let attivo = false;
+  let rotella = 0;
+  let zoom = 1;
+  let ultimaRotella = 0;
   let suBlocco = () => {};
 
   const bloccato = () => document.pointerLockElement === superficie;
@@ -37,8 +42,8 @@ export function creaComandi(superficie) {
   }
   function suMovimento(e) {
     if (!attivo || !bloccato()) return;
-    stato.dyaw -= e.movementX * SENSIBILITA;
-    stato.dpitch -= e.movementY * SENSIBILITA;
+    stato.dyaw -= e.movementX * SENSIBILITA * zoom;
+    stato.dpitch -= e.movementY * SENSIBILITA * zoom;
   }
   function suMouseGiu(e) {
     if (!attivo) return;
@@ -52,11 +57,24 @@ export function creaComandi(superficie) {
     } else if (e.button === 2) stato.mira = true;
   }
   function suMouseSu(e) {
-    if (e.button === 0) stato.sparo = false;
+    if (e.button === 0) {
+      if (stato.sparo) stato.sparoRilasciato = true;
+      stato.sparo = false;
+    }
     else if (e.button === 2) stato.mira = false;
   }
   function suRotella(e) {
-    if (attivo && bloccato()) stato.azioni.push('cambia');
+    if (!attivo || !bloccato()) return;
+    rotella += e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
+    const adesso = performance.now();
+    if (adesso - ultimaRotella < ATTESA_ROTELLA_MS) {
+      rotella = 0;
+      return;
+    }
+    if (Math.abs(rotella) < SOGLIA_ROTELLA) return;
+    rotella = 0;
+    ultimaRotella = adesso;
+    stato.azioni.push('cambia');
   }
   function azzera() {
     premuti.clear();
@@ -90,6 +108,7 @@ export function creaComandi(superficie) {
       }
     },
     blocca: chiediBlocco,
+    zoom(fattore) { zoom = fattore; },
     suBlocco(cb) { suBlocco = cb; },
     get bloccato() { return bloccato(); },
     applicaVista(io) {
@@ -105,6 +124,7 @@ export function creaComandi(superficie) {
         corsa: premuto('ShiftLeft', 'ShiftRight'),
         sparo: stato.sparo,
         sparoPremuto: stato.sparoPremuto,
+        sparoRilasciato: stato.sparoRilasciato,
         mira: stato.mira,
         f: premuto('KeyF'),
         fPremuto: stato.fPremuto,
@@ -112,6 +132,7 @@ export function creaComandi(superficie) {
         azioni: stato.azioni.splice(0),
       };
       stato.sparoPremuto = false;
+      stato.sparoRilasciato = false;
       stato.fPremuto = false;
       stato.fRilasciato = false;
       return lettura;

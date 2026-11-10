@@ -102,6 +102,12 @@ export function creaHud() {
     scadenzaAvviso = performance.now() + Math.max(DURATA_AVVISO_MS, testo.length * MS_PER_CARATTERE);
   }
 
+  const guadagni = document.createElement('div');
+  guadagni.className = 'guadagni';
+  const righePunti = document.createElement('div');
+  righePunti.className = 'righe';
+  n.punti.replaceChildren(guadagni, righePunti);
+
   function disegnaPunti(vista, mioId) {
     const ordinati = [...vista.giocatori].sort((a, b) => (a.id === mioId ? -1 : b.id === mioId ? 1 : 0));
     const chiave = ordinati.map(g => `${g.id}:${g.punti}:${g.nome}`).join('|');
@@ -110,7 +116,7 @@ export function creaHud() {
     const mio = ordinati.find(g => g.id === mioId);
     const guadagno = mio && puntiPrima !== null && mio.punti > puntiPrima ? mio.punti - puntiPrima : 0;
     puntiPrima = mio?.punti ?? null;
-    n.punti.replaceChildren(...ordinati.map(g => {
+    righePunti.replaceChildren(...ordinati.map(g => {
       const riga = document.createElement('div');
       riga.className = g.id === mioId ? '' : 'altro';
       const nome = document.createElement('span');
@@ -122,7 +128,7 @@ export function creaHud() {
       const segno = document.createElement('div');
       segno.className = 'guadagno';
       segno.textContent = `+${guadagno}`;
-      n.punti.prepend(segno);
+      guadagni.replaceChildren(segno);
     }
   }
 
@@ -171,6 +177,7 @@ export function creaHud() {
       const ora = performance.now();
       if (ora > scadenzaAvviso) n.avviso.classList.remove('visibile');
       if (ora > scadenzaSegno) n.segno.classList.remove('visibile', 'uccisione');
+      granate.classList.toggle('ragnatela', !!io?.bevande?.includes('vedova'));
       const numero = String(io?.granate ?? 0);
       if (granate.dataset.n !== numero) {
         granate.dataset.n = numero;
@@ -179,6 +186,7 @@ export function creaHud() {
       if (ora > scadenzaRadio) radio.hidden = true;
       const capo = BOSS.map(t => vista.zombie.find(z => z.tipo === t && z.stato !== 'morto')).find(Boolean);
       boss.hidden = !capo;
+      effetti.classList.toggle('sotto-boss', !!capo);
       if (capo) {
         const dati = TIPI_ZOMBIE[capo.tipo];
         const fase = dati.finale ? faseBoss(dati, capo.vita / 100) : 0;

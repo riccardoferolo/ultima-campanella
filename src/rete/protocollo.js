@@ -47,7 +47,8 @@ function eIstantanea(ist) {
     && Array.isArray(ist.x) && ist.x.every(numero)
     && Array.isArray(ist.fr) && ist.fr.every(numero)
     && numero(ist.cp) && numero(ist.co)
-    && elencoNumeri(ist.gr, 4)
+    && Array.isArray(ist.gr) && ist.gr.every(e => Array.isArray(e) && (e.length === 4 || e.length === 5) && e.every(numero))
+    && (ist.rg === undefined || (Array.isArray(ist.rg) && ist.rg.every(numero)))
     && Array.isArray(ist.m) && ist.m.length === 5 && ist.m.every(numero)
     && elencoNumeri(ist.fo, 4)
     && elencoNumeri(ist.pj, 4)
@@ -56,21 +57,23 @@ function eIstantanea(ist) {
     && Array.isArray(ist.gq) && (ist.gq.length === 0 || ist.gq.length === LUNGHEZZA_STATO) && ist.gq.every(numero)
     && elencoNumeri(ist.go, 4) && elencoNumeri(ist.nb, 5) && elencoNumeri(ist.pt, 4)
     && (ist.pl === undefined || (Array.isArray(ist.pl) && ist.pl.every(numero)))
-    && (ist.pe === undefined || (Array.isArray(ist.pe) && ist.pe.length <= 4 && ist.pe.every(e => Array.isArray(e) && e.length === 4 && typeof e[0] === 'string' && e[0].length <= ID_MASSIMO && e.slice(1).every(numero))))
+    && (ist.pe === undefined || (Array.isArray(ist.pe) && ist.pe.length <= 4 && ist.pe.every(e => Array.isArray(e) && e.length === 6 && typeof e[0] === 'string' && e[0].length <= ID_MASSIMO && e.slice(1).every(numero))))
     && (ist.pf === undefined || elencoNumeri(ist.pf, 4))
     && (ist.pa === undefined || (Array.isArray(ist.pa) && ist.pa.every(numero)))
     && (ist.pm === undefined || (Array.isArray(ist.pm) && ist.pm.length === LUNGHEZZA_MISSIONE && ist.pm.every(numero)))
     && (ist.pc === undefined || elencoNumeri(ist.pc, 6))
     && (ist.pp === undefined || elencoNumeri(ist.pp, 5))
-    && (ist.pv === undefined || (Array.isArray(ist.pv) && ist.pv.length <= 4 && ist.pv.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))));
+    && (ist.pv === undefined || (Array.isArray(ist.pv) && ist.pv.length <= 4 && ist.pv.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))))
+    && (ist.pz === undefined || elencoNumeri(ist.pz, 3));
 }
 
 function eAzione(a) {
   if (!a || typeof a !== 'object') return false;
   if (a.tipo === 'colpo') return numero(a.zombie) && numero(a.danno) && (a.gelo === undefined || numero(a.gelo)) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'scegli') return ['pistola', 'aspetto', 'mappa'].includes(a.cosa) && (typeof a.valore === 'string' || numero(a.valore));
-  if (a.tipo === 'speciale') return numero(a.yaw) && numero(a.pitch);
-  if (a.tipo === 'teschio') return numero(a.zombie) || testo(a.oggetto, 16);
+  if (a.tipo === 'speciale') return numero(a.yaw) && (a.pitch === undefined || numero(a.pitch));
+  if (a.tipo === 'lampadario') return true;
+  if (a.tipo === 'teschio') return numero(a.zombie) || testo(a.oggetto, 16) || typeof a.carica === 'boolean';
   if (a.tipo === 'sparo') return numero(a.yaw) && numero(a.pitch) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'catena') return Array.isArray(a.zombie) && a.zombie.length > 0 && a.zombie.length <= 13 && a.zombie.every(numero) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'compra') return testo(a.acquisto) && (a.arma === undefined || arma(a.arma));

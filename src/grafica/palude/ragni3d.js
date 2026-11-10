@@ -6,15 +6,16 @@ import { DURATA_CALA, DURATA_SALITA } from '../../palude.js';
 const RAGNI_MASSIMI = 40;
 const ZAMPE_PER_LATO = 4;
 const ZAMPE = ZAMPE_PER_LATO * 2;
-const COSCIA = 0.42;
-const TIBIA = 0.55;
-const ALTEZZA_ANCA = 0.42;
-const PASSO_ZAMPA = 0.32;
-const SOLLEVA_ZAMPA = 0.1;
-const APERTURA = Object.freeze([0.55, 0.2, -0.2, -0.6]);
-const ALLUNGO = Object.freeze([0.72, 0.62, 0.62, 0.72]);
-const RAGGIO_COSCIA = 0.05;
-const RAGGIO_TIBIA = 0.032;
+const COSCIA = 0.5;
+const TIBIA = 0.74;
+const ALTEZZA_ANCA = 0.5;
+const PASSO_ZAMPA = 0.4;
+const SOLLEVA_ZAMPA = 0.15;
+const APERTURA = Object.freeze([0.78, 0.26, -0.26, -0.78]);
+const ALLUNGO = Object.freeze([1.02, 0.86, 0.86, 1.02]);
+const RAGGIO_COSCIA = 0.024;
+const RAGGIO_TIBIA = 0.013;
+const RESPIRO = 0.045;
 const SCALA_ARACHNE = 5.2;
 const SOFFITTO_TANA = 12;
 const GHIACCIO = new THREE.Color(0x9fdcff);
@@ -44,20 +45,32 @@ const texturaChitina = () => tela(128, 128, (c, l, a, caso) => {
   }
 });
 
-const texturaAddome = () => tela(256, 128, (c, l, a, caso) => {
-  c.fillStyle = '#0d0a09';
+const texturaAddome = () => tela(256, 256, (c, l, a, caso) => {
+  const fondo = c.createLinearGradient(0, 0, 0, a);
+  fondo.addColorStop(0, '#ffb347');
+  fondo.addColorStop(0.45, '#ff7a12');
+  fondo.addColorStop(1, '#c2410c');
+  c.fillStyle = fondo;
   c.fillRect(0, 0, l, a);
-  c.fillStyle = '#5e0f12';
-  for (const x of [l * 0.25, l * 0.75]) {
-    c.beginPath();
-    c.moveTo(x, a * 0.18);
-    c.lineTo(x + 18, a * 0.5);
-    c.lineTo(x, a * 0.82);
-    c.lineTo(x - 18, a * 0.5);
-    c.fill();
+  c.fillStyle = 'rgba(20, 8, 4, 0.92)';
+  for (let i = 0; i < 6; i++) {
+    const y = a * (0.12 + i * 0.13);
+    const largo = l * (0.1 + 0.05 * Math.sin(i * 0.9 + 1));
+    for (const x of [l * 0.25, l * 0.75]) {
+      c.beginPath();
+      c.moveTo(x - largo, y);
+      c.lineTo(x, y + a * 0.05);
+      c.lineTo(x + largo, y);
+      c.lineTo(x, y + a * 0.085);
+      c.closePath();
+      c.fill();
+    }
   }
-  for (let i = 0; i < 500; i++) {
-    c.fillStyle = `rgba(${120 + caso() * 80}, ${100 + caso() * 60}, 80, ${0.08 + caso() * 0.12})`;
+  c.fillStyle = 'rgba(30, 10, 4, 0.55)';
+  c.fillRect(0, 0, l * 0.04, a);
+  c.fillRect(l * 0.48, 0, l * 0.04, a);
+  for (let i = 0; i < 900; i++) {
+    c.fillStyle = caso() < 0.5 ? `rgba(255, 220, 160, ${0.08 + caso() * 0.15})` : `rgba(40, 12, 4, ${0.1 + caso() * 0.2})`;
     c.fillRect(caso() * l, caso() * a, 1, 2 + caso() * 3);
   }
 });
@@ -67,10 +80,13 @@ function materialiRagni() {
   if (materiali) return materiali;
   const chitina = texturaChitina();
   materiali = {
-    corpo: new THREE.MeshStandardMaterial({ map: chitina, color: 0x8a8070, roughness: 0.42, metalness: 0.08 }),
-    zampe: new THREE.MeshStandardMaterial({ map: chitina, color: 0x6e665a, roughness: 0.5, metalness: 0.05 }),
+    corpo: new THREE.MeshStandardMaterial({ map: chitina, color: 0x3a2e26, roughness: 0.38, metalness: 0.1 }),
+    zampe: new THREE.MeshStandardMaterial({ map: chitina, color: 0x2a221c, roughness: 0.45, metalness: 0.08 }),
     occhi: new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff1a12, emissiveIntensity: 2.2, roughness: 0.2 }),
-    addome: new THREE.MeshStandardMaterial({ map: texturaAddome(), roughness: 0.35, metalness: 0.12 }),
+    addome: (() => {
+      const pelle = texturaAddome();
+      return new THREE.MeshStandardMaterial({ map: pelle, emissiveMap: pelle, emissive: 0xff6a10, emissiveIntensity: 0.55, roughness: 0.32, metalness: 0.05 });
+    })(),
     zanne: new THREE.MeshStandardMaterial({ color: 0xcfc3a4, roughness: 0.35 }),
     punto: new THREE.MeshStandardMaterial({ color: 0x3a0e04, emissive: 0xff7a1a, emissiveIntensity: 1.2, roughness: 0.3 }),
     seta: new THREE.MeshStandardMaterial({ map: texturaSeta(), color: 0xf2f2ea, emissive: 0x9fd8a0, emissiveIntensity: 0.15, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, roughness: 0.9 }),
@@ -80,17 +96,24 @@ function materialiRagni() {
 }
 
 function geometriaCorpo() {
-  const addome = new THREE.SphereGeometry(0.3, 14, 10).scale(1, 0.8, 1.25).translate(0, 0.44, -0.36);
-  const torace = new THREE.SphereGeometry(0.19, 12, 9).scale(1, 0.72, 1.1).translate(0, 0.4, 0.04);
-  const testa = new THREE.SphereGeometry(0.13, 10, 8).translate(0, 0.38, 0.25);
-  const zanne = [-1, 1].map(s => new THREE.ConeGeometry(0.03, 0.14, 5).rotateX(Math.PI * 0.85).translate(s * 0.05, 0.3, 0.36));
-  return mergeGeometries([addome, torace, testa, ...zanne].map(g => g.toNonIndexed()));
+  const torace = new THREE.SphereGeometry(0.1, 12, 9).scale(1, 0.62, 1.25).translate(0, 0.5, 0.03);
+  const testa = new THREE.SphereGeometry(0.065, 10, 8).scale(1, 0.85, 1).translate(0, 0.5, 0.15);
+  const vita = new THREE.CylinderGeometry(0.022, 0.03, 0.14, 6).rotateX(Math.PI / 2 - 0.35).translate(0, 0.53, -0.1);
+  const zanne = [-1, 1].map(s => new THREE.ConeGeometry(0.016, 0.1, 5).rotateX(Math.PI * 0.82).translate(s * 0.026, 0.45, 0.21));
+  const palpi = [-1, 1].map(s => new THREE.CylinderGeometry(0.008, 0.012, 0.13, 5).rotateX(1.1).rotateZ(s * 0.35).translate(s * 0.045, 0.49, 0.22));
+  return mergeGeometries([torace, testa, vita, ...zanne, ...palpi].map(g => g.toNonIndexed()));
+}
+
+function geometriaAddome() {
+  const sacco = new THREE.SphereGeometry(0.27, 20, 16).scale(0.9, 0.8, 1.32).rotateX(-0.28).translate(0, 0.62, -0.43);
+  const filiere = new THREE.ConeGeometry(0.04, 0.1, 6).rotateX(-Math.PI / 2 - 0.5).translate(0, 0.5, -0.78);
+  return mergeGeometries([sacco, filiere].map(g => g.toNonIndexed()));
 }
 
 function geometriaOcchi() {
   const occhi = [];
   for (let i = 0; i < 4; i++) {
-    for (const s of [-1, 1]) occhi.push(new THREE.SphereGeometry(i < 2 ? 0.026 : 0.018, 6, 4).translate(s * (0.03 + i * 0.022), 0.44 + (i % 2) * 0.025, 0.34 - i * 0.012));
+    for (const s of [-1, 1]) occhi.push(new THREE.SphereGeometry(i < 2 ? 0.016 : 0.011, 6, 4).translate(s * (0.016 + i * 0.013), 0.53 + (i % 2) * 0.016, 0.2 - i * 0.008));
   }
   return mergeGeometries(occhi);
 }
@@ -99,7 +122,7 @@ const geometriaZampa = () => new THREE.CylinderGeometry(0.65, 1, 1, 6, 1).transl
 
 const ANCA = new THREE.Vector3();
 function anca(lato, k, scala) {
-  return ANCA.set(lato * 0.13 * scala, ALTEZZA_ANCA * scala, (0.12 - k * 0.085) * scala);
+  return ANCA.set(lato * 0.07 * scala, ALTEZZA_ANCA * scala, (0.08 - k * 0.045) * scala);
 }
 
 function piede(lato, k, scala, fase, ampiezza, alzata, allungo, esito) {
@@ -178,15 +201,19 @@ function telaioCorpo(m, altezza, beccheggio, rollio, alzo) {
 function creaBranco(scena) {
   const mat = materialiRagni();
   const corpo = new THREE.InstancedMesh(geometriaCorpo(), mat.corpo, RAGNI_MASSIMI);
+  const addome = new THREE.InstancedMesh(geometriaAddome(), mat.addome, RAGNI_MASSIMI);
   const occhi = new THREE.InstancedMesh(geometriaOcchi(), mat.occhi, RAGNI_MASSIMI);
   const zampe = new THREE.InstancedMesh(geometriaZampa(), mat.zampe, RAGNI_MASSIMI * ZAMPE * 2);
-  for (const m of [corpo, occhi, zampe]) {
+  for (const m of [corpo, addome, occhi, zampe]) {
     m.frustumCulled = false;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < m.count; i++) m.setMatrixAt(i, NASCOSTA);
     scena.add(m);
   }
-  for (let i = 0; i < corpo.count; i++) corpo.setColorAt(i, BIANCO);
+  for (let i = 0; i < corpo.count; i++) {
+    corpo.setColorAt(i, BIANCO);
+    addome.setColorAt(i, BIANCO);
+  }
   for (let i = 0; i < zampe.count; i++) zampe.setColorAt(i, BIANCO);
   const liberi = Array.from({ length: RAGNI_MASSIMI }, (_, i) => RAGNI_MASSIMI - 1 - i);
   const stato = new Map();
@@ -197,7 +224,9 @@ function creaBranco(scena) {
   const pezzo = new THREE.Matrix4();
   const pos = new THREE.Vector3();
   const colore = new THREE.Color();
-  const mesh = [corpo, occhi, zampe];
+  const mesh = [corpo, addome, occhi, zampe];
+  const gonfia = new THREE.Matrix4();
+  const centroAddome = new THREE.Vector3(0, 0.62, -0.43);
   const opzioni = { fase: 0, corpo: relativo, morto: false, impennata: 0 };
   let base = 0;
   const emetti = (i, h, g, p) => {
@@ -210,6 +239,7 @@ function creaBranco(scena) {
 
   function nascondi(slot) {
     corpo.setMatrixAt(slot, NASCOSTA);
+    addome.setMatrixAt(slot, NASCOSTA);
     occhi.setMatrixAt(slot, NASCOSTA);
     for (let k = 0; k < ZAMPE * 2; k++) zampe.setMatrixAt(slot * ZAMPE * 2 + k, NASCOSTA);
     sporco = true;
@@ -245,8 +275,12 @@ function creaBranco(scena) {
       b.multiplyMatrices(m, relativo);
       corpo.setMatrixAt(slot, b);
       occhi.setMatrixAt(slot, b);
+      const respiro = 1 + RESPIRO * Math.sin(performance.now() / 260 + slot * 1.7) * (st.morto > 0 ? 0 : 1);
+      gonfia.makeTranslation(centroAddome.x, centroAddome.y, centroAddome.z).multiply(s.makeScale(respiro, respiro, respiro)).multiply(pezzo.makeTranslation(-centroAddome.x, -centroAddome.y, -centroAddome.z));
+      addome.setMatrixAt(slot, pezzo.multiplyMatrices(b, gonfia));
       colore.copy(BIANCO).lerp(GHIACCIO, Math.min(1, z.gelo ?? 0) * 0.8);
       corpo.setColorAt(slot, colore);
+      addome.setColorAt(slot, colore);
       Object.assign(opzioni, { fase: st.fase, morto: st.morto > 0.5, impennata: attacco * 0.6 });
       base = slot * ZAMPE * 2;
       posaZampe(1, opzioni, emetti);
@@ -256,6 +290,7 @@ function creaBranco(scena) {
       if (!sporco) return;
       for (const m of mesh) m.instanceMatrix.needsUpdate = true;
       corpo.instanceColor.needsUpdate = true;
+      addome.instanceColor.needsUpdate = true;
       zampe.instanceColor.needsUpdate = true;
       sporco = false;
     },
@@ -273,7 +308,7 @@ function costruisciRagno(z, radice, scena) {
   const slot = branco.prendi();
   const corpo = new THREE.Group();
   const testa = new THREE.Object3D();
-  testa.position.set(0, 0.4, 0.3);
+  testa.position.set(0, 0.62, -0.43);
   corpo.add(testa);
   radice.add(corpo);
   return {
@@ -301,18 +336,20 @@ function costruisciArachne(z, radice) {
     busto.add(o);
     return o;
   };
-  mesh(new THREE.SphereGeometry(0.3 * S, 32, 22).scale(1, 0.8, 1.25), mat.addome, 0, 0.47 * S, -0.38 * S);
-  mesh(new THREE.SphereGeometry(0.19 * S, 24, 16).scale(1, 0.72, 1.1), mat.corpo, 0, 0.42 * S, 0.04 * S);
-  mesh(new THREE.SphereGeometry(0.13 * S, 20, 14), mat.corpo, 0, 0.4 * S, 0.25 * S);
-  mesh(geometriaOcchi().scale(S, S, S).translate(0, -0.02 * S, 0.01 * S), mat.occhi, 0, 0, 0);
+  mesh(new THREE.SphereGeometry(0.3 * S, 36, 26).scale(0.92, 0.82, 1.32).rotateX(-0.28), mat.addome, 0, 0.64 * S, -0.46 * S);
+  mesh(new THREE.ConeGeometry(0.05 * S, 0.12 * S, 8).rotateX(-Math.PI / 2 - 0.5), mat.corpo, 0, 0.5 * S, -0.84 * S);
+  mesh(new THREE.SphereGeometry(0.12 * S, 24, 16).scale(1, 0.62, 1.25), mat.corpo, 0, 0.5 * S, 0.03 * S);
+  mesh(new THREE.SphereGeometry(0.08 * S, 20, 14).scale(1, 0.85, 1), mat.corpo, 0, 0.5 * S, 0.17 * S);
+  mesh(new THREE.CylinderGeometry(0.028 * S, 0.036 * S, 0.16 * S, 8).rotateX(Math.PI / 2 - 0.35), mat.corpo, 0, 0.54 * S, -0.11 * S);
+  mesh(geometriaOcchi().scale(S, S, S).translate(0, 0, 0.02 * S), mat.occhi, 0, 0, 0);
   for (const s of [-1, 1]) {
-    const zanna = mesh(new THREE.ConeGeometry(0.035 * S, 0.2 * S, 8), mat.zanne, s * 0.05 * S, 0.3 * S, 0.37 * S);
-    zanna.rotation.x = Math.PI * 0.85;
+    const zanna = mesh(new THREE.ConeGeometry(0.022 * S, 0.14 * S, 8), mat.zanne, s * 0.03 * S, 0.44 * S, 0.24 * S);
+    zanna.rotation.x = Math.PI * 0.82;
   }
-  const punto = mesh(new THREE.SphereGeometry(0.1 * S, 18, 12).scale(1.2, 0.6, 1.4), mat.punto, 0, 0.27 * S, -0.36 * S);
-  const seta = mesh(new THREE.SphereGeometry(0.42 * S, 24, 16).scale(1, 0.75, 1.55), mat.seta, 0, 0.43 * S, -0.16 * S);
+  const punto = mesh(new THREE.SphereGeometry(0.1 * S, 18, 12).scale(1.2, 0.6, 1.4), mat.punto, 0, 0.42 * S, -0.5 * S);
+  const seta = mesh(new THREE.SphereGeometry(0.42 * S, 24, 16).scale(1, 0.8, 1.6), mat.seta, 0, 0.58 * S, -0.3 * S);
   const testa = new THREE.Object3D();
-  testa.position.set(0, 0.42 * S, 0.3 * S);
+  testa.position.set(0, 0.5 * S, 0.2 * S);
   busto.add(testa);
   const filo = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1, 6).translate(0, 0.5, 0), mat.filo);
   corpo.add(filo);
@@ -387,7 +424,7 @@ function modelloDiProva(geometria, materiale) {
 
 export const PROCEDURALI = Object.freeze({
   ragno: {
-    dati: Object.freeze({ alto: 0.7, raggio: 0.45, raggioTesta: 0.22, sollevabile: true, procedurale: true }),
+    dati: Object.freeze({ alto: 0.85, raggio: 0.42, raggioTesta: 0.3, sollevabile: true, procedurale: true }),
     get modello() { return modelloDiProva(geometriaCorpo(), materialiRagni().corpo); },
     costruisci: costruisciRagno,
   },
