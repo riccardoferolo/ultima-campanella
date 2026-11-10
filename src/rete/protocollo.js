@@ -62,15 +62,18 @@ function eIstantanea(ist) {
     && (ist.pm === undefined || (Array.isArray(ist.pm) && ist.pm.length === LUNGHEZZA_MISSIONE && ist.pm.every(numero)))
     && (ist.pc === undefined || elencoNumeri(ist.pc, 6))
     && (ist.pp === undefined || elencoNumeri(ist.pp, 5))
-    && (ist.pv === undefined || (Array.isArray(ist.pv) && ist.pv.length <= 4 && ist.pv.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))));
+    && (ist.pv === undefined || (Array.isArray(ist.pv) && ist.pv.length <= 4 && ist.pv.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))))
+    && (ist.tq === undefined || (Array.isArray(ist.tq) && ist.tq.every(numero))) && (ist.tn === undefined || elencoNumeri(ist.tn, 5))
+    && [ist.ts, ist.tg].every(e => e === undefined || (Array.isArray(e) && e.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))));
 }
 
 function eAzione(a) {
   if (!a || typeof a !== 'object') return false;
   if (a.tipo === 'colpo') return numero(a.zombie) && numero(a.danno) && (a.gelo === undefined || numero(a.gelo)) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'scegli') return ['pistola', 'aspetto', 'mappa'].includes(a.cosa) && (typeof a.valore === 'string' || numero(a.valore));
-  if (a.tipo === 'speciale') return numero(a.yaw) && numero(a.pitch);
   if (a.tipo === 'teschio') return numero(a.zombie) || testo(a.oggetto, 16);
+  if (a.tipo === 'speciale') return numero(a.yaw) && (a.pitch === undefined || numero(a.pitch));
+  if (a.tipo === 'lampadario') return true;
   if (a.tipo === 'sparo') return numero(a.yaw) && numero(a.pitch) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'catena') return Array.isArray(a.zombie) && a.zombie.length > 0 && a.zombie.length <= 13 && a.zombie.every(numero) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'compra') return testo(a.acquisto) && (a.arma === undefined || arma(a.arma));

@@ -672,6 +672,7 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
   const pietreCadenti = new Map();
   const materialeNube = new THREE.SpriteMaterial({ map: alone, color: 0x7dff6a, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
   const materialeSegno = new THREE.MeshBasicMaterial({ color: 0xff3a2a, transparent: true, opacity: 0.6, depthWrite: false });
+  const geoSegno = new THREE.RingGeometry(1.6, 2.2, 32).rotateX(-Math.PI / 2);
 
   const luci = Array.from({ length: luciAccese }, () => {
     const luce = new THREE.PointLight(0xffffff, 0, 10, 1.4);
@@ -720,6 +721,9 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
   };
 
   return {
+    svuota() {
+      for (const porta of porte.values()) porta.apertura = 0;
+    },
     aggiorna(vista, dt, tempo, punto) {
       macchine.aggiorna(vista, dt, tempo);
       aggiornaLuci(dt, tempo, punto);
@@ -794,7 +798,7 @@ export function costruisciGiungla(scena, { reali, materialiArmi, oggetti, modell
         m.scale.setScalar(Math.min(1, n.timer));
       }
       sincronizza(g.pietreCadenti, pietreCadenti, () => {
-        const segno = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.2, 32).rotateX(-Math.PI / 2), materialeSegno);
+        const segno = new THREE.Mesh(geoSegno, materialeSegno);
         scena.add(segno);
         return segno;
       });

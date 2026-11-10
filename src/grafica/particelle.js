@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { quota } from '../mappa.js';
 
 const VERTICE = `
 attribute float dimensione;
@@ -47,6 +48,7 @@ export function creaNuvola(scena, texture, quante, additiva) {
   const vite = new Float32Array(quante);
   const durate = new Float32Array(quante);
   const gravita = new Float32Array(quante);
+  const pavimenti = new Float32Array(quante);
   const libere = [];
   for (let i = quante - 1; i >= 0; i--) libere.push(i);
   const attive = [];
@@ -71,10 +73,18 @@ export function creaNuvola(scena, texture, quante, additiva) {
   function nuova(x, y, z, vx, vy, vz, colore, dimensione, durata, g) {
     if (!libere.length) return;
     const i = libere.pop();
-    posizioni.set([x, y, z], i * 3);
-    velocita.set([vx, vy, vz], i * 3);
+    const p = i * 3;
+    posizioni[p] = x;
+    posizioni[p + 1] = y;
+    posizioni[p + 2] = z;
+    velocita[p] = vx;
+    velocita[p + 1] = vy;
+    velocita[p + 2] = vz;
     tinta.setHex(colore);
-    colori.set([tinta.r, tinta.g, tinta.b], i * 3);
+    colori[p] = tinta.r;
+    colori[p + 1] = tinta.g;
+    colori[p + 2] = tinta.b;
+    pavimenti[i] = Math.min(y, quota(x, z));
     dimensioni[i] = dimensione;
     alfe[i] = 1;
     vite[i] = 0;
@@ -101,7 +111,7 @@ export function creaNuvola(scena, texture, quante, additiva) {
         const i = attive[k];
         vite[i] += dt;
         const p = i * 3;
-        if (vite[i] >= durate[i] || posizioni[p + 1] < 0) {
+        if (vite[i] >= durate[i] || posizioni[p + 1] < pavimenti[i]) {
           libera(k);
           sporca = true;
           continue;

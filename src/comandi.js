@@ -1,6 +1,7 @@
 const SENSIBILITA = 0.0022;
 const PITCH_MASSIMO = 1.45;
 const TASTI_GIOCO = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyR', 'KeyF', 'KeyV', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Enter', 'NumpadEnter', 'KeyG', 'KeyM', 'KeyE']);
+const PAUSA_ROTELLA_MS = 150;
 
 export function creaComandi(superficie) {
   const premuti = new Set();
@@ -55,14 +56,18 @@ export function creaComandi(superficie) {
     if (e.button === 0) stato.sparo = false;
     else if (e.button === 2) stato.mira = false;
   }
-  function suRotella(e) {
-    if (attivo && bloccato()) stato.azioni.push('cambia');
+  let ultimaRotella = 0;
+  function suRotella() {
+    const ora = performance.now();
+    if (!attivo || !bloccato() || ora - ultimaRotella < PAUSA_ROTELLA_MS) return;
+    ultimaRotella = ora;
+    stato.azioni.push('cambia');
   }
   function azzera() {
+    if (premuti.has('KeyF')) stato.fRilasciato = true;
     premuti.clear();
     stato.sparo = false;
     stato.mira = false;
-    if (premuti.has('KeyF')) stato.fRilasciato = true;
   }
   const suCambioBlocco = () => {
     if (!bloccato()) azzera();
@@ -86,6 +91,7 @@ export function creaComandi(superficie) {
       attivo = si;
       if (!si) {
         azzera();
+        stato.azioni.length = 0;
         if (bloccato()) document.exitPointerLock();
       }
     },

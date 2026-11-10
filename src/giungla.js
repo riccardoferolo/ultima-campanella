@@ -40,6 +40,17 @@ export const ID_SCHEGGIA_FIUME = 4;
 export const ID_MASCHERA = 6;
 export const RELIQUIE = Object.freeze({ machete: 7, bastone: 8, spada: 9 });
 const POSTI_RELIQUIE = Object.freeze({ machete: OGGETTI.ALTARE, bastone: OGGETTI.BASTONE, spada: OGGETTI.SPADA });
+const RELIQUIA_PRESA = Object.freeze({ machete: g => g.altare === 3, bastone: g => g.bastone === 2, spada: g => g.sole === 3 });
+
+function rimettiReliquie(stato, eventi) {
+  const g = stato.giungla;
+  const tenute = new Set(stato.giocatori.filter(x => x.stato !== 'morto').flatMap(x => x.armi.map(armaBase)));
+  for (const [arma, presa] of Object.entries(RELIQUIA_PRESA)) {
+    if (!presa(g) || tenute.has(arma) || g.oggetti.some(o => o.id === RELIQUIE[arma])) continue;
+    g.oggetti.push({ id: RELIQUIE[arma], ...POSTI_RELIQUIE[arma] });
+    eventi.push({ k: 'reliquiaTornata', arma });
+  }
+}
 
 const CHIAVI = Object.freeze([
   'gen0', 'gen0p', 'gen1', 'gen1p', 'radioLivello', 'radioAscoltati', 'assiRaccolte', 'assiPortate', 'ponte', 'ponteP',
@@ -359,6 +370,7 @@ export function aggiorna(stato, dt, eventi, S) {
   const g = stato.giungla;
   aggiornaCassaFiume(g, dt);
   if (stato.fase === 'attesa') return;
+  rimettiReliquie(stato, eventi);
   aggiornaDifese(stato, dt, eventi, S);
   aggiornaBoss(stato, dt, eventi, S);
   aggiornaNubi(stato, dt, eventi, S);

@@ -170,6 +170,7 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
     return;
   }
   if (idAcquisto.startsWith('fusibile:')) {
+    if (!stato.missione) return;
     raccogliFusibile(stato, giocatore, Number(idAcquisto.slice('fusibile:'.length)), aperte, eventi);
     return;
   }
@@ -536,6 +537,12 @@ function iniziaFinale(stato, eventi) {
   stato.fase = 'finale';
   stato.daGenerare = 0;
   stato.presideTra = null;
+  for (const z of stato.zombie) {
+    if (z.stato === 'morto' || tipoDi(z).boss) continue;
+    z.stato = 'morto';
+    z.timer = RESTA_A_TERRA_DA_MORTO;
+    eventi.push({ k: 'ucciso', zombie: z.id, testa: false, da: null, x: z.x, z: z.z, bomba: true });
+  }
   stato.porte = stato.porte.filter(p => p !== 'rifugio');
   const vita = Math.round(R.VITA_CUSTODE * moltiplicatoreBoss(stato.giocatori.length));
   stato.zombie.push({
@@ -742,7 +749,8 @@ function ricostruisci(stato, giocatore, idFinestra, eventi) {
   if (distanza(giocatore, finestra.interno) > R.DISTANZA_FINESTRA + TOLLERANZA_DISTANZA) return;
   if (stato.zombie.some(z => z.finestra === finestra.id && z.stato === 'scavalca')) return;
   stato.finestre[finestra.id] += 1;
-  aggiungiPunti(stato, giocatore, R.PUNTI_ASSA);
+  giocatore.assiPagate = (giocatore.assiPagate ?? 0) + 1;
+  if (giocatore.assiPagate <= R.ASSI_PAGATE_PER_ROUND) aggiungiPunti(stato, giocatore, R.PUNTI_ASSA);
   giocatore.attesaAssa = R.RICOSTRUISCI_OGNI;
   eventi.push({ k: 'assaMessa', finestra: finestra.id, da: giocatore.id });
 }
@@ -837,6 +845,7 @@ function avanzaFase(stato, dt, eventi) {
     if (stato.giungla) giungla.inizioRound(stato, eventi);
     if (stato.teatro) teatro.inizioRound(stato, eventi, S);
     for (const g of stato.giocatori) {
+      g.assiPagate = 0;
       if (g.stato === 'vivo' && stato.round > 1) g.granate = Math.min(R.GRANATE_MASSIME, g.granate + R.GRANATE_PER_ROUND);
       if (g.stato !== 'morto') continue;
       const partenza = PARTENZE[0];
@@ -944,7 +953,9 @@ function muoviZombie(stato, dt, eventi) {
       const dx = finestra.esterno.x - z.x;
       const dz = finestra.esterno.z - z.z;
       const d = Math.hypot(dx, dz);
-      if (d < 0.3) {
+      const inCoda = d < R.CODA_FINESTRA && stato.zombie.some(a => a !== z && a.finestra === z.finestra
+        && (a.stato === 'assi' || a.stato === 'scavalca' || (a.stato === 'arriva' && distanza(a, finestra.esterno) < d)));
+      if (d < 0.3 || inCoda) {
         z.stato = 'assi';
         z.timer = R.ROMPI_ASSE_OGNI / (dati.rompe ?? 1);
       } else {

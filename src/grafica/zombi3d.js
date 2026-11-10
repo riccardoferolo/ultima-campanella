@@ -91,6 +91,8 @@ function aggiungiAlone(radice, materiale, punti) {
   });
 }
 const SALITA = 1.8;
+const NUOVI_PER_FOTOGRAMMA = 3;
+const SCORTA_MASSIMA = 32;
 const R_EMERSO = 1.6;
 
 function sistemaTexture(radice) {
@@ -163,6 +165,7 @@ function logica(z, siMuove) {
 
 export function creaGestoreZombi(scena, risorse) {
   const zombi = new Map();
+  const scorte = new Map();
 
   function creaProcedurale(z, risorsa) {
     const radice = new THREE.Group();
@@ -177,21 +180,13 @@ export function creaGestoreZombi(scena, risorse) {
     return voce;
   }
 
-  function crea(z) {
-    const risorsa = risorse.get(z.tipo) ?? risorse.get('normale');
-    if (risorsa.costruisci) return creaProcedurale(z, risorsa);
+  function costruisci(tipo) {
+    const risorsa = risorse.get(tipo);
     const { dati } = risorsa;
     const radice = new THREE.Group();
     const corpo = clonaScheletro(risorsa.modello);
-    const variante = dati.varianti ? VARIANTI[z.variante % VARIANTI.length] : { scala: 1 };
-    corpo.scale.setScalar(dati.scala * variante.scala);
-    if (risorsa.materialiVariante) {
-      const materiali = risorsa.materialiVariante[dati.varianti ? z.variante % VARIANTI.length : 0];
-      corpo.traverse(o => {
-        if (!o.isMesh) return;
-        o.material = Array.isArray(o.material) ? o.material.map(m => materiali.get(m) ?? m) : materiali.get(o.material) ?? o.material;
-      });
-    }
+    const originali = new Map();
+    corpo.traverse(o => { if (o.isMesh) originali.set(o, o.material); });
     corpo.traverse(o => {
       if (!o.isSkinnedMesh) return;
       o.frustumCulled = true;
@@ -202,7 +197,6 @@ export function creaGestoreZombi(scena, risorse) {
     const aloni = dati.fiamme
       ? aggiungiAlone(radice, MATERIALE_FIAMMA, [[0, 1.55, 0.05, 0.55], [0.18, 1.15, 0.1, 0.45], [-0.18, 1.05, 0.05, 0.42], [0, 0.6, 0.1, 0.4]])
       : dati.nebbia ? aggiungiAlone(radice, MATERIALE_NEBBIA, [[0, 1.1, 0, 0.9], [0, 0.5, 0, 0.8]]) : [];
-    scena.add(radice);
     let testa = null;
     let busto = null;
     corpo.traverse(o => {
@@ -224,10 +218,29 @@ export function creaGestoreZombi(scena, risorse) {
       }
       azioni.set(logico, azione);
     }
-    const voce = {
-      radice, corpo, testa, busto, mixer, azioni, dati, aloni, attuale: null, ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: Math.random() * 3,
-      vitaPrima: z.vita, sussulto: 0, senzaTesta: false, gelo: null, sollevato: 0, giro: 0,
-    };
+    return { tipo, radice, corpo, testa, busto, mixer, azioni, dati, aloni, originali, ultimaPosizione: new THREE.Vector2() };
+  }
+
+  function crea(z) {
+    const procedurale = risorse.get(z.tipo);
+    if (procedurale?.costruisci) return creaProcedurale(z, procedurale);
+    const tipo = risorse.has(z.tipo) ? z.tipo : 'normale';
+    const risorsa = risorse.get(tipo);
+    const { dati } = risorsa;
+    const voce = scorte.get(tipo)?.pop() ?? costruisci(tipo);
+    const indice = dati.varianti ? z.variante % VARIANTI.length : 0;
+    voce.corpo.scale.setScalar(dati.scala * (dati.varianti ? VARIANTI[indice].scala : 1));
+    const materiali = risorsa.materialiVariante?.[indice];
+    for (const [mesh, originale] of voce.originali) {
+      mesh.material = Array.isArray(originale) ? originale.map(m => materiali?.get(m) ?? m) : materiali?.get(originale) ?? originale;
+    }
+    Object.assign(voce, { attuale: null, tempoMorto: 0, fase: Math.random() * 3, vitaPrima: z.vita, sussulto: 0, senzaTesta: false, gelo: null, sollevato: 0, giro: 0, emerso: undefined });
+    voce.ultimaPosizione.set(z.x, z.z);
+    voce.testa?.scale.setScalar(1);
+    voce.corpo.position.z = 0;
+    voce.mixer.timeScale = 1;
+    voce.radice.visible = true;
+    scena.add(voce.radice);
     zombi.set(z.id, voce);
     return voce;
   }
@@ -297,18 +310,34 @@ export function creaGestoreZombi(scena, risorse) {
     const voce = zombi.get(id);
     if (!voce) return;
     scena.remove(voce.radice);
-    voce.chiudi?.();
+    zombi.delete(id);
+    if (voce.chiudi) {
+      voce.chiudi();
+      voce.mixer.stopAllAction();
+      voce.mixer.uncacheRoot(voce.corpo);
+      voce.corpo.traverse(o => o.skeleton?.dispose());
+      return;
+    }
+    voce.gelo?.forEach(g => g.m.dispose());
+    voce.gelo = null;
     voce.mixer.stopAllAction();
+    const scorta = scorte.get(voce.tipo) ?? [];
+    scorte.set(voce.tipo, scorta);
+    if (scorta.length < SCORTA_MASSIMA) {
+      scorta.push(voce);
+      return;
+    }
     voce.mixer.uncacheRoot(voce.corpo);
     voce.corpo.traverse(o => o.skeleton?.dispose());
-    zombi.delete(id);
   }
 
   return {
     aggiorna(vista, dt) {
       const vivi = new Set();
       const buchi = vista.buchi ?? [];
+      let nuovi = 0;
       for (const z of vista.zombie) {
+        if (!zombi.has(z.id) && (z.stato === 'morto' || nuovi++ >= NUOVI_PER_FOTOGRAMMA)) continue;
         vivi.add(z.id);
         const voce = zombi.get(z.id) ?? crea(z);
         const spostamento = Math.hypot(z.x - voce.ultimaPosizione.x, z.z - voce.ultimaPosizione.y);
@@ -372,6 +401,14 @@ export function creaGestoreZombi(scena, risorse) {
     },
     svuota() {
       for (const id of [...zombi.keys()]) rimuovi(id);
+    },
+    prepara(quanti) {
+      for (const [tipo, n] of Object.entries(quanti)) {
+        if (!risorse.has(tipo)) continue;
+        const scorta = scorte.get(tipo) ?? [];
+        scorte.set(tipo, scorta);
+        while (scorta.length < n) scorta.push(costruisci(tipo));
+      }
     },
   };
 }

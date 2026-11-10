@@ -64,6 +64,10 @@ function texturaDisco() {
 function creaVuoto3d(scena, effetti) {
   const disco = texturaDisco();
   const nero = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const geoSfera = new THREE.SphereGeometry(0.1, 16, 12);
+  const geoBuco = new THREE.SphereGeometry(0.42, 24, 18);
+  const geoAnello = new THREE.RingGeometry(0.45, 2, 64);
+  const geoAnello2 = new THREE.RingGeometry(0.45, 1.3, 48);
   const materialeDisco = new THREE.MeshBasicMaterial({ map: disco, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
   const materialeAlone = new THREE.SpriteMaterial({ map: disco, color: 0xb06cff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   const sfere = new Map();
@@ -83,7 +87,7 @@ function creaVuoto3d(scena, effetti) {
   };
   function creaSfera() {
     const g = new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 12), nero));
+    g.add(new THREE.Mesh(geoSfera, nero));
     const a = new THREE.Sprite(materialeAlone);
     a.scale.setScalar(0.75);
     g.add(a);
@@ -92,10 +96,10 @@ function creaVuoto3d(scena, effetti) {
   }
   function creaBuco() {
     const g = new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 18), nero));
-    const anello = new THREE.Mesh(new THREE.RingGeometry(0.45, 2, 64), materialeDisco);
+    g.add(new THREE.Mesh(geoBuco, nero));
+    const anello = new THREE.Mesh(geoAnello, materialeDisco);
     anello.rotation.x = Math.PI / 2 - 0.4;
-    const anello2 = new THREE.Mesh(new THREE.RingGeometry(0.45, 1.3, 48), materialeDisco);
+    const anello2 = new THREE.Mesh(geoAnello2, materialeDisco);
     anello2.rotation.y = Math.PI / 2;
     const a = new THREE.Sprite(materialeAlone);
     a.scale.setScalar(2.4);
@@ -255,7 +259,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
       ? costruisciTeatro(scena, { reali, texture, materialiArmi, oggetti, luciAccese: q.luci })
       : palude
         ? costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli: modelliGiungla, luciAccese: q.luci })
-        : costruisciScuola(scena, texture, materialiArmi, oggetti, reali);
+        : costruisciScuola(scena, texture, materialiArmi, oggetti, reali, { luciAccese: q.luci });
   if (scuola) {
     costruisciArredi(scena, oggetti);
     costruisciSala(scena);
@@ -280,6 +284,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const pixelMini = new Uint8Array(LATO_MINI * LATO_MINI * 2 * 4);
   usaMappa(mappaPrima);
   const zombi = creaGestoreZombi(scena, risorseZombi);
+  zombi.prepara(teatro ? { normale: 8, magro: 4, ardente: 4, tossico: 3 } : { normale: 10, magro: 5 });
   const effetti = creaEffetti(scena);
   const granate3d = creaGranate3d(scena);
   const vuoto3d = creaVuoto3d(scena, effetti);
@@ -303,6 +308,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   let campioni = 0;
   let sommaDt = 0;
   function dimensiona() {
+    if (renderer.domElement.style.display === 'none') return;
     const l = Math.max(1, Math.floor(contenitore.clientWidth * scala));
     const a = Math.max(1, Math.floor(contenitore.clientHeight * scala));
     renderer.setSize(l, a, false);
@@ -499,8 +505,10 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
       effetti.sangue(punto, SU);
     },
     effetti,
+    ridimensiona: dimensiona,
     svuota() {
       suoloVista = null;
+      mondoMappa.svuota?.();
       zombi.svuota();
       granate3d.svuota();
       vuoto3d.svuota();
