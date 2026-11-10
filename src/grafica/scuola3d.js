@@ -16,6 +16,8 @@ const LUCI = Object.freeze([
   [0, -30, false, 0xffe2b8], [-19, -31, true, 0xffd8a0], [0, -46, true, 0xff3326],
 ]);
 const INTENSITA_LUCE = 16;
+const SCEGLI_LUCI_OGNI_S = 0.3;
+const ACCENSIONE_LUCE_S = 0.4;
 const PORTATA_LUCE = 17;
 const LAMPIONI = Object.freeze([[17, 20, 0xbcd4ff], [10.5, 27.5, 0xc8dcff], [23, -26, 0xbcd4ff]]);
 const PROFILO_CAMPANA = Object.freeze([[0, 0.02], [0.05, 0.03], [0.07, 0.08], [0.085, 0.16], [0.13, 0.22], [0.14, 0.24], [0, 0.24]]);
@@ -57,7 +59,7 @@ export function orientamento(mesh, verso) {
   mesh.rotation.y = Math.atan2(verso.x, verso.z);
 }
 
-export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) {
+export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali, { luciAccese = 3 } = {}) {
   const pbr = (chiave, extra = {}) => new THREE.MeshStandardMaterial({ ...reali[chiave], metalness: 0, ...extra });
   const mat = {
     muro: pbr('muro'),
@@ -282,24 +284,59 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
   scena.add(quadro);
 
   const lampade = LUCI.map(([x, z, tremola, colore]) => {
-    const luce = new THREE.PointLight(colore, INTENSITA_LUCE, PORTATA_LUCE, 1.5);
-    luce.position.set(x, H - 0.4, z);
     const plafoniera = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.3), new THREE.MeshBasicMaterial({ color: 0xfff1cf }));
     plafoniera.position.set(x, H - 0.04, z);
-    scena.add(luce, plafoniera);
-    return { luce, plafoniera, tremola, base: INTENSITA_LUCE };
+    scena.add(plafoniera);
+    return { x, y: H - 0.4, z, colore, intensita: INTENSITA_LUCE, portata: PORTATA_LUCE, decadimento: 1.5, plafoniera, tremola };
   });
-
+  const fonti = [...lampade];
   for (const [x, z, colore] of LAMPIONI) {
-    const luce = new THREE.PointLight(colore, 24, 22, 1.3);
-    luce.position.set(x, 4.3, z);
     const lampada = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.15, 0.5), new THREE.MeshBasicMaterial({ color: 0xe8f0ff }));
     lampada.position.set(x, 4.55, z);
-    scena.add(luce, lampada);
+    scena.add(lampada);
+    fonti.push({ x, y: 4.3, z, colore, intensita: 24, portata: 22, decadimento: 1.3, tremola: false });
+  }
+  const luci = Array.from({ length: luciAccese }, () => {
+    const luce = new THREE.PointLight(0xffffff, 0, 10, 1.5);
+    scena.add(luce);
+    return { luce, fonte: null, accensione: 0 };
+  });
+  let attesaLuci = 0;
+  const spenta = (l, tempo) => l.tremola && Math.sin(tempo * 13.7 + l.x) > 0.93;
+  function aggiornaLuci(dt, tempo, punto) {
+    attesaLuci -= dt;
+    if (punto && attesaLuci <= 0) {
+      attesaLuci = SCEGLI_LUCI_OGNI_S;
+      const peso = f => Math.hypot(f.x - punto.x, f.y - punto.y, f.z - punto.z);
+      const vicine = [...fonti].sort((a, b) => peso(a) - peso(b)).slice(0, luciAccese);
+      for (const l of luci) if (l.fonte && !vicine.includes(l.fonte)) l.fonte = null;
+      for (const f of vicine) {
+        if (luci.some(l => l.fonte === f)) continue;
+        const l = luci.find(x => !x.fonte);
+        if (!l) break;
+        Object.assign(l, { fonte: f, accensione: 0 });
+        l.luce.color.setHex(f.colore);
+        l.luce.distance = f.portata;
+        l.luce.decay = f.decadimento;
+        l.luce.position.set(f.x, f.y, f.z);
+      }
+    }
+    for (const l of luci) {
+      if (!l.fonte) {
+        l.luce.intensity = 0;
+        continue;
+      }
+      l.accensione = Math.min(1, l.accensione + dt / ACCENSIONE_LUCE_S);
+      l.luce.intensity = (spenta(l.fonte, tempo) ? 0.6 : l.fonte.intensita) * l.accensione;
+    }
   }
 
   return {
-    aggiorna(vista, dt, tempo) {
+    svuota() {
+      for (const porta of porte.values()) porta.apertura = 0;
+    },
+    aggiorna(vista, dt, tempo, punto) {
+      aggiornaLuci(dt, tempo, punto);
       for (const f of FINESTRE) finestre.get(f.id).forEach((asse, i) => { asse.visible = i < vista.finestre[f.id]; });
       for (const p of PORTE) {
         const porta = porte.get(p.id);
@@ -308,11 +345,7 @@ export function costruisciScuola(scena, texture, materialiArmi, oggetti, reali) 
         porta.anta.position.y = ALTEZZA_PORTA / 2 + porta.apertura * ALTEZZA_PORTA;
         porta.anta.visible = porta.apertura < 1;
       }
-      for (const l of lampade) {
-        const spenta = l.tremola && Math.sin(tempo * 13.7 + l.luce.position.x) > 0.93;
-        l.luce.intensity = spenta ? 0.6 : l.base;
-        l.plafoniera.material.color.setHex(spenta ? 0x2a2620 : 0xfff1cf);
-      }
+      for (const l of lampade) l.plafoniera.material.color.setHex(spenta(l, tempo) ? 0x2a2620 : 0xfff1cf);
       const missione = vista.missione;
       if (missione) {
         alloggi.forEach((pieno, i) => { pieno.visible = i < missione.messi; });

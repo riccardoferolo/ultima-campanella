@@ -1065,6 +1065,10 @@ export function costruisciTeatro(scenaMondo, { reali, texture, materialiArmi, og
   const versoBersaglio = new THREE.Vector3();
 
   return {
+    svuota() {
+      for (const porta of porte.values()) porta.apertura = 0;
+      sipario.position.y = 0;
+    },
     aggiorna(vista, dt, tempo, puntoMondo) {
       macchine.aggiorna(vista, dt, tempo);
       const punto = puntoMondo ? { x: -puntoMondo.x, y: puntoMondo.y, z: puntoMondo.z } : null;

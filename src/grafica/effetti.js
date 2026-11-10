@@ -38,6 +38,8 @@ const COLORI_ESPLOSIONE = Object.freeze({ energia: 0x5fe9ff, fuoco: 0xff8a2a, fu
 const DURATA_RAGGIO = 0.14;
 const DURATA_LAMPO = 0.18;
 const INTENSITA_LAMPO = 25;
+const VUOTO_AL_SECONDO = 90;
+const VUOTO_SCORTA = 12;
 
 export function creaEffetti(scena) {
   const texture = texturaPunto();
@@ -50,6 +52,12 @@ export function creaEffetti(scena) {
   const macchie = [];
   const geometriaMacchia = new THREE.CircleGeometry(0.35, 6).rotateX(-Math.PI / 2);
   const materialeMacchia = new THREE.MeshBasicMaterial({ color: 0x4a0606, transparent: true, opacity: 0.85, depthWrite: false });
+  let scortaVuoto = VUOTO_SCORTA;
+  const prendiVuoto = voluti => {
+    const dati = Math.min(voluti, Math.floor(scortaVuoto));
+    scortaVuoto -= dati;
+    return dati;
+  };
 
   function emetti(nome, punto, quante, verso = null, colore = null, spinta = 0.6) {
     const tipo = TIPI[nome];
@@ -113,11 +121,12 @@ export function creaEffetti(scena) {
       emetti('scarica', punto, 8);
     },
     scia(punto, colore) {
-      emetti('vuoto', punto, 2, null, colore);
+      emetti('vuoto', punto, prendiVuoto(2), null, colore);
     },
     risucchio(centro, raggio, quante = 5) {
       const durata = 0.6;
-      for (let i = 0; i < quante; i++) {
+      const concesse = prendiVuoto(quante);
+      for (let i = 0; i < concesse; i++) {
         const angolo = Math.random() * Math.PI * 2;
         const r = raggio * (0.5 + Math.random() * 0.5);
         const x = centro.x + Math.cos(angolo) * r;
@@ -165,6 +174,7 @@ export function creaEffetti(scena) {
       macchie.push(mesh);
     },
     aggiorna(dt, occhio) {
+      scortaVuoto = Math.min(VUOTO_SCORTA, scortaVuoto + dt * VUOTO_AL_SECONDO);
       tempoLampo = Math.max(0, tempoLampo - dt);
       lampoEsplosione.intensity = INTENSITA_LAMPO * (tempoLampo / DURATA_LAMPO);
       for (let i = raggi.length - 1; i >= 0; i--) {

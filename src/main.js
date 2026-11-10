@@ -30,7 +30,6 @@ const SOLO_RISERVA = PARAMETRI.has('riserva');
 const CHIAVE_NOME = 'campanella.nome';
 const ISTANTANEE_OGNI_MS = { diretto: 50, riserva: 100 };
 const RITARDO_VISTA_S = { diretto: 0.15, riserva: 0.25 };
-const BLOCCO_PRONTO_MS = 1500;
 const ZOOM_MIRA = Math.tan((52 * Math.PI) / 360) / Math.tan((72 * Math.PI) / 360);
 const ZOOM_CANNOCCHIALE = Math.tan((20 * Math.PI) / 360) / Math.tan((72 * Math.PI) / 360);
 const GIOCATORE_OGNI_MS = 33;
@@ -57,6 +56,10 @@ const COLPITI_COLTELLO = 2;
 const COLPITI_RELIQUIA = 3;
 const BOSS_MINORI = new Set(['preside', 'sciamano', 'guardiano']);
 const RAGGIO_LAMPADARIO = 1.4;
+const HOST_PERSO_MS = 8000;
+const AVVISO_HOST_PERSO_MS = 6000;
+const PRONTO_IN_VOLO_MS = 1500;
+const ARMI_DIVERSE_S = 1;
 const ALTEZZA_SOPRA = 3;
 const TESTI_BOSS = {
   sciamano: 'Lo Sciamano esce dalla giungla: tamburi in lontananza…',
@@ -123,7 +126,7 @@ const s = {
 
 const io = { x: 0, z: 0, yaw: Math.PI, pitch: 0, pronto: false, tp: 0, colpi: 0, movimento: 0, corsa: false, inMira: false };
 const arsenale = creaArsenale();
-const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null, caricaTeschio: 0, teschio: null, prossimoRaggio: 0 };
+const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null, caricaTeschio: 0, avvisoHostPerso: 0, prontoChiesto: -Infinity, armiDiverse: 0, teschio: null, prossimoRaggio: 0 };
 const cacheScatole = new Map();
 
 const collegato = () => s.coll && (s.coll.modo === 'diretto' || s.coll.modo === 'riserva');
@@ -141,6 +144,8 @@ async function apriMondo(mappa) {
     throw e;
   }
   for (const altro of mondi.values()) altro.then(m => { m.tela.style.display = m === pronto ? '' : 'none'; }, () => {});
+  pronto.tela.style.display = '';
+  pronto.ridimensiona();
   return pronto;
 }
 
@@ -297,6 +302,7 @@ async function iniziaPartita(seme, { mappa = 'scuola' } = {}) {
     s.partita = creaPartita({ seme, giocatori: giocatori.map(g => ({ ...g, ...scelte.get(g.id) })), sala: true, mappa });
   }
   s.fase = 'gioco';
+  if (s.sonoHost) inviaLobby();
   mostraSchermata(null);
   hud.mostra(true);
   comandi.attiva(true);
@@ -655,6 +661,11 @@ function tick() {
       s.ultimoCiao = ora;
     }
   }
+  if (!s.sonoHost && s.coll && s.fase === 'gioco' && s.coll.silenzio() > HOST_PERSO_MS && ora - locale.avvisoHostPerso > AVVISO_HOST_PERSO_MS) {
+    locale.avvisoHostPerso = ora;
+    s.lobbyRicevuta = false;
+    hud.avviso(`Non arriva più niente da ${s.nomeHost ?? 'chi ha creato la stanza'}: se non torna, ricarica la pagina`);
+  }
   if (s.fase !== 'gioco' && s.fase !== 'fine') return;
   if (s.sonoHost && s.partita) tickHost(dt, ora);
   else if (!s.sonoHost) tickOspite(ora);
@@ -919,7 +930,7 @@ function usaArmi(lettura, me, vista, dt) {
   locale.sparoForzato = false;
   if (!vuole) return;
   if (armaAttiva(arsenale).caricatore === 0) {
-    if (arsenale.ricarica === 0 && !avviaRicarica(me) && performance.now() / 1000 - locale.ultimoVuoto > VUOTO_OGNI_S) {
+    if (!avviaRicarica(me) && arsenale.ricarica === 0 && performance.now() / 1000 - locale.ultimoVuoto > VUOTO_OGNI_S) {
       audio.suona('vuoto');
       locale.ultimoVuoto = performance.now() / 1000;
     }
@@ -1054,7 +1065,7 @@ function speciale(me) {
     hud.avviso(`Colpo speciale al ${Math.round((me.carica ?? 0) * 100)}%: continua a uccidere`);
     return;
   }
-  inviaAzione({ tipo: 'speciale', yaw: io.yaw });
+  inviaAzione({ tipo: 'speciale', yaw: io.yaw, pitch: io.pitch });
   mondo.spara();
 }
 
@@ -1119,8 +1130,13 @@ function ciclo(ora) {
       if ((vista.fase === 'fine' || vista.fase === 'vinta') && s.fase === 'gioco') mostraFine({ round: vista.round, vinto: vista.fase === 'vinta', giocatori: vista.giocatori.map(g => ({ nome: g.nome, punti: g.punti, uccisioni: g.uccisioni })) });
       const lettura = comandi.leggi();
       comandi.applicaVista(io);
-      if (vista.fase === 'attesa' && !me.pronto && comandi.bloccato && performance.now() - (locale.prontoChiesto ?? 0) > BLOCCO_PRONTO_MS) document.exitPointerLock();
-      if (vista.fase === 'attesa' && (arsenale.armi.length !== me.armi.length || arsenale.armi.some((a, i) => a.tipo !== me.armi[i]))) allinea(arsenale, me.armi);
+      if (vista.fase === 'attesa' && !me.pronto && comandi.bloccato && ora - locale.prontoChiesto > PRONTO_IN_VOLO_MS) document.exitPointerLock();
+      const armiDiverse = arsenale.armi.length !== me.armi.length || arsenale.armi.some((a, i) => a.tipo !== me.armi[i]);
+      locale.armiDiverse = armiDiverse ? locale.armiDiverse + dt : 0;
+      if (armiDiverse && (vista.fase === 'attesa' || locale.armiDiverse > ARMI_DIVERSE_S)) {
+        allinea(arsenale, me.armi);
+        locale.armiDiverse = 0;
+      }
       if (locale.aspetto !== me.aspetto) {
         locale.aspetto = me.aspetto;
         mondo.tingiManica(me.aspetto ?? 0);
@@ -1131,7 +1147,7 @@ function ciclo(ora) {
       suoniAmbiente(vista, dt);
       audio.ambiente?.(mappaAttiva, ZONE.some(z => z.aperto && io.x >= z.x0 && io.x <= z.x1 && io.z >= z.z0 && io.z <= z.z1));
       audio.musica(statoMusica(vista), Math.min(1, vista.round / 12));
-      const ferito = vista.giocatori.filter(g => g.id !== s.mioId && g.stato === 'terra').sort((a, b) => Math.hypot(a.x - io.x, a.z - io.z) - Math.hypot(b.x - io.x, b.z - io.z))[0];
+      const ferito = interazione?.tipo === 'rianima' ? vista.giocatori.find(g => g.id === interazione.bersaglio) : null;
       const tipo = armaAttiva(arsenale).tipo;
       const cannocchiale = io.inMira && ARMI[tipo].mirino === true;
       comandi.zoom(cannocchiale ? ZOOM_CANNOCCHIALE : io.inMira ? ZOOM_MIRA : 1);
@@ -1195,8 +1211,8 @@ hud.suScelta(({ cosa, valore }) => {
   audio.prepara();
   audio.suona('scatto');
   if (cosa === 'pronto') {
-    locale.prontoChiesto = performance.now();
     inviaAzione({ tipo: 'pronto', attivo: true });
+    locale.prontoChiesto = performance.now();
     comandi.blocca();
     return;
   }

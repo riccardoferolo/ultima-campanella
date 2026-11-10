@@ -77,10 +77,10 @@ export function creaComandi(superficie) {
     stato.azioni.push('cambia');
   }
   function azzera() {
+    if (premuti.has('KeyF')) stato.fRilasciato = true;
     premuti.clear();
     stato.sparo = false;
     stato.mira = false;
-    if (premuti.has('KeyF')) stato.fRilasciato = true;
   }
   const suCambioBlocco = () => {
     if (!bloccato()) azzera();
@@ -104,6 +104,7 @@ export function creaComandi(superficie) {
       attivo = si;
       if (!si) {
         azzera();
+        stato.azioni.length = 0;
         if (bloccato()) document.exitPointerLock();
       }
     },
