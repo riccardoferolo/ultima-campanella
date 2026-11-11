@@ -182,6 +182,15 @@ export const OSTACOLI = Object.freeze([
   ostacolo('cassonetti', 12.6, 12.6, 16.4, 13.8, 0, 1.4),
   ostacolo('auto', -37.5, 9.6, -33.1, 11.5, 0, 1.5, { colore: 0x5a5e62, incidentata: true, ribaltata: true }),
   ostacolo('cassonetti', -32.5, 34, -29.5, 35.2, 0, 1.4),
+  ostacolo('panchina', -27.15, -4.6, -26.55, -2.8, 0, 0.85, { schiena: 'x0' }),
+  ostacolo('panchina', -20.5, -16.6, -18.7, -16.05, 0, 0.85, { schiena: 'z0' }),
+  ostacolo('panchina', 3, 11.6, 4.8, 12.15, 0, 0.85, { schiena: 'z0' }),
+  ostacolo('fioriera', -7.8, -19.65, -6.8, -19.05, 0, 0.6),
+  ostacolo('fioriera', -3.2, -19.65, -2.2, -19.05, 0, 0.6),
+  ostacolo('rastrelliera', 18.6, -19.95, 20.8, -17.85, 0, 0.9),
+  ostacolo('segnale', -0.68, 12.42, -0.52, 12.58, 0, 2.6, { cartello: 'sensoUnico' }),
+  ostacolo('segnale', 17.12, 24.12, 17.28, 24.28, 0, 2.6, { cartello: 'divieto' }),
+  ostacolo('segnale', -26.88, 33.72, -26.72, 33.88, 0, 2.6, { cartello: 'precedenza' }),
 ]);
 
 function finestra(id, zonaId, asse, posizione, da, a, versoFuori, { recinzione = false, spessore = SPESSORE } = {}) {

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { OSTACOLI, FINESTRE, ACQUISTI, PAVIMENTO_CHIESA, quota } from '../../mappe/piazza.js';
 import { VOTO, ORE_DEL_BEATO, ANIME_VEGLIA, NUMERI_OROLOGIO, puntoCarro } from '../../piazza.js';
 import { texturaAlone } from './texture.js';
+import { texturaVetrina } from './superfici.js';
 
 const PANNELLO_RECINTO = 2.2;
 const SEGMENTO_JERSEY = 2;
@@ -31,6 +32,22 @@ function texturaGrata() {
   ctx.fillText('CERANO', 64, 20);
   const t = new THREE.CanvasTexture(tela);
   t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+const SAGOMA_AUTO = Object.freeze([[0, 0.3], [0, 0.7], [0.05, 0.8], [0.27, 0.86], [0.42, 1.28], [0.7, 1.32], [0.86, 0.96], [1, 0.9], [1, 0.3]]);
+const SAGOMA_VETRI = Object.freeze([[0.405, 0.9], [0.44, 1.23], [0.69, 1.26], [0.83, 0.95]]);
+
+function estrusa(punti, lungo, largo, smusso = 0.04) {
+  const forma = new THREE.Shape();
+  punti.forEach(([a, y], i) => (i ? forma.lineTo(a * lungo - lungo / 2, y) : forma.moveTo(a * lungo - lungo / 2, y)));
+  return new THREE.ExtrudeGeometry(forma, { depth: largo - smusso * 2, bevelEnabled: smusso > 0, bevelThickness: smusso, bevelSize: smusso, bevelSegments: 2, curveSegments: 4 })
+    .translate(0, 0, -(largo - smusso * 2) / 2);
+}
+
+function vetroRipetuto() {
+  const t = texturaVetrina();
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
   return t;
 }
 
@@ -66,35 +83,48 @@ export function costruisciAssedio({ scena, statico, mat, box, cil, cartello }) {
     terra: new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 1 }),
     cassonetto: new THREE.MeshStandardMaterial({ color: 0x2e5634, roughness: 0.55, metalness: 0.2 }),
     ruggine: new THREE.MeshStandardMaterial({ color: 0x5a3a26, roughness: 0.9, metalness: 0.3 }),
-    bruciato: new THREE.MeshStandardMaterial({ color: 0x1c1a18, roughness: 0.95 }),
     grata: new THREE.MeshStandardMaterial({ map: texturaGrata(), roughness: 0.55, metalness: 0.6 }),
+    vetroBus: new THREE.MeshStandardMaterial({ map: vetroRipetuto(), roughness: 0.08, metalness: 0.45 }),
   });
   const lampeggianti = new THREE.MeshStandardMaterial({ color: 0x1840ff, emissive: 0x2050ff, emissiveIntensity: 1.4 });
   mat.lampeggiante = lampeggianti;
 
+  mat.faroAuto ??= new THREE.MeshBasicMaterial({ color: 0xfff1d6 });
+  mat.fanaleAuto ??= new THREE.MeshStandardMaterial({ color: 0x8a0c0c, emissive: 0xb01010, emissiveIntensity: 0.5, roughness: 0.3 });
   const automobile = o => {
-    const k = colore('auto', o.colore, { metalness: 0.55, roughness: 0.4 });
-    const v = veicolo(o, box, statico);
-    if (o.ribaltata) {
-      v.blocco(k, 0.03, 0.97, 0.55, 1.15, 0.08);
-      v.blocco('vetroScuro', 0.24, 0.74, 0.1, 0.55, 0.2);
-      v.blocco(k, 0.26, 0.72, 0.02, 0.12, 0.24);
-      v.blocco('bruciato', 0.03, 0.97, 1.15, 1.2, 0.2);
-      for (const a of [0.18, 0.82]) for (const l of [-1, 1]) v.ruota(a, l, 0.33, 1.3);
-      return;
+    const asseX = o.x1 - o.x0 >= o.z1 - o.z0;
+    const lungo = (asseX ? o.x1 - o.x0 : o.z1 - o.z0) - 0.1;
+    const largo = (asseX ? o.z1 - o.z0 : o.x1 - o.x0) - 0.14;
+    const tinta = o.colore ?? ((o.x0 + o.x1) / 2 < 13 ? 0x9a9ea4 : 0xe6e8ea);
+    const k = colore('auto', tinta, { metalness: 0.55, roughness: 0.35 });
+    const pezzi = { [k]: [], vetroBus: [], nero: [], zincato: [], faroAuto: [], fanaleAuto: [] };
+    pezzi[k].push(estrusa(SAGOMA_AUTO, lungo, largo));
+    pezzi.vetroBus.push(estrusa(SAGOMA_VETRI, lungo, largo + 0.03, 0.01));
+    for (const a of [0.17, 0.8]) for (const s of [-1, 1]) {
+      pezzi.nero.push(new THREE.CylinderGeometry(0.33, 0.33, 0.22, 16).rotateX(Math.PI / 2).translate((a - 0.5) * lungo, 0.33, s * (largo / 2 - 0.02)));
+      pezzi.zincato.push(new THREE.CylinderGeometry(0.19, 0.19, 0.24, 10).rotateX(Math.PI / 2).translate((a - 0.5) * lungo, 0.33, s * (largo / 2 - 0.02)));
     }
-    v.blocco(k, 0.03, 0.84, 0.35, 0.95, 0.08);
-    v.blocco('ruggine', 0.84, 0.98, 0.3, 0.72, 0.14);
-    v.blocco(k, 0.22, 0.74, 0.95, 1.45, 0.18);
-    v.blocco('vetroScuro', 0.2, 0.76, 1, 1.4, 0.16);
-    for (const a of [0.18, 0.82]) for (const l of [-1, 1]) v.ruota(a, l);
+    for (const s of [-1, 1]) {
+      pezzi.faroAuto.push(new THREE.BoxGeometry(0.06, 0.12, 0.26).translate(-lungo / 2 - 0.03, 0.66, s * (largo / 2 - 0.22)));
+      pezzi.fanaleAuto.push(new THREE.BoxGeometry(0.06, 0.12, 0.3).translate(lungo / 2 + 0.03, 0.74, s * (largo / 2 - 0.22)));
+    }
+    pezzi.nero.push(new THREE.BoxGeometry(0.1, 0.16, largo + 0.04).translate(-lungo / 2 - 0.02, 0.38, 0));
+    pezzi.nero.push(new THREE.BoxGeometry(0.1, 0.16, largo + 0.04).translate(lungo / 2 + 0.02, 0.38, 0));
+    if (o.incidentata && !o.ribaltata) pezzi.ruggine = [new THREE.BoxGeometry(0.5, 0.2, largo * 0.7).rotateZ(0.35).translate(-lungo / 2 + 0.3, 0.86, 0)];
+    const cx = (o.x0 + o.x1) / 2;
+    const cz = (o.z0 + o.z1) / 2;
+    const ry = (asseX ? 0 : Math.PI / 2) + (o.incidentata ? 0.06 : 0);
+    for (const [chiave, geometrie] of Object.entries(pezzi)) {
+      if (!geometrie.length) continue;
+      statico.aggiungi(chiave, mergeGeometries(geometrie.map(g => (g.index ? g.toNonIndexed() : g))), cx, o.ribaltata ? 1.45 : 0, cz, ry, o.ribaltata ? Math.PI : 0);
+    }
   };
 
   const pullman = o => {
     const v = veicolo(o, box, statico);
     v.blocco('carrozzeria', 0.005, 0.995, 0.5, 3.05);
-    v.blocco('vetroScuro', 0.05, 0.86, 1.6, 2.7, -0.02);
-    v.blocco('vetroScuro', 0.995, 1.002, 1.05, 2.85, 0.12);
+    v.blocco('vetroBus', 0.05, 0.86, 1.6, 2.7, -0.02);
+    v.blocco('vetroBus', 0.995, 1.002, 1.05, 2.85, 0.12);
     v.blocco('bluLinea', 0, 1, 1.18, 1.42, -0.015);
     v.blocco('bluLinea', 0, 1, 0.5, 0.66, -0.01);
     v.blocco('ferro', 0, 1, 3.05, 3.2, 0.25);
@@ -130,9 +160,10 @@ export function costruisciAssedio({ scena, statico, mat, box, cil, cartello }) {
     const cx = (o.x0 + o.x1) / 2;
     const cz = (o.z0 + o.z1) / 2;
     const lx = o.x1 - o.x0 + 0.3;
-    const lz = (o.z1 - o.z0) / 2 + 0.25;
-    statico.aggiungi(tela, new THREE.BoxGeometry(lx, 0.03, lz), cx, 2.42, cz - lz / 2 + 0.1, 0, -0.32);
-    statico.aggiungi(tela, new THREE.BoxGeometry(lx, 0.03, lz), cx, 2.42, cz + lz / 2 - 0.1, 0, 0.32);
+    const lz = (o.z1 - o.z0) / 2 + 0.3;
+    const falda = 0.32;
+    const colmo = 2.62;
+    for (const s of [-1, 1]) statico.aggiungi(tela, new THREE.BoxGeometry(lx, 0.03, lz), cx, colmo - (lz / 2) * Math.sin(falda), cz + s * (lz / 2) * Math.cos(falda), 0, s * falda);
     for (let i = 0; i < 3; i++) {
       const x = o.x0 + 0.5 + i * ((o.x1 - o.x0 - 1) / 2);
       box('legno', x - 0.26, 0.88, cz - 0.2, x + 0.26, 1.16, cz + 0.2, 1);
@@ -213,7 +244,7 @@ export function costruisciAssedio({ scena, statico, mat, box, cil, cartello }) {
 
   const disegna = { pullman, ambulanza, furgone, bancarella, jersey, sacchi, cantiere, cassonetti };
   for (const o of OSTACOLI) {
-    if (o.tipo === 'auto' && o.colore) automobile(o);
+    if (o.tipo === 'auto') automobile(o);
     else disegna[o.tipo]?.(o);
   }
 

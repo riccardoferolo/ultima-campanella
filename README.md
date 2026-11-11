@@ -127,6 +127,14 @@ transenne di via Vittime della Mafia, del vicolo delle Scuole, della strada vers
   conica): con la corrente si sale per 750 punti e si resta 40 secondi nella cella campanaria con la Fonderia (il
   potenziatore); la corda delle campane (1500) le suona a distesa e stordisce per 7 secondi tutti gli zombie della
   mappa (boss esclusi), poi vanno lasciate riposare 75 secondi. A ogni round il campanile batte i rintocchi.
+- **Resa grafica**: cielo stellato con la luna nella direzione della luce lunare, il bagliore di Milano e Novara
+  all'orizzonte e le Alpi in lontananza; porfido a coda di pavone, ciottoli del sagrato, lastre e intonaco disegnati a
+  1024 px con le mappe di rilievo ricavate dalla stessa pittura. Le case hanno finestre vere con cornici in pietra,
+  persiane aperte, chiuse o socchiuse, luci accese dietro le tende, balconi con ringhiera e vasi, portoni con la
+  lanterna, negozi con saracinesca e insegna, inferriate e finestre sbarrate con le assi, marcapiani, travetti sotto la
+  gronda, grondaie, pluviali, comignoli e antenne; anche il Municipio ha finestre vere. Pozze e coni di luce sotto i
+  lampioni, pozzanghere, sangue, cartacce e foglie per terra, panchine, fioriere, una rastrelliera con le bici, cartelli
+  stradali e la bacheca dei necrologi sul fianco della chiesa; le auto hanno la sagoma, i fari e i cerchi.
 - **La piazza assediata**: non è più un campo aperto dove girare in tondo. Bancarelle rovesciate, un pullman di linea
   per Novara abbandonato in mezzo, un'ambulanza, auto incidentate, new jersey, sacchi di sabbia e un cantiere
   recintato del Comune spezzano la piazza in corsie strette; dal sagrato al bar ci sono un furgone, cassonetti e
@@ -151,6 +159,8 @@ transenne di via Vittime della Mafia, del vicolo delle Scuole, della strada vers
 - `vetrina3.mjs`, `mani.mjs` – schermate di sala, armi in mano, zombie e mappa;
 - `teatro.mjs` – giro di foto del Teatro dell'Eclissi (Edge su GPU) e misura degli fps in platea con un'orda;
 - `piazza.mjs` – giro di foto della Piazza di Cerano, dentro e fuori, fino alla cella campanaria;
+- `bellezza.mjs` – stesse viste fisse della piazza prima e dopo un lavoro grafico (`node bellezza.mjs <cartella>`), con
+  gli fps di ogni vista;
 - `voto.mjs`, `collaudo-voto.mjs` – foto degli ingombri e del Voto del Beato con gli spari veri all'orologio, e la
   stessa storia giocata in due;
 - `converti-tutto.mjs` + `converti/tutto.html` – conversione dei modelli scaricati in `public/modelli/*.glb`

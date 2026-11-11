@@ -8,6 +8,7 @@ _lavoro/*
 !_lavoro/piazza.mjs
 !_lavoro/voto.mjs
 !_lavoro/collaudo-voto.mjs
+!_lavoro/bellezza.mjs
 !_lavoro/mani.mjs
 !_lavoro/foglio.mjs
 !_lavoro/converti-tutto.mjs

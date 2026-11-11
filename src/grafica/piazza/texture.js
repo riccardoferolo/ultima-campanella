@@ -16,76 +16,6 @@ export function tela(l, a, pittore, ripeti = true, seme = 0) {
 
 const tinta = (r, g, b, v = 0) => `rgb(${Math.round(r + v)},${Math.round(g + v)},${Math.round(b + v)})`;
 
-export const texturaPorfido = () => tela(512, 512, (ctx, l, a, caso) => {
-  ctx.fillStyle = '#2a2624';
-  ctx.fillRect(0, 0, l, a);
-  const passo = 12;
-  for (let riga = -1; riga < a / (passo * 2.6) + 2; riga++) {
-    for (let col = -1; col < l / (passo * 9) + 2; col++) {
-      const cx = col * passo * 9 + (riga % 2) * passo * 4.5;
-      const cy = riga * passo * 2.6;
-      for (let anello = 1; anello <= 4; anello++) {
-        const r = anello * passo * 1.05;
-        const quanti = 3 + anello * 3;
-        for (let k = 0; k <= quanti; k++) {
-          const ang = Math.PI * (k / quanti);
-          const x = cx + Math.cos(ang) * r * 1.15;
-          const y = cy + Math.sin(ang) * r * 0.58;
-          const v = caso();
-          ctx.fillStyle = v < 0.4 ? tinta(96, 84, 82, caso() * 26) : v < 0.75 ? tinta(112, 92, 90, caso() * 22) : tinta(84, 80, 86, caso() * 24);
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate(ang + Math.PI / 2 + (caso() - 0.5) * 0.25);
-          ctx.fillRect(-passo * 0.46, -passo * 0.42, passo * 0.92, passo * 0.84);
-          ctx.restore();
-        }
-      }
-    }
-  }
-  for (let i = 0; i < 2200; i++) {
-    ctx.fillStyle = caso() < 0.5 ? 'rgba(255,240,230,0.06)' : 'rgba(0,0,0,0.09)';
-    ctx.fillRect(caso() * l, caso() * a, 1 + caso() * 2, 1 + caso() * 2);
-  }
-});
-
-export const texturaCiottoli = () => tela(256, 256, (ctx, l, a, caso) => {
-  ctx.fillStyle = '#3c3936';
-  ctx.fillRect(0, 0, l, a);
-  for (let i = 0; i < 900; i++) {
-    const x = caso() * l;
-    const y = caso() * a;
-    const r = 3 + caso() * 4;
-    const v = caso();
-    ctx.fillStyle = v < 0.55 ? tinta(196, 192, 182, caso() * 30 - 15) : v < 0.85 ? tinta(150, 146, 138, caso() * 20) : tinta(110, 104, 98, caso() * 16);
-    ctx.beginPath();
-    ctx.ellipse(x, y, r, r * (0.55 + caso() * 0.3), caso() * Math.PI, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = 'rgba(70,64,58,0.9)';
-  ctx.lineWidth = 7;
-  ctx.strokeRect(0, 0, l, a);
-});
-
-export const texturaLastre = () => tela(256, 256, (ctx, l, a, caso) => {
-  const n = 4;
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      ctx.fillStyle = tinta(164, 158, 148, caso() * 22 - 11);
-      ctx.fillRect((i * l) / n, (j * a) / n, l / n, a / n);
-    }
-  }
-  for (let i = 0; i < 1500; i++) {
-    ctx.fillStyle = caso() < 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
-    ctx.fillRect(caso() * l, caso() * a, 2, 2);
-  }
-  ctx.strokeStyle = '#6e6860';
-  ctx.lineWidth = 2;
-  for (let i = 0; i <= n; i++) {
-    ctx.beginPath(); ctx.moveTo((i * l) / n, 0); ctx.lineTo((i * l) / n, a); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, (i * a) / n); ctx.lineTo(l, (i * a) / n); ctx.stroke();
-  }
-});
-
 export const texturaMattoni = () => tela(256, 256, (ctx, l, a, caso) => {
   ctx.fillStyle = '#6d5d50';
   ctx.fillRect(0, 0, l, a);
@@ -263,35 +193,6 @@ export function texturaVetrata(seme, figura = true) {
     for (let k = 1; k < 5; k++) { ctx.beginPath(); ctx.moveTo(0, (k * a) / 5); ctx.lineTo(l, (k * a) / 5); ctx.stroke(); }
   }, false, seme);
 }
-
-export const texturaFacciataCasa = () => tela(256, 256, (ctx, l, a, caso) => {
-  ctx.fillStyle = '#f2ece2';
-  ctx.fillRect(0, 0, l, a);
-  for (let i = 0; i < 2500; i++) {
-    ctx.fillStyle = caso() < 0.5 ? 'rgba(255,255,255,0.18)' : 'rgba(80,60,40,0.07)';
-    ctx.fillRect(caso() * l, caso() * a, 2, 2);
-  }
-  const fx = l * 0.36;
-  const fy = a * 0.24;
-  const fl = l * 0.28;
-  const fa = a * 0.5;
-  ctx.fillStyle = '#d6d0c4';
-  ctx.fillRect(fx - 8, fy - 10, fl + 16, fa + 18);
-  ctx.fillStyle = '#1b1d24';
-  ctx.fillRect(fx, fy, fl, fa);
-  ctx.fillStyle = '#4a3a2c';
-  ctx.fillRect(fx + fl / 2 - 2, fy, 4, fa);
-  ctx.fillStyle = '#3c5a3a';
-  ctx.fillRect(fx - fl * 0.42, fy, fl * 0.4, fa);
-  ctx.fillRect(fx + fl + 2, fy, fl * 0.4, fa);
-  ctx.strokeStyle = 'rgba(20,30,20,0.6)';
-  for (let k = 0; k < 10; k++) {
-    const y = fy + (k * fa) / 10;
-    ctx.beginPath(); ctx.moveTo(fx - fl * 0.42, y); ctx.lineTo(fx - 2, y); ctx.moveTo(fx + fl + 2, y); ctx.lineTo(fx + fl * 1.4 + 2, y); ctx.stroke();
-  }
-  ctx.fillStyle = 'rgba(120,110,100,0.5)';
-  ctx.fillRect(0, a - 6, l, 6);
-});
 
 export const texturaMunicipio = () => tela(256, 1024, (ctx, l, a, caso) => {
   const m = a / 9.4;

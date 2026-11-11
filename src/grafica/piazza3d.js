@@ -11,6 +11,10 @@ import { scatolaUV, orientamento } from './scuola3d.js';
 import { creaMacchine } from './macchine3d.js';
 import * as T from './piazza/texture.js';
 import { costruisciAssedio, creaVoto } from './piazza/assedio3d.js';
+import { costruisciFacciate } from './piazza/case3d.js';
+import { costruisciArredo } from './piazza/arredo3d.js';
+import { creaAtmosfera } from './piazza/atmosfera3d.js';
+import { superficiePorfido, superficieCiottoli, superficieLastre, superficieIntonaco } from './piazza/superfici.js';
 
 const SCEGLI_LUCI_OGNI_S = 0.3;
 const ACCENSIONE_LUCE_S = 0.4;
@@ -198,13 +202,17 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
   const caso = creaCaso(1595);
   const pbr = (chiave, extra = {}) => new THREE.MeshStandardMaterial({ ...reali[chiave], metalness: 0, ...extra });
   const conMappa = (map, extra = {}) => new THREE.MeshStandardMaterial({ map, roughness: 0.9, metalness: 0, ...extra });
-  const facciataCasa = T.texturaFacciataCasa();
+  const facciataCasa = superficieIntonaco();
+  const porfido = superficiePorfido();
+  const ciottoli = superficieCiottoli();
+  const lastre = superficieLastre();
+  const rilievo = forza => new THREE.Vector2(forza, forza);
   const ocraTex = T.texturaIntonacoOcra();
-  const faro = (map, colore, extra = {}) => new THREE.MeshStandardMaterial({ map, color: colore, roughness: 0.88, metalness: 0, emissive: 0x2a1c0c, emissiveMap: map, emissiveIntensity: 1, ...extra });
+  const faro = (map, colore, extra = {}) => new THREE.MeshStandardMaterial({ map, color: colore, roughness: 0.88, metalness: 0, emissive: 0x2a1c0c, emissiveMap: map, emissiveIntensity: 1, normalMap: facciataCasa.normalMap, normalScale: rilievo(0.8), ...extra });
   const mat = {
-    porfido: conMappa(T.texturaPorfido(), { roughness: 0.82 }),
-    ciottoli: conMappa(T.texturaCiottoli(), { roughness: 0.9 }),
-    lastre: conMappa(T.texturaLastre(), { roughness: 0.78, color: 0x9d978d }),
+    porfido: conMappa(porfido.map, { normalMap: porfido.normalMap, normalScale: rilievo(1.1), roughness: 0.78 }),
+    ciottoli: conMappa(ciottoli.map, { normalMap: ciottoli.normalMap, normalScale: rilievo(1.2), roughness: 0.82, color: 0x9c968c }),
+    lastre: conMappa(lastre.map, { normalMap: lastre.normalMap, normalScale: rilievo(0.9), roughness: 0.72, color: 0xb8b2a8 }),
     asfalto: pbr('asfalto', { color: 0x5e6066, roughness: 0.6 }),
     granito: pbr('cemento', { color: 0x8f8d89, roughness: 0.55 }),
     cemento: pbr('cemento', { color: 0x8a8580 }),
@@ -252,7 +260,7 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
   const coloriCase = new Map();
   const chiaveCasa = colore => {
     const chiave = `casa${colore.toString(16)}`;
-    if (!coloriCase.has(chiave)) coloriCase.set(chiave, conMappa(facciataCasa, { color: colore, roughness: 0.92 }));
+    if (!coloriCase.has(chiave)) coloriCase.set(chiave, conMappa(facciataCasa.map, { normalMap: facciataCasa.normalMap, normalScale: rilievo(0.7), color: colore, roughness: 0.92 }));
     return chiave;
   };
 
@@ -952,7 +960,8 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
     }
     statico.aggiungi('tegole', tettoPadiglione(c.x0 - 0.5, c.z0 - 0.5, c.x1 + 0.5, c.z1 + 0.5, h, h + Math.min(3, Math.min(c.x1 - c.x0, c.z1 - c.z0) * 0.3)), 0, 0, 0);
     box('crema', c.x0 - 0.5, h - 0.2, c.z0 - 0.5, c.x1 + 0.5, h + 0.02, c.z1 + 0.5, 1);
-    box('granito', c.x0 - 0.04, 0, c.z0 - 0.04, c.x1 + 0.04, 0.5, c.z1 + 0.04, 1);
+    box('granito', c.x0 - 0.04, 0, c.z0 - 0.04, c.x1 + 0.04, 0.85, c.z1 + 0.04, 1);
+    box('granito', c.x0 - 0.07, 0.85, c.z0 - 0.07, c.x1 + 0.07, 0.92, c.z1 + 0.07, 1);
     if (c.portici) {
       for (let x = c.x0 + 1.8; x < c.x1 - 1.5; x += 3.4) {
         statico.aggiungi('nero', new THREE.ShapeGeometry(new THREE.Shape().moveTo(-1.3, 0).lineTo(1.3, 0).lineTo(1.3, 2.3).absarc(0, 2.3, 1.3, 0, Math.PI, false).lineTo(-1.3, 0), 10), x, 0, c.z1 + 0.02);
@@ -969,6 +978,8 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
       cartello(['BAR'], c.x1 + 0.02, 3.25, 22, { x: 1, z: 0 }, 1.8, 0.5, { larghezza: 128, altezza: 36, sfondo: '#1a0e08', colore: '#ffcf6a', font: 'bold 26px Georgia, serif' });
     }
   }
+
+  const { lanterne: lanterneMuro } = costruisciFacciate({ statico, mat, box, cil, sfera, cartello });
 
   const tunnel = muroConArchi(-30.6, -25, 0, 10, [[-30.35, -25.25, 0.02, 2.9]], 5.5, 3);
   statico.aggiungi('ocraScuro', tunnel, 34.6, 0, 0, Math.PI / 2);
@@ -1144,17 +1155,7 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
   for (const o of OSTACOLI) {
     const ox = (o.x0 + o.x1) / 2;
     const oz = (o.z0 + o.z1) / 2;
-    if (o.tipo === 'auto' && !o.colore) {
-      const colore = ox < 13 ? 0x9a9ea4 : 0xe6e8ea;
-      const chiave = `auto${colore}`;
-      if (!mat[chiave]) mat[chiave] = new THREE.MeshStandardMaterial({ color: colore, metalness: 0.6, roughness: 0.35 });
-      box(chiave, o.x0 + 0.1, 0.35, o.z0 + 0.1, o.x1 - 0.1, 0.95, o.z1 - 0.1, 1);
-      box(chiave, o.x0 + 1, 0.95, o.z0 + 0.2, o.x1 - 0.9, 1.45, o.z1 - 0.2, 1);
-      box('vetroScuro', o.x0 + 1.05, 1, o.z0 + 0.18, o.x1 - 0.95, 1.4, o.z1 - 0.18, 1);
-      for (const [wx, wz] of [[o.x0 + 0.8, o.z0 + 0.12], [o.x1 - 0.8, o.z0 + 0.12], [o.x0 + 0.8, o.z1 - 0.12], [o.x1 - 0.8, o.z1 - 0.12]]) {
-        statico.aggiungi('nero', new THREE.CylinderGeometry(0.33, 0.33, 0.22, 12).rotateX(Math.PI / 2), wx, 0.33, wz);
-      }
-    } else if (o.tipo === 'tavolino') {
+    if (o.tipo === 'tavolino') {
       cil('ferro', ox, 0, oz, 0.03, 0.72, 6);
       cil('bianco', ox, 0.72, oz, 0.4, 0.04, 12);
       for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) box('ferro', ox + Math.cos(a) * 0.65 - 0.2, 0.42, oz + Math.sin(a) * 0.65 - 0.2, ox + Math.cos(a) * 0.65 + 0.2, 0.47, oz + Math.sin(a) * 0.65 + 0.2, 1);
@@ -1236,22 +1237,19 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
   for (let x = 125; x < 132; x += 1.1) for (const z of [-3, -1.8, 1.8, 3]) box('legnoScuro', x - 0.22, 0, z - 0.22, x + 0.22, 0.85, z + 0.22, 1);
   quadro(T.texturaStemma(), 120.05, 2.4, 0, { x: 1, z: 0 }, 1.1, 1.4, 0.05);
 
-  const stelle = new THREE.BufferGeometry();
-  const puntiStelle = [];
-  for (let i = 0; i < 420; i++) {
-    const a = caso() * Math.PI * 2;
-    const e = 0.12 + caso() * 1.1;
-    puntiStelle.push(Math.cos(a) * Math.cos(e) * 380, Math.sin(e) * 380, Math.sin(a) * Math.cos(e) * 380);
-  }
-  stelle.setAttribute('position', new THREE.Float32BufferAttribute(puntiStelle, 3));
-  const cielo = new THREE.Points(stelle, new THREE.PointsMaterial({ color: 0xc8d4ff, size: 1.4, sizeAttenuation: false, fog: false }));
-  scena.add(cielo);
-  const luna = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.texturaAlone('rgba(235,240,255,1)'), color: 0xe8eeff, fog: false, depthWrite: false }));
-  luna.position.set(-160, 170, -200);
-  luna.scale.setScalar(26);
-  scena.add(luna);
+  const esterne = ZONE.filter(z => z.aperto && !z.sala && z.id !== 'cella');
+  const areaEsterna = esterne.reduce((t, z) => t + (z.x1 - z.x0) * (z.z1 - z.z0), 0);
+  const liberi = estrai => {
+    let resto = estrai() * areaEsterna;
+    const zona = esterne.find(z => (resto -= (z.x1 - z.x0) * (z.z1 - z.z0)) <= 0) ?? esterne[0];
+    const x = zona.x0 + estrai() * (zona.x1 - zona.x0);
+    const z = zona.z0 + estrai() * (zona.z1 - zona.z0);
+    return OSTACOLI.some(o => x > o.x0 - 0.7 && x < o.x1 + 0.7 && z > o.z0 - 0.7 && z < o.z1 + 0.7) ? null : { x, z };
+  };
+  const atmosfera = creaAtmosfera(scena, { lampioni, lanterne: lanterneMuro, quota, liberi });
 
   const assedio = costruisciAssedio({ scena, statico, mat, box, cil, cartello });
+  costruisciArredo({ statico, mat, box, cil, sfera });
   const voto = creaVoto(scena, { mat, statico, box, cil, quadrante: quadranteMat });
   statico.finisci(scena, { ...mat, ...Object.fromEntries(coloriCase) });
   const macchine = creaMacchine(scena, { materialiArmi, oggetti, metallo: mat.ferro, legno: mat.legnoScuro, serveCorrente: true });
@@ -1417,7 +1415,7 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
       acqua.material.roughness = 0.05 + Math.sin(tempo * 3) * 0.02;
       for (const f of finestreTamburo) f.material.color.setHex(corrente ? 0xc8d4f0 : 0x6a7898);
       lucernario.material.color.setHex(corrente ? 0xd8e2ff : 0x8a9ac0);
-      cielo.rotation.y = tempo * 0.002;
+      atmosfera.aggiorna(punto);
     },
     nebbia() {
       return null;
