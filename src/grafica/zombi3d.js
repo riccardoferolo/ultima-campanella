@@ -5,6 +5,7 @@ import { TESTA } from '../colpi.js';
 import { quota } from '../mappa.js';
 import { PROCEDURALI, decoraBruto } from './palude/ragni3d.js';
 import { creaOcchi, altezzaLevitazione } from './palude/occhi3d.js';
+import { decoraCapitano } from './piazza/capitano3d.js';
 
 const DISSOLVENZA = 0.25;
 const AFFONDA_DOPO = 2.6;
@@ -64,6 +65,11 @@ const MODELLI = Object.freeze({
     url: './modelli/zombie.glb', scala: 0.0148, tinta: 0x7d8288, alto: 2.05, raggio: 0.55, raggioTesta: 0.24, reazione: 0.3, decora: decoraBruto,
     clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
     velocita: { cammina: 0.8, corre: 0.85, attacco: 1.1, attacco2: 1.05, muore: 0.9, fermo: 0.8 },
+  },
+  capitano: {
+    url: './modelli/zombie.glb', scala: 0.015, tinta: 0x9a8a80, alto: 2.15, raggio: 0.56, raggioTesta: 0.25, reazione: 0.35, decora: decoraCapitano,
+    clip: { cammina: 'cammina', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.8, corre: 0.9, attacco: 1.1, attacco2: 1.1, muore: 0.8, fermo: 0.8 },
   },
 });
 const MATERIALE_FIAMMA = new THREE.SpriteMaterial({ map: texturaFiamma(), color: 0xff8a3a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });

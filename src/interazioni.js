@@ -5,7 +5,7 @@ import { OGGETTI } from './mappe/giungla.js';
 import { ID_ASSI, ID_SCHEGGIA_GROTTA, ID_SCHEGGIA_FIUME, ID_MASCHERA, RELIQUIE, ASSI, SCHEGGE, ANIME_PER_IDOLO } from './giungla.js';
 import { RUNE } from './storia.js';
 import { descrivi as descriviPalude } from './palude.js';
-import { COSTO_CAMPANILE, COSTO_CAMPANE, STORDIMENTO_CAMPANE, TEMPO_CELLA } from './piazza.js';
+import { COSTO_CAMPANILE, COSTO_CAMPANE, STORDIMENTO_CAMPANE, TEMPO_CELLA, VOTO, campaneBenedette } from './piazza.js';
 
 const DISTANZA_OGGETTO = 1.8;
 const PORTE_CHIUSE = Object.freeze({
@@ -72,7 +72,13 @@ function descriviPiazza(a, io, vista) {
     case 'campane':
       if (!vista.corrente) return nessuno('Le campane sono ferme: serve la corrente');
       if ((p?.campane ?? 0) > 0) return nessuno(`Le campane vibrano ancora: ${Math.ceil(p.campane)} s`);
+      if (campaneBenedette(p)) return { costo: 0, testo: `Premi F per suonare le campane benedette: zombie storditi per ${STORDIMENTO_CAMPANE} s` };
       return { costo: COSTO_CAMPANE, testo: `Premi F per suonare le campane a distesa: zombie storditi per ${STORDIMENTO_CAMPANE} s [${COSTO_CAMPANE}]` };
+    case 'libro': {
+      const fase = p?.voto?.fase ?? VOTO.STATUE;
+      if (fase < VOTO.LIBRO) return { nascosto: true, costo: Infinity, testo: '' };
+      return { costo: 0, testo: fase === VOTO.LIBRO ? 'Premi F per sfogliare il vecchio libro sul leggio' : 'Premi F per rileggere la Summa pacifica' };
+    }
     default:
       return null;
   }
@@ -185,7 +191,9 @@ export function interazioneVicina(io, vista) {
     if (!aperte.has(a.zona)) continue;
     const d = distanza(a.posizione, io);
     if (d > R.DISTANZA_ACQUISTO) continue;
-    candidati.push({ d, tipo: 'compra', acquisto: a.id, ...descrivi(a, io, vista) });
+    const descrizione = descrivi(a, io, vista);
+    if (descrizione.nascosto) continue;
+    candidati.push({ d, tipo: 'compra', acquisto: a.id, ...descrizione });
   }
   candidati.sort((a, b) => a.d - b.d);
   return candidati[0] ?? null;

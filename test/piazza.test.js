@@ -1,14 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { R, ARMI } from '../src/regole.js';
-import { ZONE, MURI, FINESTRE, PORTE, ACQUISTI, FRAMMENTI, zonaDi, quota, ostacoliPerGiocatori, zoneAperte, NOMI_MAPPE, ELENCO_MAPPE } from '../src/mappa.js';
+import { ZONE, MURI, OSTACOLI, FINESTRE, PORTE, ACQUISTI, FRAMMENTI, zonaDi, quota, ostacoliPerGiocatori, zoneAperte, NOMI_MAPPE, ELENCO_MAPPE } from '../src/mappa.js';
 import { OGGETTI, CASE, PAVIMENTO_CHIESA, PAVIMENTO_PRESBITERIO, PAVIMENTO_SAGRATO, PIANO_CONSIGLIO, PIANO_CELLA, ALTEZZA_CAMPANILE } from '../src/mappe/piazza.js';
 import { creaPartita, passo } from '../src/partita.js';
 import { faiIstantanea, espandi } from '../src/istantanea.js';
 import { valida } from '../src/rete/protocollo.js';
 import { griglia, campoVerso, distanzaCampo } from '../src/navigazione.js';
 import { dentroScatola } from '../src/fisica.js';
-import { COSTO_CAMPANILE, TEMPO_CELLA, COSTO_CAMPANE, RICARICA_CAMPANE, STORDIMENTO_CAMPANE } from '../src/piazza.js';
+import {
+  COSTO_CAMPANILE, TEMPO_CELLA, COSTO_CAMPANE, RICARICA_CAMPANE, STORDIMENTO_CAMPANE, RICARICA_BENEDETTA,
+  VOTO, ORE_DEL_BEATO, ANIME_VEGLIA, LUNGHEZZA_CARRO, PUNTI_PACE, NUMERI_OROLOGIO, RAGGIO_DONI, CENTRO_DONI,
+  oraColpita, puntoCarro, portaCheFerma, occhiDi,
+} from '../src/piazza.js';
+import { ELENCO_BONUS } from '../src/regole.js';
 
 function avanza(stato, secondi, ingressi = {}) {
   const eventi = [];
@@ -241,7 +246,7 @@ test('le cinque statuette in cotto svegliano il segreto', () => {
 test('i morti risalgono dalle lapidi della chiesa solo quando la chiesa è aperta', () => {
   const stato = creaPartita({ seme: 3, giocatori: [{ id: 'a', nome: 'A' }], mappa: 'piazza' });
   avanza(stato, R.PRIMO_ROUND_TRA + 0.1);
-  const tombe = new Set(FINESTRE.filter(f => f.tana).map(f => f.id));
+  const tombe = new Set(FINESTRE.filter(f => f.tana && f.zona !== 'piazza').map(f => f.id));
   Object.assign(giocatore(stato), { vita: 1e9, vitaMax: 1e9 });
   avanza(stato, 20);
   assert.ok(!stato.zombie.some(z => tombe.has(z.finestra)), 'a chiesa chiusa nessuno esce dalle lapidi');
@@ -252,4 +257,216 @@ test('i morti risalgono dalle lapidi della chiesa solo quando la chiesa è apert
     return {};
   });
   assert.ok(stato.zombie.some(z => tombe.has(z.finestra)), 'aperta la chiesa, qualcuno risale dalle lapidi');
+});
+
+const statue = stato => FRAMMENTI.flatMap(f => {
+  metti(stato, f);
+  return avanza(stato, R.PASSO, una('frammento', { id: f.id }));
+});
+const voto = stato => stato.piazza.voto;
+const verso = (o, p) => {
+  const d = { x: p.x - o.x, y: p.y - o.y, z: p.z - o.z };
+  const l = Math.hypot(d.x, d.y, d.z);
+  return { x: d.x / l, y: d.y / l, z: d.z / l };
+};
+const DAL_SAGRATO = Object.freeze({ x: 8, z: 22 });
+const mira = (da, n) => {
+  const bersaglio = NUMERI_OROLOGIO.find(q => q.ora === n && q.n.x === -1);
+  const d = verso(occhiDi(da), bersaglio);
+  return { yaw: Math.atan2(d.x, d.z), pitch: Math.asin(d.y) };
+};
+const ora = (stato, n) => {
+  metti(stato, DAL_SAGRATO);
+  return avanza(stato, R.PASSO, una('orologio', mira(DAL_SAGRATO, n)));
+};
+const uccidi = (stato, z) => avanza(stato, R.PASSO, una('colpo', { zombie: z.id, danno: 8000 }));
+
+test('la piazza non è più un campo aperto: ingombri nel mezzo e tre tombini da cui risalgono i morti', () => {
+  creaPartita({ seme: 1, mappa: 'piazza' });
+  const ingombri = OSTACOLI.filter(o => o.tipo !== 'lampione' && o.tipo !== 'casa' && zonaDi((o.x0 + o.x1) / 2, (o.z0 + o.z1) / 2) === 'piazza');
+  assert.ok(ingombri.length >= 10, `solo ${ingombri.length} ingombri in piazza`);
+  for (const z of [-15, -8.8, 0, 12.3, 20, 26]) {
+    assert.ok(ingombri.some(o => o.z0 <= z && o.z1 >= z), `a z=${z} la piazza si attraversa senza ostacoli`);
+  }
+  const tombini = FINESTRE.filter(f => f.tana && f.zona === 'piazza');
+  assert.equal(tombini.length, 3);
+  for (const t of tombini) assert.ok(!OSTACOLI.some(o => dentroScatola(t.interno.x, t.interno.z, o, 0.6)), `${t.id} sotto un ingombro`);
+  const ids = new Set(tombini.map(t => t.id));
+  const stato = creaPartita({ seme: 5, giocatori: [{ id: 'a', nome: 'A' }], mappa: 'piazza' });
+  avanza(stato, R.PRIMO_ROUND_TRA + 0.1);
+  Object.assign(giocatore(stato), { vita: 1e9, vitaMax: 1e9 });
+  Object.assign(stato, { daGenerare: 60, attesaComparsa: 0 });
+  avanza(stato, 60, () => {
+    for (const z of stato.zombie) if (z.stato !== 'morto' && !ids.has(z.finestra)) Object.assign(z, { stato: 'morto', timer: 0.1 });
+    return {};
+  });
+  assert.ok(stato.zombie.some(z => ids.has(z.finestra)), 'nessuno è risalito dai tombini');
+});
+
+test('il carro del Beato ha la strada libera dagli ingombri', () => {
+  creaPartita({ seme: 1, mappa: 'piazza' });
+  const leggio = a => ({ x0: a.posizione.x - 0.3, z0: a.posizione.z - 0.3, x1: a.posizione.x + 0.3, z1: a.posizione.z + 0.3 });
+  const muri = [...MURI, ...OSTACOLI, ...ACQUISTI.map(leggio)];
+  for (let s = 0; s <= LUNGHEZZA_CARRO; s += 0.25) {
+    const p = puntoCarro(s);
+    const urta = muri.find(m => dentroScatola(p.x, p.z, m, 0.8));
+    assert.ok(!urta || PORTE.some(q => dentroScatola(p.x, p.z, q.scatola, 0.9)), `a ${s.toFixed(1)} m il carro urta ${urta?.tipo ?? urta?.parte}`);
+  }
+});
+
+test('il libro della Summa compare in sacrestia solo dopo le cinque statue', () => {
+  const stato = piazza();
+  accendi(stato);
+  metti(stato, davanti('libro'));
+  assert.ok(!compra(stato, 'libro').some(e => e.k === 'summa'));
+  assert.equal(voto(stato).fase, VOTO.STATUE);
+  const eventi = statue(stato);
+  assert.equal(voto(stato).fase, VOTO.LIBRO);
+  assert.ok(eventi.some(e => e.k === 'libroBeato'));
+  metti(stato, davanti('libro'));
+  assert.ok(compra(stato, 'libro').some(e => e.k === 'summa' && e.prima));
+  assert.equal(voto(stato).fase, VOTO.OROLOGIO);
+  assert.ok(compra(stato, 'libro').some(e => e.k === 'summa' && !e.prima), 'la Summa si può rileggere');
+});
+
+test("le ore del campanile vanno colpite nell'ordine della morte del Beato, il 4 giugno 1482", () => {
+  const stato = piazza();
+  assert.deepEqual([...ORE_DEL_BEATO], [4, 6, 1, 4, 8, 2]);
+  ora(stato, 4);
+  assert.equal(voto(stato).ore, 0, "prima del libro l'orologio non ascolta");
+  voto(stato).fase = VOTO.OROLOGIO;
+  [4, 4, 4, 6, 6, 1].forEach(n => ora(stato, n));
+  assert.equal(voto(stato).ore, 3, "i colpi in più sull'ora appena presa non contano e non azzerano");
+  assert.ok(ora(stato, 5).some(e => e.k === 'oraSbagliata'));
+  assert.equal(voto(stato).ore, 0, "un'ora sbagliata fa ricominciare");
+  ora(stato, 4);
+  assert.equal(voto(stato).ore, 1, 'il quattro sbagliato riparte come primo');
+  const rintocchi = stato.piazza.rintocchi;
+  const eventi = [6, 1, 4, 8, 2].flatMap(n => ora(stato, n));
+  assert.ok(eventi.some(e => e.k === 'ritornoBeato'));
+  assert.equal(voto(stato).fase, VOTO.CARRO);
+  assert.equal(stato.piazza.rintocchi, rintocchi + 1, 'le campane suonano da sole');
+});
+
+test("l'orologio si colpisce dal fianco della chiesa, non attraverso la facciata", () => {
+  creaPartita({ seme: 1, mappa: 'piazza' });
+  assert.equal(NUMERI_OROLOGIO.length, 48);
+  const ovest = n => NUMERI_OROLOGIO.find(q => q.ora === n && q.n.x === -1);
+  assert.ok(Math.abs(ovest(12).y - OGGETTI.OROLOGIO - 1.025) < 0.01, 'il XII sta in alto');
+  assert.ok(ovest(3).z > ovest(12).z + 1, 'guardando da ovest il III sta a destra, verso sud');
+  const dalSagrato = { x: 6, y: 1.7, z: 24 };
+  assert.equal(oraColpita(dalSagrato, verso(dalSagrato, ovest(4))), 4);
+  const dalFondo = { x: -14, y: 1.7, z: 22 };
+  assert.equal(oraColpita(dalFondo, verso(dalFondo, ovest(4))), 4, 'dal fondo della piazza si vede sopra il Tempietto');
+  const davantiFacciata = { x: -10, y: 1.7, z: 0 };
+  assert.equal(oraColpita(davantiFacciata, verso(davantiFacciata, ovest(4))), null, 'la facciata copre il campanile');
+  assert.equal(oraColpita(dalSagrato, { x: 0, y: 1, z: 0 }), null);
+});
+
+test('il carro avanza solo scortato, si ferma coi Dannati addosso e aspetta che si aprano le porte', () => {
+  const stato = piazza();
+  Object.assign(voto(stato), { fase: VOTO.CARRO, carro: 0 });
+  avanza(stato, 2);
+  assert.equal(voto(stato).carro, 0, 'da solo il carro non parte');
+  const scorta = () => {
+    metti(stato, puntoCarro(voto(stato).carro));
+    return {};
+  };
+  avanza(stato, 2, scorta);
+  assert.ok(voto(stato).carro > 1.2 && voto(stato).carro < 1.6, `${voto(stato).carro}`);
+  const z = zombie(stato);
+  const prima = voto(stato).carro;
+  avanza(stato, 2, () => {
+    Object.assign(z, puntoCarro(voto(stato).carro), { stato: 'dentro' });
+    return scorta();
+  });
+  assert.equal(voto(stato).carro, prima, 'un Dannato attaccato al carro lo ferma');
+  z.stato = 'morto';
+  avanza(stato, 200, scorta);
+  assert.equal(portaCheFerma(stato.porte, voto(stato).carro), 'transenneSud');
+  assert.equal(voto(stato).fase, VOTO.CARRO);
+  stato.porte.push('transenneSud');
+  avanza(stato, 60, scorta);
+  assert.equal(portaCheFerma(stato.porte, voto(stato).carro), 'tempietto');
+  stato.porte.push('tempietto');
+  const eventi = avanza(stato, 60, scorta);
+  assert.ok(eventi.some(e => e.k === 'arrivoBeato'));
+  assert.equal(voto(stato).fase, VOTO.VEGLIA);
+  assert.equal(zonaDi(puntoCarro(LUNGHEZZA_CARRO).x, puntoCarro(LUNGHEZZA_CARRO).z), 'tempietto');
+});
+
+test('la veglia conta i Dannati caduti nel Tempietto, poi il Capitano; abbatterlo dà la pace e le campane benedette', () => {
+  const stato = piazza();
+  accendi(stato);
+  Object.assign(voto(stato), { fase: VOTO.VEGLIA, anime: 0 });
+  uccidi(stato, zombie(stato, { x: -10, z: 10, vita: 1 }));
+  assert.equal(voto(stato).anime, 0, 'fuori dal Tempietto non conta');
+  for (let i = 0; i < ANIME_VEGLIA - 1; i++) uccidi(stato, zombie(stato, { x: 24, z: 18, vita: 1 }));
+  assert.equal(voto(stato).anime, ANIME_VEGLIA - 1);
+  const eventi = uccidi(stato, zombie(stato, { x: 24, z: 18, vita: 1 }));
+  assert.ok(eventi.some(e => e.k === 'boss' && e.tipo === 'capitano'));
+  assert.equal(voto(stato).fase, VOTO.CAPITANO);
+  const capitano = stato.zombie.find(z => z.tipo === 'capitano' && z.stato !== 'morto');
+  assert.ok(capitano, 'il Capitano del Visconti è in piazza');
+  const punti = giocatore(stato).punti;
+  const bonus = stato.bonus.length;
+  Object.assign(capitano, { stato: 'dentro', vita: 1 });
+  assert.ok(uccidi(stato, capitano).some(e => e.k === 'paceCerano'));
+  assert.equal(voto(stato).fase, VOTO.PACE);
+  assert.ok(giocatore(stato).punti >= punti + PUNTI_PACE);
+  assert.equal(stato.bonus.length, bonus + ELENCO_BONUS.length);
+  salta(stato);
+  metti(stato, davanti('campane'));
+  const prima = giocatore(stato).punti;
+  compra(stato, 'campane');
+  assert.equal(giocatore(stato).punti, prima, 'le campane benedette suonano gratis');
+  assert.ok(Math.abs(stato.piazza.campane - RICARICA_BENEDETTA) < 0.1);
+});
+
+test("l'istantanea porta la storia del Beato e la rete accetta solo ore vere", () => {
+  const stato = piazza();
+  Object.assign(voto(stato), { fase: VOTO.CARRO, ore: 6, carro: 12.345, anime: 0 });
+  const ist = faiIstantanea(stato);
+  assert.ok(valida({ t: 'st', g: 1, ist }));
+  assert.deepEqual(espandi(ist).piazza.voto, { fase: VOTO.CARRO, ore: 6, carro: 12.35, anime: 0 });
+  assert.equal(valida({ t: 'st', g: 1, ist: { ...ist, cv: [1, 2] } }), null);
+  assert.ok(valida({ t: 'az', a: { tipo: 'orologio', yaw: 1.2, pitch: 0.6 } }));
+  assert.equal(valida({ t: 'az', a: { tipo: 'orologio', ora: 4 } }), null);
+  assert.equal(valida({ t: 'az', a: { tipo: 'orologio', yaw: 'su', pitch: 0 } }), null);
+});
+
+test("l'host ricalcola il colpo all'orologio: senza vista sul campanile l'ora non conta", () => {
+  const stato = piazza();
+  voto(stato).fase = VOTO.OROLOGIO;
+  const davantiFacciata = { x: -10, z: 0 };
+  metti(stato, davantiFacciata);
+  avanza(stato, R.PASSO, una('orologio', mira(davantiFacciata, 4)));
+  assert.equal(voto(stato).ore, 0, 'la facciata copre il campanile');
+  metti(stato, DAL_SAGRATO);
+  avanza(stato, R.PASSO, una('orologio', { yaw: 0, pitch: 0 }));
+  assert.equal(voto(stato).ore, 0, 'un colpo che non prende l\'orologio non fa niente');
+  ora(stato, 4);
+  assert.equal(voto(stato).ore, 1);
+});
+
+test('la bomba durante la veglia vale per i Dannati caduti nel Tempietto', () => {
+  const stato = piazza();
+  Object.assign(voto(stato), { fase: VOTO.VEGLIA, anime: 0 });
+  for (let i = 0; i < 3; i++) zombie(stato, { x: 24, z: 16 + i, vita: 100 });
+  zombie(stato, { x: -10, z: 10, vita: 100 });
+  stato.bonus.push({ id: 900, tipo: 'bomba', x: giocatore(stato).x, z: giocatore(stato).z, timer: 10 });
+  avanza(stato, R.PASSO * 2);
+  assert.equal(voto(stato).anime, 3);
+});
+
+test('i doni della pace cadono nel Tempietto, lontano da muri e ingombri', () => {
+  creaPartita({ seme: 1, mappa: 'piazza' });
+  const ostacoli = ostacoliPerGiocatori(new Set(PORTE.map(q => q.id)));
+  for (let i = 0; i < ELENCO_BONUS.length; i++) {
+    const a = (i / ELENCO_BONUS.length) * Math.PI * 2;
+    const x = CENTRO_DONI.x + Math.cos(a) * RAGGIO_DONI;
+    const z = CENTRO_DONI.z + Math.sin(a) * RAGGIO_DONI;
+    assert.equal(zonaDi(x, z), 'tempietto');
+    assert.ok(!ostacoli.some(o => dentroScatola(x, z, o, 0.5)), `${ELENCO_BONUS[i]} dentro un ingombro`);
+  }
 });

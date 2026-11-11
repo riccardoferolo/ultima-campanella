@@ -67,6 +67,7 @@ function eIstantanea(ist) {
     && (ist.pz === undefined || elencoNumeri(ist.pz, 3))
     && (ist.tq === undefined || (Array.isArray(ist.tq) && ist.tq.every(numero))) && (ist.tn === undefined || elencoNumeri(ist.tn, 5))
     && (ist.cq === undefined || (Array.isArray(ist.cq) && ist.cq.length === 2 && ist.cq.every(numero)))
+    && (ist.cv === undefined || (Array.isArray(ist.cv) && ist.cv.length === 4 && ist.cv.every(numero)))
     && [ist.ts, ist.tg, ist.cs].every(e => e === undefined || (Array.isArray(e) && e.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))));
 }
 
@@ -76,6 +77,7 @@ function eAzione(a) {
   if (a.tipo === 'scegli') return ['pistola', 'aspetto', 'mappa'].includes(a.cosa) && (typeof a.valore === 'string' || numero(a.valore));
   if (a.tipo === 'speciale') return numero(a.yaw) && (a.pitch === undefined || numero(a.pitch));
   if (a.tipo === 'lampadario') return true;
+  if (a.tipo === 'orologio') return numero(a.yaw) && numero(a.pitch);
   if (a.tipo === 'teschio') return numero(a.zombie) || testo(a.oggetto, 16) || typeof a.carica === 'boolean';
   if (a.tipo === 'sparo') return numero(a.yaw) && numero(a.pitch) && (a.arma === undefined || arma(a.arma));
   if (a.tipo === 'catena') return Array.isArray(a.zombie) && a.zombie.length > 0 && a.zombie.length <= 13 && a.zombie.every(numero) && (a.arma === undefined || arma(a.arma));

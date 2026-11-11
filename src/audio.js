@@ -259,6 +259,8 @@ export function creaAudio() {
     campanone: () => {
       [[98, 0], [131, 0.35], [165, 0.7], [131, 1.25], [98, 1.6], [196, 1.9]].forEach(([f, r]) => campana(f, r, 0.2));
     },
+    ora: () => campana(196, 0, 0.18),
+    oraSbagliata: () => { campana(73, 0, 0.16); campana(69, 0.25, 0.12); },
     campanella: () => { for (let i = 0; i < 6; i++) { nota(1175, { durata: 0.5, tipo: 'sine', volume: 0.18, ritardo: i * 0.16 }); nota(1760, { durata: 0.3, tipo: 'sine', volume: 0.08, ritardo: i * 0.16 }); } },
     lancio: () => { nota(1900, { durata: 0.03, tipo: 'square', volume: 0.08 }); soffio({ durata: 0.28, da: 2600, a: 600, tipo: 'bandpass', volume: 0.35, ritardo: 0.05 }); },
     boss: () => { nota(62, { durata: 1.8, tipo: 'sawtooth', volume: 0.35, scendi: 38 }); nota(93, { durata: 1.5, tipo: 'sawtooth', volume: 0.2, scendi: 52, ritardo: 0.1 }); soffio({ durata: 1.6, da: 900, a: 180, tipo: 'bandpass', volume: 0.7 }); },

@@ -480,6 +480,7 @@ function danneggia(stato, giocatore, zombie, dannoRichiesto, opzioni, eventi) {
   if (stato.giungla) giungla.suUccisione(stato, zombie, giocatore, opzioni, eventi);
   if (stato.teatro) teatro.suUccisione(stato, zombie, eventi, S);
   if (stato.palude) palude.suUccisione(stato, zombie, giocatore, eventi);
+  if (stato.piazza) piazza.suUccisione(stato, zombie, eventi, S);
   if (dati.boss) bossUcciso(stato, zombie, eventi);
   else forseBonus(stato, zombie, eventi);
 }
@@ -714,6 +715,7 @@ function applicaBonus(stato, bonus, giocatore, eventi) {
       z.stato = 'morto';
       z.timer = RESTA_A_TERRA_DA_MORTO;
       eventi.push({ k: 'ucciso', zombie: z.id, testa: false, da: null, x: z.x, z: z.z, bomba: true });
+      if (stato.piazza) piazza.suUccisione(stato, z, eventi, S);
     }
     for (const g of vivi(stato)) aggiungiPunti(stato, g, R.PUNTI_BOMBA);
   }
@@ -818,6 +820,7 @@ function eseguiAzioni(stato, azioni, eventi) {
     else if (azione.tipo === 'speciale' && stato.giungla) giungla.speciale(stato, giocatore, azione, eventi, S);
     else if (azione.tipo === 'lampadario' && stato.teatro) teatro.lampadario(stato, giocatore, eventi);
     else if (azione.tipo === 'teschio' && stato.palude) palude.implodi(stato, giocatore, azione, eventi, S);
+    else if (azione.tipo === 'orologio' && stato.piazza) piazza.orologio(stato, giocatore, azione, eventi);
   }
 }
 
@@ -905,7 +908,7 @@ function avanzaFase(stato, dt, eventi) {
       eventi.push({ k: 'boss', tipo: 'preside', fusibile: stato.missione.presideFusibile });
     }
   }
-  const generatore = stato.missione?.generatore === 'acceso' || (!!stato.giungla && giungla.difesaAttiva(stato)) || (!!stato.palude && palude.difesaAttiva(stato));
+  const generatore = stato.missione?.generatore === 'acceso' || (!!stato.giungla && giungla.difesaAttiva(stato)) || (!!stato.palude && palude.difesaAttiva(stato)) || (!!stato.piazza && piazza.difesaAttiva(stato));
   if (generatore && stato.daGenerare < 2) stato.daGenerare = 2;
   stato.attesaComparsa -= dt;
   const presenti = stato.zombie.filter(z => z.stato !== 'morto').length;

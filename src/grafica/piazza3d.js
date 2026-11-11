@@ -10,6 +10,7 @@ import { creaCaso } from './caso-grafica.js';
 import { scatolaUV, orientamento } from './scuola3d.js';
 import { creaMacchine } from './macchine3d.js';
 import * as T from './piazza/texture.js';
+import { costruisciAssedio, creaVoto } from './piazza/assedio3d.js';
 
 const SCEGLI_LUCI_OGNI_S = 0.3;
 const ACCENSIONE_LUCE_S = 0.4;
@@ -569,7 +570,7 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
     banco(x, 0.95, 4.55);
   }
 
-  for (const f of FINESTRE.filter(q => q.tana)) {
+  for (const f of FINESTRE.filter(q => q.tana && q.zona !== 'piazza')) {
     const lapide = new THREE.MeshStandardMaterial({ map: T.texturaLapide(['HIC IACET', `MDC${['XII', 'XXX', 'XLV'][Number(f.id.slice(1)) - 1] ?? 'X'}`, 'R.I.P.']), roughness: 0.6 });
     pannello(lapide, 1, 2, f.centro.x, PAVIMENTO_CHIESA + 0.006, f.centro.z, { x: 0, z: 1 }, { x: -Math.PI / 2 });
   }
@@ -1143,7 +1144,7 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
   for (const o of OSTACOLI) {
     const ox = (o.x0 + o.x1) / 2;
     const oz = (o.z0 + o.z1) / 2;
-    if (o.tipo === 'auto') {
+    if (o.tipo === 'auto' && !o.colore) {
       const colore = ox < 13 ? 0x9a9ea4 : 0xe6e8ea;
       const chiave = `auto${colore}`;
       if (!mat[chiave]) mat[chiave] = new THREE.MeshStandardMaterial({ color: colore, metalness: 0.6, roughness: 0.35 });
@@ -1250,6 +1251,8 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
   luna.scale.setScalar(26);
   scena.add(luna);
 
+  const assedio = costruisciAssedio({ scena, statico, mat, box, cil, cartello });
+  const voto = creaVoto(scena, { mat, statico, box, cil, quadrante: quadranteMat });
   statico.finisci(scena, { ...mat, ...Object.fromEntries(coloriCase) });
   const macchine = creaMacchine(scena, { materialiArmi, oggetti, metallo: mat.ferro, legno: mat.legnoScuro, serveCorrente: true });
 
@@ -1295,6 +1298,7 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
     { x: 35.6, y: PIANO_CELLA + 1, z: 14.4, colore: 0xff8a2a, prima: 6, dopo: 14, portata: 9, fuoco: true },
     { x: 34, y: PIANO_CELLA + 2.6, z: 16.8, colore: 0xb8c8ff, prima: 6, dopo: 6, portata: 8 },
     { x: 127, y: 3.4, z: 0, colore: 0xffe2b0, prima: 16, dopo: 16, portata: 18 },
+    voto.fonte,
   ];
   const luci = Array.from({ length: luciAccese }, () => {
     const luce = new THREE.PointLight(0xffffff, 0, 10, 1.4);
@@ -1326,6 +1330,7 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
         continue;
       }
       const f = l.fonte;
+      if (f.mobile) l.luce.position.set(f.x, f.y, f.z);
       l.accensione = Math.min(1, l.accensione + dt / ACCENSIONE_LUCE_S);
       const tremolio = f.fuoco ? 0.8 + Math.sin(tempo * 9 + f.x) * 0.12 + Math.sin(tempo * 23 + f.z) * 0.08 : f.tremola && Math.sin(tempo * 13.7 + f.x) > 0.9 ? 0.15 : 1;
       l.luce.intensity = intensita(f, vista) * l.accensione * tremolio;
@@ -1357,6 +1362,8 @@ export function costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti
     },
     aggiorna(vista, dt, tempo, punto) {
       macchine.aggiorna(vista, dt, tempo);
+      voto.aggiorna(vista, dt, tempo);
+      assedio.aggiorna(tempo);
       aggiornaLuci(vista, dt, tempo, punto);
       const corrente = vista.corrente;
       for (const f of FINESTRE) {

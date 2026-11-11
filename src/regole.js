@@ -285,6 +285,7 @@ export const TIPI_ZOMBIE = Object.freeze({
   ragno: Object.freeze({ mappa: 'palude', nome: 'Zombi ragno', vita: 0.55, velocita: 1.25, danno: 0.7, portata: 0.95, punti: 1.2, corre: true, carica: 0.8 }),
   bruto: Object.freeze({ mappa: 'palude', nome: 'Bruto corazzato', vita: 4.5, velocita: 0.8, danno: 1.8, portata: 1.25, punti: 4, rompe: 2.5, carica: 1.3, corazza: 0.3 }),
   arachne: Object.freeze({ nome: 'Arachne, la Tessitrice', vita: 1, velocita: 1, danno: 2.2, portata: 2.2, punti: 40, boss: true, finale: true, soglie: Object.freeze([0.5, 0.2]) }),
+  capitano: Object.freeze({ mappa: 'piazza', nome: 'Il Capitano del Visconti', vita: 24, velocita: 1, danno: 2, portata: 1.5, punti: 15, boss: true, carica: 1.5, infuria: 0.5 }),
 });
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 

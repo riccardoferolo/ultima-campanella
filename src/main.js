@@ -5,6 +5,8 @@ import { MURI, OSTACOLI, PORTE, ACQUISTI, ZONE, ELENCO_MAPPE, NOMI_MAPPE, NOMI, 
 import { OGGETTI as OGGETTI_TEATRO } from './mappe/teatro.js';
 import { rallentamento } from './teatro.js';
 import { messaggioRadio, RUNE } from './storia.js';
+import { VOTO, ORE_DEL_BEATO, ANIME_VEGLIA, oraColpita } from './piazza.js';
+import { CRONACA, ROMANI } from './piazza/cronaca.js';
 import { muoviCerchio } from './fisica.js';
 import { CORPO, colpisciZombie, direzioneDa, disperdi, esplosione, primoMuro, raggioSfera } from './colpi.js';
 import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi } from './arsenale.js';
@@ -54,7 +56,7 @@ const PORTATA_TRACCIA = 30;
 const FERMATI_PRIMA = 0.55;
 const COLPITI_COLTELLO = 2;
 const COLPITI_RELIQUIA = 3;
-const BOSS_MINORI = new Set(['preside', 'sciamano', 'guardiano']);
+const BOSS_MINORI = new Set(['preside', 'sciamano', 'guardiano', 'capitano']);
 const RAGGIO_LAMPADARIO = 1.4;
 const HOST_PERSO_MS = 8000;
 const AVVISO_HOST_PERSO_MS = 6000;
@@ -64,11 +66,13 @@ const ALTEZZA_SOPRA = 3;
 const TESTI_BOSS = {
   sciamano: 'Lo Sciamano esce dalla giungla: tamburi in lontananza…',
   guardiano: 'Le pietre del sole si allineano… il Guardiano si sveglia!',
+  capitano: 'Le campane suonano a martello: il Capitano del Visconti è in piazza!',
 };
 const TESTI_BOSS_UCCISO = {
   preside: 'Il Preside è morto!',
   sciamano: 'Lo Sciamano è caduto!',
   guardiano: 'Il Guardiano del Sole è caduto: ha lasciato una spada!',
+  capitano: 'Il Capitano del Visconti è caduto: Cerano è salva!',
 };
 const TESTI_VIA = {
   giungla: 'Si comincia! La giungla non perdona',
@@ -373,8 +377,15 @@ function suEventi(eventi) {
         mondo.effetti.esplosione({ x: e.x, y: e.y + 0.8, z: e.z }, 'fuoco', 0xffc070);
         audio.esplosione(Math.hypot(e.x - io.x, e.z - io.z), Math.atan2(e.x - io.x, e.z - io.z) - io.yaw);
         break;
-      case 'boss': audio.suona('boss'); hud.avviso(TESTI_BOSS[e.tipo] ?? (e.fusibile ? 'Il Preside è arrivato… e ha qualcosa in tasca' : 'Il Preside è tornato!')); break;
-      case 'infuriato': audio.suona('urlo'); hud.avviso('Il Preside si è infuriato!'); break;
+      case 'boss':
+        audio.suona('boss');
+        hud.avviso(TESTI_BOSS[e.tipo] ?? (e.fusibile ? 'Il Preside è arrivato… e ha qualcosa in tasca' : 'Il Preside è tornato!'));
+        if (e.tipo === 'capitano') {
+          mondo.campane?.();
+          hud.radio(CRONACA.galeazzo);
+        }
+        break;
+      case 'infuriato': audio.suona('urlo'); hud.avviso(e.tipo === 'capitano' ? 'Il Capitano del Visconti si infuria!' : 'Il Preside si è infuriato!'); break;
       case 'bossUcciso': audio.suona('bossUcciso'); if (TESTI_BOSS_UCCISO[e.tipo]) hud.avviso(TESTI_BOSS_UCCISO[e.tipo], 'bene'); break;
       case 'fusibileCaduto': hud.avviso('Il Preside ha perso un fusibile!', 'bene'); break;
       case 'fusibile': audio.suona('fusibile'); hud.avviso(`Fusibile ${e.trovati}/${e.totale}`, 'bene'); break;
@@ -465,6 +476,14 @@ function suEventi(eventi) {
         hud.avviso(perMe ? `Sei in cima al campanile: hai ${e.secondi} s nella cella campanaria` : `${nomeDi(e.a)} è salito sul campanile`, 'bene');
         break;
       case 'discesaCampanile': if (perMe) { audio.suona('porta'); hud.avviso('Sei sceso nel Tempietto del Beato Pacifico'); } break;
+      case 'libroBeato': audio.suona('segreto'); hud.avviso('In sacrestia, sul leggio, è comparso un vecchio libro…', 'bene'); break;
+      case 'summa': if (perMe || e.prima) { audio.suona('frammento'); hud.radio(CRONACA.summa); } break;
+      case 'oraDelBeato': audio.suona('ora'); hud.avviso(`${ROMANI[e.ora]}: l'orologio risponde (${e.n}/${ORE_DEL_BEATO.length})`, 'bene'); break;
+      case 'oraSbagliata': audio.suona('oraSbagliata'); hud.avviso(`${ROMANI[e.ora]}: l'orologio tace, si ricomincia`); break;
+      case 'ritornoBeato': audio.suona('campanone'); mondo.campane?.(); hud.radio(CRONACA.ritorno); break;
+      case 'arrivoBeato': audio.suona('segreto'); hud.radio(CRONACA.veglia); break;
+      case 'animaBeato': if (e.anime % 5 === 0) { audio.suona('frammento'); hud.avviso(`La veglia del Beato: ${e.anime}/${ANIME_VEGLIA}`, 'bene'); } break;
+      case 'paceCerano': audio.suona('campanone'); mondo.campane?.(); hud.radio(CRONACA.pace); break;
       case 'campane':
         audio.suona('campanone');
         mondo.campane?.();
@@ -811,6 +830,9 @@ function sparaColpo(arma, vista) {
   }
   const bersagli = mondo.bersagli(vista);
   const ostacoli = scatole(vista.porte, true);
+  if (vista.piazza?.voto?.fase === VOTO.OROLOGIO) {
+    if (oraColpita(origine, centro)) inviaAzione({ tipo: 'orologio', yaw: io.yaw, pitch: io.pitch });
+  }
   if (vista.teatro?.lampadario === 0 && raggioSfera(origine, centro, OGGETTI_TEATRO.LAMPADARIO, RAGGIO_LAMPADARIO) < primoMuro(origine, centro, ostacoli)) inviaAzione({ tipo: 'lampadario' });
   if (arma.catena) {
     scarica(arma, tipo, origine, centro, bersagli, ostacoli);

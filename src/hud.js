@@ -1,10 +1,11 @@
 import { ARMI, BEVANDE, BONUS, TIPI_ZOMBIE, R, faseBoss, ASPETTI } from './regole.js';
 import { NOMI_MAPPE, nomeBevanda } from './mappa.js';
 import { obiettivoGiungla, reliquieGiungla } from './storia.js';
+import { obiettivoVoto } from './piazza/cronaca.js';
 import { creaSalaScelte } from './salaScelte.js';
 import { obiettivo as obiettivoPalude, secondario as secondarioPalude } from './palude.js';
 
-const BOSS = Object.freeze(['arachne', 'divoratore', 'custode', 'guardiano', 'sciamano', 'preside']);
+const BOSS = Object.freeze(['arachne', 'divoratore', 'custode', 'guardiano', 'sciamano', 'preside', 'capitano']);
 const DURATA_RADIO_MS = 14000;
 
 const $ = id => document.getElementById(id);
@@ -30,7 +31,7 @@ function obiettivoPiazza(vista, mioId) {
   const sopra = vista.piazza?.sopra?.[mioId];
   if (sopra > 0) return `Cella campanaria: si scende tra ${Math.ceil(sopra)} s`;
   if (!vista.corrente) return 'La corrente è saltata: riattivate il quadro elettrico della sacrestia';
-  return '';
+  return obiettivoVoto(vista);
 }
 
 function obiettivo(vista, mioId) {

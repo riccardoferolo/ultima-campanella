@@ -127,8 +127,21 @@ transenne di via Vittime della Mafia, del vicolo delle Scuole, della strada vers
   conica): con la corrente si sale per 750 punti e si resta 40 secondi nella cella campanaria con la Fonderia (il
   potenziatore); la corda delle campane (1500) le suona a distesa e stordisce per 7 secondi tutti gli zombie della
   mappa (boss esclusi), poi vanno lasciate riposare 75 secondi. A ogni round il campanile batte i rintocchi.
+- **La piazza assediata**: non è più un campo aperto dove girare in tondo. Bancarelle rovesciate, un pullman di linea
+  per Novara abbandonato in mezzo, un'ambulanza, auto incidentate, new jersey, sacchi di sabbia e un cantiere
+  recintato del Comune spezzano la piazza in corsie strette; dal sagrato al bar ci sono un furgone, cassonetti e
+  un'auto ribaltata. E i morti risalgono da tre tombini in mezzo alla piazza, fin dal primo round.
 - Easter egg: cinque statuette in cotto (il Beato Pacifico, San Rocco, San Giuseppe, San Giovanni e la Madonna, le
   statue della facciata) nascoste fra piazza, Municipio, navata, Tempietto e campanile.
+- **Il voto del Beato** (spoiler): finite le statuette, in sacrestia compare la *Summa pacifica* sul leggio e la
+  «Cronaca di Cerano» racconta la storia vera di fra Pacifico Ramati (Cerano 1424 circa – Sassari, 4 giugno 1482),
+  sepolto per sua volontà nel paese natale. Si sparano le ore dell'orologio del campanile nell'ordine della sua morte
+  (IIII · VI · I · IIII · VIII · II; si mira dal fianco della chiesa o dal fondo della piazza, la facciata copre), si
+  scorta il carro col feretro dal bar fino al Tempietto (avanza solo con qualcuno accanto e si ferma se un Dannato lo
+  tocca), si vegliano 20 Dannati caduti nel Tempietto e infine si abbatte il Capitano del Visconti, col biscione sul
+  petto: Galeazzo II Visconti distrusse Cerano nel 1356. In premio 2500 punti a testa, tutti i bonus a terra e le
+  campane gratis ogni 30 secondi. Le date della cronaca vengono dalle voci di Wikipedia su Cerano, sulla chiesa e sul
+  Beato Pacifico.
 
 ## Strumenti
 
@@ -138,6 +151,8 @@ transenne di via Vittime della Mafia, del vicolo delle Scuole, della strada vers
 - `vetrina3.mjs`, `mani.mjs` – schermate di sala, armi in mano, zombie e mappa;
 - `teatro.mjs` – giro di foto del Teatro dell'Eclissi (Edge su GPU) e misura degli fps in platea con un'orda;
 - `piazza.mjs` – giro di foto della Piazza di Cerano, dentro e fuori, fino alla cella campanaria;
+- `voto.mjs`, `collaudo-voto.mjs` – foto degli ingombri e del Voto del Beato con gli spari veri all'orologio, e la
+  stessa storia giocata in due;
 - `converti-tutto.mjs` + `converti/tutto.html` – conversione dei modelli scaricati in `public/modelli/*.glb`
   (i file sorgente vanno rimessi in `_lavoro/scaricati/`, vedi `CREDITI.md`).
 

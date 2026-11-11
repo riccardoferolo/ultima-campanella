@@ -166,6 +166,22 @@ export const OSTACOLI = Object.freeze([
   ostacolo('lampione', -20.15, -11.15, -19.85, -10.85, 0, 4.6), ostacolo('lampione', -20.15, 14.85, -19.85, 15.15, 0, 4.6),
   ostacolo('lampione', -8.15, 28.85, -7.85, 29.15, 0, 4.6), ostacolo('lampione', 10.85, 28.85, 11.15, 29.15, 0, 4.6),
   ostacolo('lampione', 20.85, -13.15, 21.15, -12.85, 0, 4.6), ostacolo('lampione', -35.15, 28.85, -34.85, 29.15, 0, 4.6),
+
+  ostacolo('pullman', -18.9, 15.6, -16.3, 27.4, 0, 3.2),
+  ostacolo('bancarella', -25.2, -10, -21.8, -7.6, 0, 2.5, { tenda: 0xb8323a }),
+  ostacolo('bancarella', -18.4, -10, -15, -7.6, 0, 2.5, { tenda: 0x2f6aa8 }),
+  ostacolo('bancarella', -11.6, -10, -8.2, -7.6, 0, 2.5, { tenda: 0xd8a020 }),
+  ostacolo('auto', -23.8, -17.2, -21.9, -12.8, 0, 1.5, { colore: 0x8a1e1e, incidentata: true }),
+  ostacolo('auto', -9.6, -14.6, -5.2, -12.7, 0, 1.5, { colore: 0x26466e, incidentata: true }),
+  ostacolo('ambulanza', -8.4, 15, -6, 20.8, 0, 2.7),
+  ostacolo('jersey', -27.2, 12, -22.8, 12.6, 0, 0.9),
+  ostacolo('jersey', -14.2, 12, -10.2, 12.6, 0, 0.9),
+  ostacolo('sacchi', -4.6, 22.6, -1.2, 23.6, 0, 1.1),
+  ostacolo('cantiere', -25.6, 22, -21.2, 27.2, 0, 2),
+  ostacolo('furgone', 5.6, 15.5, 7.8, 21, 0, 2.5),
+  ostacolo('cassonetti', 12.6, 12.6, 16.4, 13.8, 0, 1.4),
+  ostacolo('auto', -37.5, 9.6, -33.1, 11.5, 0, 1.5, { colore: 0x5a5e62, incidentata: true, ribaltata: true }),
+  ostacolo('cassonetti', -32.5, 34, -29.5, 35.2, 0, 1.4),
 ]);
 
 function finestra(id, zonaId, asse, posizione, da, a, versoFuori, { recinzione = false, spessore = SPESSORE } = {}) {
@@ -206,6 +222,9 @@ export const FINESTRE = Object.freeze([
   tomba('t1', 'navata', 9.5, -8.3),
   tomba('t2', 'navata', 21.5, 8.3),
   tomba('t3', 'crociera', 36, -7.6),
+  tomba('g1', 'piazza', -20.6, 4.4),
+  tomba('g2', 'piazza', -4.2, 27),
+  tomba('g3', 'piazza', -17.6, -3.6),
 ]);
 
 function porta(id, nome, costo, zone, scatola, extra = {}) {
@@ -251,6 +270,7 @@ export const ACQUISTI = Object.freeze([
   acquisto('potenziatore', 'potenziatore', 'cella', 34, 13.75, [0, 1]),
   acquisto('campane', 'campane', 'cella', 31.76, 15.6, [1, 0]),
   acquisto('discesa', 'discesa', 'cella', 36.24, 16.6, [-1, 0]),
+  acquisto('libro', 'libro', 'sacrestia', 47.5, -16.4, [0, 1]),
 ]);
 
 export const MURALI = Object.freeze(new Set(['arma', 'munizioni', 'interruttore', 'campanile', 'campane', 'discesa']));
@@ -285,4 +305,15 @@ export const OGGETTI = Object.freeze({
   CUPOLA: Object.freeze({ x: 36, z: 0, raggio: 5.9 }),
   FONTANA: punto(-24.8, 1),
   OROLOGIO: 26.5,
+  RAGGIO_QUADRANTE: 1.25,
+  PERCORSO_CARRO: Object.freeze([
+    Object.freeze({ x: -41, z: 31 }),
+    Object.freeze({ x: -12, z: 31.5 }),
+    Object.freeze({ x: 4, z: 30.4 }),
+    Object.freeze({ x: 16.3, z: 30.4, porta: 'transenneSud' }),
+    Object.freeze({ x: 21, z: 28.4, porta: 'tempietto' }),
+    Object.freeze({ x: 21, z: 22 }),
+    Object.freeze({ x: 22.3, z: 18.2 }),
+  ]),
+  CAPITANO: punto(8, 24),
 });
