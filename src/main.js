@@ -1,7 +1,7 @@
 import './stile.css';
 import { R, ARMI, BEVANDE, BONUS, COLTELLO, PISTOLE_INIZIALI, ASPETTI, saltiArco, fattoreBevande, modoRicarica, dannoColtello } from './regole.js';
 import { semeCasuale } from './caso.js';
-import { MURI, OSTACOLI, PORTE, ACQUISTI, ZONE, ELENCO_MAPPE, NOMI_MAPPE, usaMappa, mappaAttiva, ostacoliPerGiocatori, scatolaAcquisto, quota, nomeBevanda } from './mappa.js';
+import { MURI, OSTACOLI, PORTE, ACQUISTI, ZONE, ELENCO_MAPPE, NOMI_MAPPE, NOMI, FRAMMENTI, usaMappa, mappaAttiva, ostacoliPerGiocatori, scatolaAcquisto, quota, nomeBevanda } from './mappa.js';
 import { OGGETTI as OGGETTI_TEATRO } from './mappe/teatro.js';
 import { rallentamento } from './teatro.js';
 import { messaggioRadio, RUNE } from './storia.js';
@@ -73,6 +73,7 @@ const TESTI_BOSS_UCCISO = {
 const TESTI_VIA = {
   giungla: 'Si comincia! La giungla non perdona',
   teatro: 'Si va in scena! Il sipario è chiuso: il generatore è sul palco',
+  piazza: 'Piazza Crespi, Cerano: la corrente è saltata, il quadro è in sacrestia',
 };
 const FASI_DIVORATORE = {
   2: 'Il Divoratore si copre di scaglie: rompetele con le reliquie!',
@@ -352,7 +353,11 @@ function suEventi(eventi) {
     const perMe = e.a === s.mioId;
     if (mappaAttiva === 'palude' && mondo && eventoPalude(e, { hud, audio, mondo, perMe, nomeDi, io })) continue;
     switch (e.k) {
-      case 'round': audio.suona('round'); hud.avviso(`Round ${e.round}`); break;
+      case 'round':
+        audio.suona('round');
+        if (mappaAttiva === 'piazza') audio.rintocchi(Math.min(12, e.round));
+        hud.avviso(`Round ${e.round}`);
+        break;
       case 'fineRound': audio.suona('fineRound'); break;
       case 'ucciso':
         mondo.effetti.macchia(e.x, e.z);
@@ -455,6 +460,16 @@ function suEventi(eventi) {
         hud.avviso(perMe ? `La botola si apre: hai ${e.secondi} s nel sottopalco con la Forgia Arcana` : `${nomeDi(e.a)} è sceso nel sottopalco`, 'bene');
         break;
       case 'risalita': if (perMe) { audio.suona('porta'); hud.avviso('Il montacarichi ti riporta sul palco'); } break;
+      case 'campanile':
+        audio.suona('porta');
+        hud.avviso(perMe ? `Sei in cima al campanile: hai ${e.secondi} s nella cella campanaria` : `${nomeDi(e.a)} è salito sul campanile`, 'bene');
+        break;
+      case 'discesaCampanile': if (perMe) { audio.suona('porta'); hud.avviso('Sei sceso nel Tempietto del Beato Pacifico'); } break;
+      case 'campane':
+        audio.suona('campanone');
+        mondo.campane?.();
+        hud.avviso(`Le campane suonano a distesa: ${e.storditi} zombie storditi per ${e.secondi} s!`, 'bene');
+        break;
       case 'sentinella': audio.suona('generatore'); hud.avviso(`La sentinella della platea apre il fuoco per ${e.secondi} s`, 'bene'); break;
       case 'sentinellaSpenta': hud.avviso('La sentinella si ferma a raffreddarsi'); break;
       case 'trappola': audio.suona('implosione'); hud.avviso('Trappola incendiaria accesa: non attraversatela!'); break;
@@ -482,8 +497,13 @@ function suEventi(eventi) {
         hud.avviso(`${BONUS[e.tipo].nome} — ${BONUS[e.tipo].descrizione}`, 'bene');
         if (e.tipo === 'munizioni') arsenale.armi.forEach(a => riempi(arsenale, a.tipo));
         break;
-      case 'frammento': audio.suona('frammento'); hud.avviso(`Frammento di meteorite ${e.trovati}/${e.totale}`, 'bene'); break;
-      case 'segreto': audio.suona('segreto'); hud.avviso("La meteorite si risveglia: avete l'Orizzonte degli Eventi!", 'bene'); break;
+      case 'frammento': {
+        const santo = FRAMMENTI.find(f => f.id === e.id)?.santo;
+        audio.suona('frammento');
+        hud.avviso(NOMI.frammento ? `${NOMI.frammento}${santo ? `: ${santo}` : ''} (${e.trovati}/${e.totale})` : `Frammento di meteorite ${e.trovati}/${e.totale}`, 'bene');
+        break;
+      }
+      case 'segreto': audio.suona('segreto'); hud.avviso(NOMI.segreto ?? "La meteorite si risveglia: avete l'Orizzonte degli Eventi!", 'bene'); break;
       case 'campanella':
         audio.suona('campanella');
         mondo.campanella();

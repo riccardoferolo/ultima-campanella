@@ -25,10 +25,19 @@ function obiettivoTeatro(vista, mioId) {
   return '';
 }
 
+function obiettivoPiazza(vista, mioId) {
+  if (vista.fase === 'attesa' || vista.round === 0) return '';
+  const sopra = vista.piazza?.sopra?.[mioId];
+  if (sopra > 0) return `Cella campanaria: si scende tra ${Math.ceil(sopra)} s`;
+  if (!vista.corrente) return 'La corrente è saltata: riattivate il quadro elettrico della sacrestia';
+  return '';
+}
+
 function obiettivo(vista, mioId) {
   if (vista.giungla) return obiettivoGiungla(vista);
   if (vista.teatro) return obiettivoTeatro(vista, mioId);
   if (vista.palude) return obiettivoPalude(vista, mioId);
+  if (vista.piazza) return obiettivoPiazza(vista, mioId);
   if (vista.mappa !== 'scuola') return '';
   const m = vista.missione;
   if (!m || vista.fase === 'attesa' || vista.fase === 'vinta' || vista.round === 0) return '';

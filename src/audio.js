@@ -214,6 +214,11 @@ export function creaAudio() {
     osc.stop(t + durata + 0.05);
   }
 
+  function campana(fondamentale, ritardo = 0, volume = 0.16) {
+    [[0.5, 4.5, 0.55], [1, 3.6, 1], [1.19, 2.6, 0.5], [1.5, 2.2, 0.35], [2, 1.8, 0.45], [2.67, 1.1, 0.2], [4.1, 0.6, 0.12]]
+      .forEach(([rapporto, durata, peso]) => nota(fondamentale * rapporto, { durata, tipo: 'sine', volume: volume * peso, ritardo }));
+  }
+
   const buffer = (chiave, opzioni = {}) => motore.suona([{ chiave, velocita: caso(0.95, 1.05) }], { volume: 0.6, umido: 0.15, ...opzioni });
   const dentroPartita = () => musica.stato !== 'calma' && musica.stato !== 'silenzio';
 
@@ -251,6 +256,9 @@ export function creaAudio() {
     bomba: () => buffer('esplosione_grande', { volume: 1, umido: 0.45, priorita: 3 }),
     frammento: () => { [1568, 2093, 2637].forEach((f, i) => nota(f, { durata: 0.6, tipo: 'sine', volume: 0.12, ritardo: i * 0.15 })); },
     segreto: () => { [262, 330, 392, 523, 392, 523, 659, 784, 1046].forEach((f, i) => nota(f, { durata: 0.5, tipo: 'triangle', volume: 0.16, ritardo: i * 0.18 })); soffio({ durata: 3, da: 200, a: 3000, tipo: 'bandpass', volume: 0.3 }); },
+    campanone: () => {
+      [[98, 0], [131, 0.35], [165, 0.7], [131, 1.25], [98, 1.6], [196, 1.9]].forEach(([f, r]) => campana(f, r, 0.2));
+    },
     campanella: () => { for (let i = 0; i < 6; i++) { nota(1175, { durata: 0.5, tipo: 'sine', volume: 0.18, ritardo: i * 0.16 }); nota(1760, { durata: 0.3, tipo: 'sine', volume: 0.08, ritardo: i * 0.16 }); } },
     lancio: () => { nota(1900, { durata: 0.03, tipo: 'square', volume: 0.08 }); soffio({ durata: 0.28, da: 2600, a: 600, tipo: 'bandpass', volume: 0.35, ritardo: 0.05 }); },
     boss: () => { nota(62, { durata: 1.8, tipo: 'sawtooth', volume: 0.35, scendi: 38 }); nota(93, { durata: 1.5, tipo: 'sawtooth', volume: 0.2, scendi: 52, ritardo: 0.1 }); soffio({ durata: 1.6, da: 900, a: 180, tipo: 'bandpass', volume: 0.7 }); },
@@ -387,6 +395,10 @@ export function creaAudio() {
     },
     sparo(arma, distanza = 0, angolo = 0) {
       if (pronto()) sparoArma(arma, distanza, angolo);
+    },
+    rintocchi(quanti) {
+      if (!pronto()) return;
+      for (let i = 0; i < quanti; i++) campana(110, 1.2 + i * 1.7, 0.09);
     },
     esplosione(distanza, angolo) {
       if (!pronto() || distanza > DISTANZA_MASSIMA_ESPLOSIONE) return;

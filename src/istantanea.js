@@ -1,6 +1,7 @@
 import { FINESTRE, ELENCO_MAPPE } from './mappa.js';
 import { istantanea as istantaneaGiungla, espandi as espandiGiungla } from './giungla.js';
 import { istantanea as istantaneaTeatro, espandi as espandiTeatro } from './teatro.js';
+import { istantanea as istantaneaPiazza, espandi as espandiPiazza } from './piazza.js';
 import { istantanea as istantaneaPalude, espandi as espandiPalude } from './palude.js';
 import { ELENCO_TIPI_ZOMBIE, ELENCO_BONUS, BONUS_A_TEMPO } from './regole.js';
 
@@ -48,6 +49,7 @@ export function faiIstantanea(stato) {
     ...istantaneaGiungla(stato),
     ...istantaneaTeatro(stato),
     ...istantaneaPalude(stato),
+    ...istantaneaPiazza(stato),
   };
 }
 
@@ -78,6 +80,7 @@ export function espandi(ist) {
     giungla: espandiGiungla(ist),
     teatro: espandiTeatro(ist),
     palude: espandiPalude(ist),
+    piazza: espandiPiazza(ist),
     granate: (ist.gr ?? []).map(([id, x, y, z, ragnatela]) => ({ id, x, y, z, ragnatela: !!ragnatela })),
     ragnatele: new Set(ist.rg ?? []),
     proiettili: (ist.pj ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),

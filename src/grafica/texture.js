@@ -20,6 +20,7 @@ const REALI = Object.freeze(['muro', 'piastrelle', 'parquet', 'soffitto', 'legno
 
 export const TEXTURE_SCUOLA = REALI;
 export const TEXTURE_TEATRO = Object.freeze(['muro', 'parquet', 'soffitto', 'legno', 'porta', 'cemento', 'asfalto', 'metallo', 'assiVecchie']);
+export const TEXTURE_PIAZZA = Object.freeze(['muro', 'parquet', 'legno', 'porta', 'cemento', 'asfalto', 'metallo']);
 export const TEXTURE_PALUDE = Object.freeze(['fango', 'foglieTerra', 'assiVecchie', 'corteccia', 'pietraMuschio', 'pietraTempio', 'roccia', 'legno', 'metallo', 'cemento', 'paglia']);
 export const TEXTURE_GIUNGLA = Object.freeze(['suoloGiungla', 'foglieTerra', 'pietraMuschio', 'pietraTempio', 'roccia', 'paglia', 'assiVecchie', 'fango', 'cortecciaPalma', 'corteccia', 'metallo', 'legno']);
 

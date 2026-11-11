@@ -7,14 +7,24 @@ const DESCRIZIONI_MAPPA = Object.freeze({
   giungla: 'Il tempio perduto: fiume, grotta, rune, reliquie e il Divoratore.',
   teatro: "Un teatro del '66 in rovina: scalone, camerini, caldaia, sipario e la Forgia Arcana.",
   palude: 'Il bayou di notte: passerelle, baracche, il cimitero dei relitti e il Teschio di Malakor.',
+  piazza: 'Piazza Crespi a Cerano: la chiesa della Natività, il Municipio, il campanile di 45 metri e le sue campane.',
 });
 const SFONDI_MAPPA = Object.freeze({
   scuola: 'linear-gradient(180deg, #121a2e 0%, #2a2f45 60%, #3b3326 100%)',
   giungla: 'linear-gradient(180deg, #0d2418 0%, #1f4a2a 55%, #3a3a1c 100%)',
   teatro: 'linear-gradient(180deg, #14070a 0%, #3a0d14 55%, #2a1a0c 100%)',
   palude: 'linear-gradient(180deg, #0c1712 0%, #1b3124 55%, #14211a 100%)',
+  piazza: 'linear-gradient(180deg, #0a1224 0%, #1d2a44 55%, #4a3418 100%)',
 });
 const DISEGNI_MAPPA = Object.freeze({
+  piazza: '<svg viewBox="0 0 120 60"><rect y="52" width="120" height="8" fill="#2a2622"/>'
+    + '<rect x="80" y="8" width="9" height="44" fill="#8c4a32"/><polygon points="80,8 84.5,-2 89,8" fill="#7a3c28"/><rect x="80" y="18" width="9" height="7" fill="#e8dcc0"/><circle cx="84.5" cy="21.5" r="2.6" fill="#fff6dc" stroke="#3a2a1a" stroke-width="0.6"/>'
+    + '<rect x="81.5" y="11" width="2" height="4" fill="#1a1410"/><rect x="85.5" y="11" width="2" height="4" fill="#1a1410"/>'
+    + '<rect x="26" y="30" width="52" height="22" fill="#d9a85a"/><rect x="40" y="20" width="24" height="32" fill="#e2b466"/><rect x="38" y="18" width="28" height="3" fill="#c08a48"/>'
+    + '<path d="M44 52 V38 Q52 30 60 38 V52 Z" fill="#3a2416"/><path d="M41 36 Q52 24 63 36" fill="none" stroke="#b06a3a" stroke-width="2"/>'
+    + '<ellipse cx="70" cy="24" rx="8" ry="6" fill="#3c5a52"/><rect x="68.5" y="14" width="3" height="5" fill="#e8e0cc"/>'
+    + '<g fill="#c97a4a"><rect x="45" y="13" width="2" height="5"/><rect x="51" y="12" width="2" height="6"/><rect x="57" y="13" width="2" height="5"/></g>'
+    + '<rect x="2" y="30" width="22" height="22" fill="#e6d27a"/><g fill="#ffe9a8" opacity="0.85"><rect x="5" y="34" width="3" height="5"/><rect x="11" y="34" width="3" height="5"/><rect x="17" y="34" width="3" height="5"/></g></svg>',
   scuola: '<svg viewBox="0 0 120 60"><rect x="18" y="22" width="84" height="34" fill="#1b1f2c"/><polygon points="14,24 60,6 106,24" fill="#262b3d"/><rect x="54" y="38" width="12" height="18" fill="#0c0e14"/>'
     + '<g fill="#e8c46a" opacity="0.8"><rect x="26" y="30" width="8" height="7"/><rect x="40" y="30" width="8" height="7"/><rect x="72" y="30" width="8" height="7"/><rect x="86" y="30" width="8" height="7"/></g><rect x="57" y="10" width="6" height="8" fill="#e8c46a"/></svg>',
   giungla: '<svg viewBox="0 0 120 60"><polygon points="34,56 60,14 86,56" fill="#3c3a2a"/><polygon points="44,56 60,30 76,56" fill="#2a2a1e"/><rect x="56" y="44" width="8" height="12" fill="#7dff6a" opacity="0.7"/>'

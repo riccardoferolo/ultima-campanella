@@ -5,6 +5,7 @@ import { OGGETTI } from './mappe/giungla.js';
 import { ID_ASSI, ID_SCHEGGIA_GROTTA, ID_SCHEGGIA_FIUME, ID_MASCHERA, RELIQUIE, ASSI, SCHEGGE, ANIME_PER_IDOLO } from './giungla.js';
 import { RUNE } from './storia.js';
 import { descrivi as descriviPalude } from './palude.js';
+import { COSTO_CAMPANILE, COSTO_CAMPANE, STORDIMENTO_CAMPANE, TEMPO_CELLA } from './piazza.js';
 
 const DISTANZA_OGGETTO = 1.8;
 const PORTE_CHIUSE = Object.freeze({
@@ -50,6 +51,33 @@ function descriviTeatro(a, io, vista) {
       return null;
   }
 }
+function descriviPiazza(a, io, vista) {
+  const p = vista.piazza;
+  const nessuno = testo => ({ costo: Infinity, testo });
+  switch (a.tipo) {
+    case 'bevanda':
+      return vista.corrente ? null : nessuno(`${nomeBevanda(a.bevanda, BEVANDE)}: spenta, serve la corrente della sacrestia`);
+    case 'interruttore':
+      return vista.corrente ? nessuno('Il quadro della sacrestia è acceso') : { costo: 0, testo: 'Premi F per riattivare il quadro elettrico della sacrestia' };
+    case 'munizioni': {
+      const costo = ARMI[io.armaAttiva]?.potenziata ? R.COSTO_MUNIZIONI_POTENZIATE : R.COSTO_MUNIZIONI;
+      return { costo, testo: `Premi F alla fontana del Beato Pacifico: munizioni per ${ARMI[io.armaAttiva].nome} [${costo}]` };
+    }
+    case 'campanile':
+      if (!vista.corrente) return nessuno('La scala del campanile è al buio: serve la corrente');
+      if (p?.sopra?.[io.id]) return nessuno('Sei già sul campanile');
+      return { costo: COSTO_CAMPANILE, testo: `Premi F per salire sul campanile alla ${NOMI.potenziatore}, ${TEMPO_CELLA} s [${COSTO_CAMPANILE}]` };
+    case 'discesa':
+      return { costo: 0, testo: p?.sopra?.[io.id] ? `Premi F per scendere dal campanile (${Math.ceil(p.sopra[io.id])} s)` : 'Premi F per scendere dal campanile' };
+    case 'campane':
+      if (!vista.corrente) return nessuno('Le campane sono ferme: serve la corrente');
+      if ((p?.campane ?? 0) > 0) return nessuno(`Le campane vibrano ancora: ${Math.ceil(p.campane)} s`);
+      return { costo: COSTO_CAMPANE, testo: `Premi F per suonare le campane a distesa: zombie storditi per ${STORDIMENTO_CAMPANE} s [${COSTO_CAMPANE}]` };
+    default:
+      return null;
+  }
+}
+
 const NOMI_OGGETTI = Object.freeze({ [ID_SCHEGGIA_GROTTA]: 'la scheggia di giada', [ID_MASCHERA]: 'la maschera dello Sciamano' });
 
 function testoOggetto(id) {
@@ -129,7 +157,7 @@ export function interazioneVicina(io, vista) {
   for (const f of FRAMMENTI) {
     if (vista.frammenti?.includes(f.id)) continue;
     const d = distanza(f, io);
-    if (d <= R.DISTANZA_FRAMMENTO) candidati.push({ d: d - 1, tipo: 'frammento', id: f.id, acquisto: `frammento:${f.id}`, testo: 'Premi F per raccogliere lo strano frammento luminoso' });
+    if (d <= R.DISTANZA_FRAMMENTO) candidati.push({ d: d - 1, tipo: 'frammento', id: f.id, acquisto: `frammento:${f.id}`, testo: NOMI.raccogli ?? 'Premi F per raccogliere lo strano frammento luminoso' });
   }
   for (const f of vista.missione?.aTerra ?? []) {
     const d = distanza(f, io);
@@ -204,6 +232,8 @@ function descrivi(a, io, vista) {
   if (teatro) return teatro;
   const palude = vista.palude ? descriviPalude(a, io, vista) : null;
   if (palude) return palude;
+  const piazza = vista.piazza ? descriviPiazza(a, io, vista) : null;
+  if (piazza) return piazza;
   if (a.tipo === 'arma') {
     const possiede = io.armi.some(x => armaBase(x) === a.arma);
     const costo = possiede ? a.munizioni : a.costo;

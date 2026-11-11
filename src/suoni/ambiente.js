@@ -274,6 +274,17 @@ const SCENE = Object.freeze({
     chiuso: { taglio: 520, volume: 0.22, umido: 0.55 },
     sottoMusica: 0.3,
   },
+  piazza: {
+    letti: [{ chiave: 's_vento', volume: 0.2, bus: 'esterno' }, { chiave: 't_sala', volume: 0.2, bus: 'interno' }],
+    eventi: [
+      { chiave: 'a_gufo', ogni: 26, spazio: [20, 45], volume: 0.22, bus: 'esterno' },
+      { chiave: 'a_corvo', ogni: 34, spazio: [25, 50], volume: 0.2, bus: 'esterno' },
+      { chiave: 'a_scricchiolio', ogni: 10, spazio: [4, 16], volume: 0.28, bus: 'interno', soloChiuso: true },
+    ],
+    aperto: { taglio: 13000, volume: 1, umido: 0.2 },
+    chiuso: { taglio: 800, volume: 0.35, umido: 0.6 },
+    sottoMusica: 0,
+  },
   teatro: {
     letti: [{ chiave: 't_pioggia', volume: 0.3, bus: 'esterno' }, { chiave: 't_sala', volume: 0.22, bus: 'interno' }],
     eventi: [

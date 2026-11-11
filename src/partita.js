@@ -10,6 +10,7 @@ import {
 import * as giungla from './giungla.js';
 import * as teatro from './teatro.js';
 import * as palude from './palude.js';
+import * as piazza from './piazza.js';
 import { muoviCerchio, vistaLibera, indiceScatole, scatoleTra, scatoleIntorno } from './fisica.js';
 import { direzioneDa } from './colpi.js';
 import { griglia, nuovoCalcolo, avanzaCalcolo, campoDa, direzione } from './navigazione.js';
@@ -108,6 +109,7 @@ export function creaPartita({ seme, giocatori = [], sala = false, mappa = 'scuol
     giungla: nomeMappa === 'giungla' ? giungla.statoIniziale(seme) : null,
     teatro: nomeMappa === 'teatro' ? teatro.statoIniziale(seme) : null,
     palude: nomeMappa === 'palude' ? palude.statoIniziale() : null,
+    piazza: nomeMappa === 'piazza' ? piazza.statoIniziale() : null,
     finale: null,
   };
   giocatori.forEach(g => aggiungiGiocatore(stato, g));
@@ -197,6 +199,7 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   if (stato.giungla && giungla.compra(stato, giocatore, acquisto, eventi, S)) return;
   if (stato.teatro && teatro.compra(stato, giocatore, acquisto, eventi)) return;
   if (stato.palude && palude.compra(stato, giocatore, acquisto, eventi, S)) return;
+  if (stato.piazza && piazza.compra(stato, giocatore, acquisto, eventi, S)) return;
   if (acquisto.tipo === 'munizioni') {
     const costo = ARMI[giocatore.armaAttiva]?.potenziata ? R.COSTO_MUNIZIONI_POTENZIATE : R.COSTO_MUNIZIONI;
     if (giocatore.punti < costo) return;
@@ -1207,6 +1210,7 @@ export function passo(stato, dt, { posizioni = {}, azioni = [] } = {}) {
   if (stato.giungla) giungla.aggiorna(stato, dt, eventi, S);
   if (stato.teatro) teatro.aggiorna(stato, dt, eventi, S);
   if (stato.palude) palude.aggiorna(stato, dt, eventi, S);
+  if (stato.piazza) piazza.aggiorna(stato, dt, eventi);
   if (stato.fase === 'vinta') return eventi;
   if (stato.giocatori.length > 0 && vivi(stato).length === 0) {
     stato.fase = 'fine';

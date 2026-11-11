@@ -3,10 +3,11 @@ import { clone as clonaScheletro } from 'three/examples/jsm/utils/SkeletonUtils.
 import { R, ARMI } from '../regole.js';
 import { ZONE, ATMOSFERA, ACQUISTI, mappaAttiva, usaMappa, quota } from '../mappa.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA, TEXTURE_TEATRO, TEXTURE_PALUDE } from './texture.js';
+import { creaTexture, caricaTextureReali, TEXTURE_SCUOLA, TEXTURE_GIUNGLA, TEXTURE_TEATRO, TEXTURE_PALUDE, TEXTURE_PIAZZA } from './texture.js';
 import { caricaGiungla, costruisciGiungla } from './giungla3d.js';
 import { costruisciTeatro } from './teatro3d.js';
 import { costruisciPalude } from './palude3d.js';
+import { costruisciPiazza } from './piazza3d.js';
 import { TINTE_ASPETTO } from './compagno3d.js';
 import { creaAnimali } from './animali3d.js';
 import { LIVELLI, ORDINE, livelloAttivo } from './qualita.js';
@@ -220,14 +221,15 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const giungla = mappa === 'giungla';
   const teatro = mappa === 'teatro';
   const palude = mappa === 'palude';
-  const scuola = !giungla && !teatro && !palude;
+  const piazza = mappa === 'piazza';
+  const scuola = !giungla && !teatro && !palude && !piazza;
   const atmosfera = ATMOSFERA;
   const scena = new THREE.Scene();
   scena.background = new THREE.Color(atmosfera.buio);
   scena.fog = new THREE.Fog(atmosfera.buio, atmosfera.nebbiaVicino, atmosfera.nebbiaDentro);
-  const cieloEmisfero = giungla ? 0x7fa392 : teatro ? 0x8a7a6c : palude ? 0x8aa894 : 0x7f8ea3;
+  const cieloEmisfero = giungla ? 0x7fa392 : teatro ? 0x8a7a6c : palude ? 0x8aa894 : piazza ? 0x7a88a8 : 0x7f8ea3;
   const terraEmisfero = giungla ? 0x15200f : palude ? 0x141a10 : 0x1b150f;
-  scena.add(new THREE.HemisphereLight(cieloEmisfero, terraEmisfero, giungla ? 0.6 : teatro ? 0.42 : palude ? 0.85 : 0.55));
+  scena.add(new THREE.HemisphereLight(cieloEmisfero, terraEmisfero, giungla ? 0.6 : teatro ? 0.42 : palude ? 0.85 : piazza ? 0.5 : 0.55));
   const luna = new THREE.DirectionalLight(0x7088b8, 0.6);
   luna.position.set(-20, 30, -30);
   scena.add(luna);
@@ -249,7 +251,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const texture = creaTexture();
   const [libreria, risorseZombi, personaggi, oggetti, reali, modelliGiungla] = await Promise.all([
     caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(),
-    caricaTextureReali(giungla ? TEXTURE_GIUNGLA : teatro ? TEXTURE_TEATRO : palude ? TEXTURE_PALUDE : TEXTURE_SCUOLA, { piene: q.texturePiene }), giungla || palude ? caricaGiungla() : null,
+    caricaTextureReali(giungla ? TEXTURE_GIUNGLA : teatro ? TEXTURE_TEATRO : palude ? TEXTURE_PALUDE : piazza ? TEXTURE_PIAZZA : TEXTURE_SCUOLA, { piene: q.texturePiene }), giungla || palude ? caricaGiungla() : null,
   ]);
   const mappaPrima = mappaAttiva;
   usaMappa(mappa);
@@ -262,14 +264,16 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
       ? costruisciTeatro(scena, { reali, texture, materialiArmi, oggetti, luciAccese: q.luci })
       : palude
         ? costruisciPalude(scena, { reali, materialiArmi, oggetti, modelli: modelliGiungla, luciAccese: q.luci })
-        : costruisciScuola(scena, texture, materialiArmi, oggetti, reali, { luciAccese: q.luci });
+        : piazza
+          ? costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti, luciAccese: q.luci })
+          : costruisciScuola(scena, texture, materialiArmi, oggetti, reali, { luciAccese: q.luci });
   if (scuola) {
     costruisciArredi(scena, oggetti);
     costruisciSala(scena);
   }
   const bonus3d = creaBonus3d(scena);
   const segreti = scuola ? creaSegreti(scena) : vuoto;
-  const animali = q.animali && !teatro ? creaAnimali(scena, mappa) : { aggiorna() {}, svuota() {} };
+  const animali = q.animali && !teatro && !piazza ? creaAnimali(scena, mappa) : { aggiorna() {}, svuota() {} };
   function applicaDensita() {
     scena.traverse(o => {
       if (o.isInstancedMesh && o.userData.pieni) o.count = Math.max(1, Math.round(o.userData.pieni * q.densita));
@@ -512,6 +516,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
     },
     effetti,
     ragnatela: (x, z, raggio) => ragnatele.scoppio(x, z, raggio),
+    campane: () => mondoMappa.campane?.(),
     ridimensiona: dimensiona,
     svuota() {
       suoloVista = null;

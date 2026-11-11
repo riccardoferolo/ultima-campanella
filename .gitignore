@@ -5,6 +5,7 @@ _lavoro/*
 !_lavoro/collaudo.mjs
 !_lavoro/vetrina3.mjs
 !_lavoro/teatro.mjs
+!_lavoro/piazza.mjs
 !_lavoro/mani.mjs
 !_lavoro/foglio.mjs
 !_lavoro/converti-tutto.mjs

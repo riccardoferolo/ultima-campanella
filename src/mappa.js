@@ -2,10 +2,11 @@ import * as scuola from './mappe/scuola.js';
 import * as giungla from './mappe/giungla.js';
 import * as teatro from './mappe/teatro.js';
 import * as palude from './mappe/palude.js';
+import * as piazza from './mappe/piazza.js';
 
-export const MAPPE = Object.freeze({ scuola, giungla, teatro, palude });
+export const MAPPE = Object.freeze({ scuola, giungla, teatro, palude, piazza });
 export const ELENCO_MAPPE = Object.freeze(Object.keys(MAPPE));
-export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla', teatro: "Il Teatro dell'Eclissi", palude: 'Bayou Vermillion' });
+export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla', teatro: "Il Teatro dell'Eclissi", palude: 'Bayou Vermillion', piazza: 'Piazza di Cerano' });
 const PIANO = () => 0;
 const NESSUN_NOME = Object.freeze({});
 

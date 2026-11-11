@@ -66,7 +66,8 @@ function eIstantanea(ist) {
     && (ist.pv === undefined || (Array.isArray(ist.pv) && ist.pv.length <= 4 && ist.pv.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))))
     && (ist.pz === undefined || elencoNumeri(ist.pz, 3))
     && (ist.tq === undefined || (Array.isArray(ist.tq) && ist.tq.every(numero))) && (ist.tn === undefined || elencoNumeri(ist.tn, 5))
-    && [ist.ts, ist.tg].every(e => e === undefined || (Array.isArray(e) && e.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))));
+    && (ist.cq === undefined || (Array.isArray(ist.cq) && ist.cq.length === 2 && ist.cq.every(numero)))
+    && [ist.ts, ist.tg, ist.cs].every(e => e === undefined || (Array.isArray(e) && e.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))));
 }
 
 function eAzione(a) {

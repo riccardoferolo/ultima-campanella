@@ -19,7 +19,7 @@ npm test
 - Difficoltà a crescere: nei primi tre round solo zombie che camminano, poi arrivano gli Scuoiati e i corridori
   (20% in più a round); nella giungla vita, numero, danno e velocità salgono dal 4° al 9° round fino al massimo.
 - Zombie fluidi: simulazione a passo fisso con disegno interpolato fra gli ultimi due passi.
-- Tre mappe: La scuola, Il tempio nella giungla e Il Teatro dell'Eclissi. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
+- Cinque mappe: La scuola, Il tempio nella giungla, Il Teatro dell'Eclissi, Bayou Vermillion e la Piazza di Cerano. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
   alberi con la chioma che sporge, palme e felci) e la mappa è piena di animaletti che scappano quando arrivi:
   pappagalli sulle palme, pipistrelli in grotta e nel tempio, lucciole, farfalle blu, rane sulle ninfee del fiume;
   nella scuola corvi e pipistrelli.
@@ -99,6 +99,37 @@ La mappa è scritta in coordinate «di progetto» (`PROGETTO` in `src/mappe/teat
 a sinistra e a destra tornano come nel progetto; la grafica (`src/grafica/teatro3d.js`) si costruisce in coordinate di
 progetto dentro un gruppo con `scale.x = -1`. L'altezza del pavimento sta in `quota(x, z)` (0 nelle altre due mappe).
 
+### Piazza di Cerano
+
+Piazza Crespi a Cerano (Novara), di notte, ricostruita in metri veri: pianta dalle sagome di OpenStreetMap (chiesa,
+Municipio e case attorno), ruotata di 18,7° perché la chiesa stia dritta sugli assi del gioco, misure e dettagli dalla
+foto aerea e dalle foto di Wikimedia Commons. Si parte in piazza, fra la fontana del Beato Pacifico (davanti alla
+facciata, con la statua del frate) e il sagrato a semicerchio in ciottoli con i paracarri; gli zombie scavalcano le
+transenne di via Vittime della Mafia, del vicolo delle Scuole, della strada verso ovest e del cancello del giardino.
+
+- **Chiesa della Natività di Maria Vergine** (portone 1000): facciata neorinascimentale a salienti in ocra e cotto,
+  pronao con due colonne e frontone curvo, portali laterali con le lunette, balaustre e statue in cotto; dentro tre
+  navate con arcate, lesene e capitelli dorati, volte a crociera dipinte, vetrate, banchi, Via Crucis, cantoria con
+  l'organo sopra l'ingresso, crociera con la cupola e la lanterna, presbiterio rialzato con balaustra, altare,
+  tabernacolo e crocifisso appeso. Nel transetto nord l'Ultima Cena del Cerano (1595), nel sud l'Ecce Homo. I morti
+  risalgono dalle lapidi del pavimento. Lo Scrigno delle Offerte è nella navata nord.
+- **Municipio** (portone ad arco con la scritta MUNICIPIO, 750): piano terra a bugnato grigio e primo piano giallo,
+  balcone con le bandiere d'Europa, d'Italia e il gonfalone di Cerano; androne e uffici (Anagrafe, Protocollo,
+  Ufficio tecnico, Segreteria), poi lo scalone (1000) per la Sala del Consiglio, con stemma, gonfalone e il fucile di
+  precisione; le barricate della sala danno sul tetto della scuola.
+- **Lato del Municipio** e **Via Beato Pacifico** (transenne, 750 l'una): la prima fra Municipio e chiesa con le auto
+  parcheggiate fino alla sacrestia, la seconda lungo il Tempietto fino all'arco con il piccolo campanile a vela.
+- **Sacrestia** (1000 dal lato nord, 750 dal presbiterio): il quadro generale che riaccende la corrente; senza
+  corrente le bibite sono spente.
+- **Tempietto del Beato Pacifico** (cancelli 1000 da via Beato Pacifico o porta 1000 dalla navata): due archi con le
+  tende rosse, balaustra, frontone con la statua e il cupolino; dentro l'urna del Beato e la porta del campanile.
+- **Campanile** (45 m, mattoni, orologio sui quattro lati con l'ora vera, cella con una bifora per lato, guglia
+  conica): con la corrente si sale per 750 punti e si resta 40 secondi nella cella campanaria con la Fonderia (il
+  potenziatore); la corda delle campane (1500) le suona a distesa e stordisce per 7 secondi tutti gli zombie della
+  mappa (boss esclusi), poi vanno lasciate riposare 75 secondi. A ogni round il campanile batte i rintocchi.
+- Easter egg: cinque statuette in cotto (il Beato Pacifico, San Rocco, San Giuseppe, San Giovanni e la Madonna, le
+  statue della facciata) nascoste fra piazza, Municipio, navata, Tempietto e campanile.
+
 ## Strumenti
 
 `_lavoro/` contiene gli script di collaudo e di conversione (Playwright con Edge, server Vite su 5421):
@@ -106,6 +137,7 @@ progetto dentro un gruppo con `scale.x = -1`. L'altezza del pavimento sta in `qu
 - `collaudo.mjs` – partita in due dall'inizio alla fine (`--riserva`, `--supabase`);
 - `vetrina3.mjs`, `mani.mjs` – schermate di sala, armi in mano, zombie e mappa;
 - `teatro.mjs` – giro di foto del Teatro dell'Eclissi (Edge su GPU) e misura degli fps in platea con un'orda;
+- `piazza.mjs` – giro di foto della Piazza di Cerano, dentro e fuori, fino alla cella campanaria;
 - `converti-tutto.mjs` + `converti/tutto.html` – conversione dei modelli scaricati in `public/modelli/*.glb`
   (i file sorgente vanno rimessi in `_lavoro/scaricati/`, vedi `CREDITI.md`).
 
