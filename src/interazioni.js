@@ -6,6 +6,7 @@ import { ID_ASSI, ID_SCHEGGIA_GROTTA, ID_SCHEGGIA_FIUME, ID_MASCHERA, RELIQUIE, 
 import { RUNE } from './storia.js';
 import { descrivi as descriviPalude } from './palude.js';
 import { COSTO_CAMPANILE, COSTO_CAMPANE, STORDIMENTO_CAMPANE, TEMPO_CELLA, VOTO, campaneBenedette } from './piazza.js';
+import { descrivi as descriviAbisso } from './abisso.js';
 
 const DISTANZA_OGGETTO = 1.8;
 const PORTE_CHIUSE = Object.freeze({
@@ -16,6 +17,8 @@ const PORTE_CHIUSE = Object.freeze({
   centrali: 'Le doppie porte della platea si aprono quando torna la corrente',
   pLaboratorio: 'La grata del laboratorio è senza corrente: riavviate il motore della segheria',
   pRadici: 'Radici corrotte sbarrano la passerella: qui i punti non servono',
+  stagnaA: 'Portello stagno sigillato: si comanda dal quadro della camera stagna',
+  stagnaB: 'Portello stagno sigillato: si comanda dal quadro della camera stagna',
 });
 const SENZA_CORRENTE = Object.freeze({ palude: 'Il potenziatore non ha corrente: riavviate il motore della segheria' });
 const NOMI_TRAPPOLE = Object.freeze({ sinistra: 'della scaletta sinistra', destra: 'della scaletta destra', corridoio: 'del corridoio dei camerini' });
@@ -242,6 +245,8 @@ function descrivi(a, io, vista) {
   if (palude) return palude;
   const piazza = vista.piazza ? descriviPiazza(a, io, vista) : null;
   if (piazza) return piazza;
+  const abisso = vista.abisso ? descriviAbisso(a, io, vista) : null;
+  if (abisso) return abisso;
   if (a.tipo === 'arma') {
     const possiede = io.armi.some(x => armaBase(x) === a.arma);
     const costo = possiede ? a.munizioni : a.costo;

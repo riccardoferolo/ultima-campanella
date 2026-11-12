@@ -349,5 +349,12 @@ export function creaVista1p(materialiArmi) {
     nascondi(nascosta) {
       supporto.visible = !nascosta;
     },
+    accessorio(oggetto) {
+      supporto.add(oggetto);
+    },
+    accessorioSinistro(oggetto) {
+      manoSinistra.add(oggetto);
+      return manoSinistra;
+    },
   };
 }

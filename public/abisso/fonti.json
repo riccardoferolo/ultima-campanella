@@ -1,0 +1,18 @@
+{
+  "texture": {
+    "lamiera": "rusty_metal_02",
+    "paratia": "rusty_painted_metal",
+    "marmo": "marble_01",
+    "pietraMarina": "seaworn_sandstone_brick",
+    "roccia": "dark_rock",
+    "fondale": "coral_ground_02",
+    "graffiato": "blue_metal_plate",
+    "pelle": "brown_leather"
+  },
+  "hdri": [
+    "blue_lagoon_night",
+    "dikhololo_night",
+    "boiler_room"
+  ],
+  "licenza": "CC0 (polyhaven.com)"
+}

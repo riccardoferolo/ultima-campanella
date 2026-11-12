@@ -223,6 +223,24 @@ export function creaAudio() {
   const dentroPartita = () => musica.stato !== 'calma' && musica.stato !== 'silenzio';
 
   const SUONI = {
+    sirena: () => {
+      for (let i = 0; i < 3; i++) {
+        nota(230, { durata: 1.1, tipo: 'sawtooth', volume: 0.07, ritardo: i * 1.3, scendi: 150 });
+        nota(115, { durata: 1.1, tipo: 'triangle', volume: 0.12, ritardo: i * 1.3, scendi: 80 });
+      }
+      soffio({ durata: 3.6, da: 300, a: 60, volume: 0.3 });
+    },
+    ruggito: () => {
+      soffio({ durata: 3, da: 900, a: 70, volume: 1 });
+      soffio({ durata: 2.2, da: 2200, a: 300, tipo: 'bandpass', volume: 0.5, ritardo: 0.15 });
+      nota(62, { durata: 2.8, tipo: 'sawtooth', volume: 0.32, scendi: 31 });
+      nota(93, { durata: 2.2, tipo: 'sawtooth', volume: 0.18, scendi: 44, ritardo: 0.1 });
+      nota(41, { durata: 3.2, tipo: 'sine', volume: 0.5, scendi: 24 });
+    },
+    bolle: () => {
+      for (let i = 0; i < 9; i++) nota(caso(500, 1300), { durata: 0.07, tipo: 'sine', volume: 0.07, ritardo: i * caso(0.03, 0.09), scendi: caso(1400, 2400) });
+      soffio({ durata: 0.6, da: 2400, a: 600, tipo: 'bandpass', volume: 0.25 });
+    },
     vuoto: () => nota(900, { durata: 0.04, tipo: 'square', volume: 0.12 }),
     coltello: () => motore.suona([{ chiave: 'fendente_coltello', velocita: caso(0.92, 1.1) }], { volume: 0.5, umido: 0.06, pan: caso(-0.2, 0.2) }),
     carne: () => { soffio({ durata: 0.12, da: 700, a: 200, volume: 0.6 }); nota(90, { durata: 0.1, volume: 0.25, scendi: 50 }); },
@@ -397,6 +415,16 @@ export function creaAudio() {
     },
     sparo(arma, distanza = 0, angolo = 0) {
       if (pronto()) sparoArma(arma, distanza, angolo);
+    },
+    organo(canna, giusta = true) {
+      if (!pronto()) return;
+      const base = [73.42, 87.31, 98, 110, 130.81][canna % 5];
+      const accordo = giusta ? [1, 1.5, 2, 2.52, 3, 4] : [1, 1.06, 1.41, 2.12];
+      accordo.forEach((r, i) => {
+        nota(base * r, { durata: 4.2, tipo: i % 2 ? 'triangle' : 'sawtooth', volume: 0.06 / (1 + i * 0.35) });
+        nota(base * r * 1.004, { durata: 4, tipo: 'sine', volume: 0.05, ritardo: 0.02 });
+      });
+      soffio({ durata: 1.4, da: 1800, a: 400, tipo: 'bandpass', volume: 0.12 });
     },
     rintocchi(quanti) {
       if (!pronto()) return;

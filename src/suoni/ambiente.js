@@ -228,6 +228,32 @@ function fruscio(sr) {
   return finisci(d, sr, 0.9, 0.2);
 }
 
+const profondo = sr => letto(sr, 12, n => {
+  const d = normalizza(bassa(marrone(n), sr, 90, 3), 1);
+  mescola(d, normalizza(filtra(marrone(n), sr, 'banda', 42, 3), 1), sr, 0, 0.7);
+  const respiro = lento(n, sr, 0.08);
+  for (let i = 0; i < n; i++) d[i] *= 0.55 + 0.45 * respiro[i];
+  for (let k = 0; k < 6; k++) tono(d, sr, caso(0, n / sr - 2), { f: caso(48, 70), fFine: caso(40, 55), glissando: 1.6, tau: 1.2, attacco: 0.6, ampiezza: 0.25, durata: 2.4, armonica: 0.2 });
+  return d;
+});
+
+function sonar(sr) {
+  const out = vuoto(3.2, sr);
+  const f = caso(1050, 1250);
+  [[0, 1], [0.55, 0.35], [1.1, 0.12]].forEach(([t, a]) => tono(out, sr, t, { f, fFine: f * 0.995, glissando: 1.2, tau: 0.9, attacco: 0.004, ampiezza: a, durata: 1.6, armonica: 0.02 }));
+  return finisci(out, sr, 0.7, 0.3);
+}
+
+function lamentoAbissale(sr) {
+  const durata = caso(4.5, 6.5);
+  const out = vuoto(durata, sr);
+  const f = caso(70, 95);
+  tono(out, sr, 0, { f, fFine: f * caso(1.6, 2.1), glissando: durata * 0.5, tau: durata * 0.4, attacco: 0.9, ampiezza: 1, durata, armonica: 0.35 });
+  tono(out, sr, 0.4, { f: f * 1.5, fFine: f * 0.8, glissando: durata * 0.6, tau: durata * 0.3, attacco: 1.1, ampiezza: 0.45, durata: durata - 0.4, armonica: 0.2 });
+  for (let i = 0; i < out.length; i++) out[i] *= gonfia(0.8, durata, 1.6)(i / sr);
+  return finisci(bassa(out, sr, 900, 2), sr, 0.85, 0.8);
+}
+
 const ricetta = (rendi, varianti = 1) => ({ rendi, varianti, sr: 'medio' });
 
 export const RICETTE_AMBIENTE = Object.freeze({
@@ -241,6 +267,9 @@ export const RICETTE_AMBIENTE = Object.freeze({
   t_pioggia: ricetta(pioggia),
   t_sala: ricetta(sala),
   s_neon: ricetta(neon),
+  u_profondo: ricetta(profondo),
+  a_sonar: ricetta(sonar, 2),
+  a_lamento: ricetta(lamentoAbissale, 3),
   a_rana: ricetta(rana, 5),
   a_uccello: ricetta(uccello, 5),
   a_gufo: ricetta(gufo, 2),
@@ -306,6 +335,22 @@ const SCENE = Object.freeze({
     aperto: { taglio: 12000, volume: 1, umido: 0.15 },
     chiuso: { taglio: 900, volume: 0.4, umido: 0.35 },
     sottoMusica: 0,
+  },
+  abisso: {
+    letti: [
+      { chiave: 'u_profondo', volume: 0.42, bus: 'interno' },
+      { chiave: 'g_grotta', volume: 0.22, bus: 'interno' },
+      { chiave: 'g_acqua', volume: 0.12, bus: 'interno' },
+    ],
+    eventi: [
+      { chiave: 'a_scricchiolio', ogni: 7, spazio: [4, 18], volume: 0.38, bus: 'interno', soloChiuso: true },
+      { chiave: 'a_goccia', ogni: 3.5, spazio: [2, 10], volume: 0.3, bus: 'interno', soloChiuso: true },
+      { chiave: 'a_sonar', ogni: 26, spazio: [10, 30], volume: 0.16, bus: 'interno', soloChiuso: true },
+      { chiave: 'a_lamento', ogni: 55, spazio: [60, 120], volume: 0.32, bus: 'interno', soloChiuso: true },
+    ],
+    aperto: { taglio: 900, volume: 0.6, umido: 0.5 },
+    chiuso: { taglio: 900, volume: 0.6, umido: 0.55 },
+    sottoMusica: 0.25,
   },
   palude: {
     letti: [

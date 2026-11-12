@@ -8,6 +8,7 @@ const DESCRIZIONI_MAPPA = Object.freeze({
   teatro: "Un teatro del '66 in rovina: scalone, camerini, caldaia, sipario e la Forgia Arcana.",
   palude: 'Il bayou di notte: passerelle, baracche, il cimitero dei relitti e il Teschio di Malakor.',
   piazza: 'Piazza Crespi a Cerano: la chiesa della Natività, il Municipio, il campanile di 45 metri e le sue campane.',
+  abisso: 'La Cattedrale degli Abissi: una stazione sul fondo della Fossa, le rovine di Atlantide, il Tridente di Poseidone e il Leviatano.',
 });
 const SFONDI_MAPPA = Object.freeze({
   scuola: 'linear-gradient(180deg, #121a2e 0%, #2a2f45 60%, #3b3326 100%)',
@@ -15,8 +16,14 @@ const SFONDI_MAPPA = Object.freeze({
   teatro: 'linear-gradient(180deg, #14070a 0%, #3a0d14 55%, #2a1a0c 100%)',
   palude: 'linear-gradient(180deg, #0c1712 0%, #1b3124 55%, #14211a 100%)',
   piazza: 'linear-gradient(180deg, #0a1224 0%, #1d2a44 55%, #4a3418 100%)',
+  abisso: 'linear-gradient(180deg, #020a10 0%, #06303e 55%, #0a1a22 100%)',
 });
 const DISEGNI_MAPPA = Object.freeze({
+  abisso: '<svg viewBox="0 0 120 60"><rect width="120" height="60" fill="#03141c"/><g fill="#2fd0ff" opacity="0.18"><path d="M20 0 L32 60 L26 60 L14 0 Z"/><path d="M74 0 L90 60 L82 60 L68 0 Z"/></g>'
+    + '<path d="M0 52 Q20 44 40 50 T80 48 T120 52 V60 H0 Z" fill="#0a2630"/><path d="M30 52 A30 30 0 0 1 90 52 Z" fill="#0b3a4a" stroke="#7fe4ff" stroke-width="1" opacity="0.9"/>'
+    + '<g stroke="#c4954a" stroke-width="1.2" fill="none"><path d="M60 22 V52"/><path d="M45 26 Q52 36 50 52"/><path d="M75 26 Q68 36 70 52"/><path d="M33 42 Q60 34 87 42"/></g>'
+    + '<g fill="#2fd0ff"><circle cx="60" cy="44" r="3"/></g><path d="M57 30 V40 M60 28 V40 M63 30 V40 M56 30 H64" stroke="#e8c46a" stroke-width="1.2"/>'
+    + '<g fill="#ffb060"><circle cx="98" cy="20" r="1.4"/><circle cx="103" cy="19" r="1.4"/><circle cx="108" cy="21" r="1.4"/></g><path d="M84 24 Q100 12 118 22" stroke="#0f4a5a" stroke-width="6" fill="none"/></svg>',
   piazza: '<svg viewBox="0 0 120 60"><rect y="52" width="120" height="8" fill="#2a2622"/>'
     + '<rect x="80" y="8" width="9" height="44" fill="#8c4a32"/><polygon points="80,8 84.5,-2 89,8" fill="#7a3c28"/><rect x="80" y="18" width="9" height="7" fill="#e8dcc0"/><circle cx="84.5" cy="21.5" r="2.6" fill="#fff6dc" stroke="#3a2a1a" stroke-width="0.6"/>'
     + '<rect x="81.5" y="11" width="2" height="4" fill="#1a1410"/><rect x="85.5" y="11" width="2" height="4" fill="#1a1410"/>'

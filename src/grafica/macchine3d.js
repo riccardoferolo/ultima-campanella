@@ -48,7 +48,7 @@ function vetrinaArma(contenitore, materialiArmi, scala) {
   };
 }
 
-export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno, serveCorrente = false }) {
+export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno, serveCorrente = false, soloMuri = false }) {
   const bagliori = [];
   for (const a of ACQUISTI) {
     if (a.tipo === 'arma') armaAppesa(scena, a, materialiArmi, legno);
@@ -60,6 +60,7 @@ export function creaMacchine(scena, { materialiArmi, oggetti, metallo, legno, se
       if (serveCorrente) macchina.traverse(o => { if (o.isSprite) bagliori.push(o); });
     }
   }
+  if (soloMuri) return { aggiorna(vista) { for (const b of bagliori) b.visible = vista.corrente; } };
 
   const potenziatoreDati = ACQUISTI.find(a => a.tipo === 'potenziatore');
   const macchina = new THREE.Group();

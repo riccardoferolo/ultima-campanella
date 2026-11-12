@@ -4,8 +4,10 @@ import { obiettivoGiungla, reliquieGiungla } from './storia.js';
 import { obiettivoVoto } from './piazza/cronaca.js';
 import { creaSalaScelte } from './salaScelte.js';
 import { obiettivo as obiettivoPalude, secondario as secondarioPalude } from './palude.js';
+import { obiettivo as obiettivoAbisso } from './abisso.js';
+import { creaHudAbisso } from './abisso/hud.js';
 
-const BOSS = Object.freeze(['arachne', 'divoratore', 'custode', 'guardiano', 'sciamano', 'preside', 'capitano']);
+const BOSS = Object.freeze(['leviatano', 'arachne', 'divoratore', 'custode', 'guardiano', 'sciamano', 'preside', 'capitano', 'palombaro']);
 const DURATA_RADIO_MS = 14000;
 
 const $ = id => document.getElementById(id);
@@ -39,6 +41,7 @@ function obiettivo(vista, mioId) {
   if (vista.teatro) return obiettivoTeatro(vista, mioId);
   if (vista.palude) return obiettivoPalude(vista, mioId);
   if (vista.piazza) return obiettivoPiazza(vista, mioId);
+  if (vista.abisso) return obiettivoAbisso(vista, mioId);
   if (vista.mappa !== 'scuola') return '';
   const m = vista.missione;
   if (!m || vista.fase === 'attesa' || vista.fase === 'vinta' || vista.round === 0) return '';
@@ -94,6 +97,7 @@ export function creaHud() {
   granate.className = 'granate';
   n.munizioni.after(granate);
   n.radice.append(sala, effetti, boss, missione, reliquie, radio);
+  const abisso = creaHudAbisso(n.radice);
   let chiaveSala = '';
   let chiaveEffetti = '';
   let suScelta = () => {};
@@ -182,7 +186,9 @@ export function creaHud() {
       n.segno.classList.add('visibile', 'uccisione');
       scadenzaSegno = performance.now() + DURATA_UCCISIONE_MS;
     },
-    aggiorna({ vista, mioId, arma, suggerimento, rianimazione, inMira, cannocchiale, bloccato, rete, apertura, host = false }) {
+    trofeo: righe => abisso.trofeo(righe),
+    aggiorna({ vista, mioId, arma, suggerimento, rianimazione, inMira, cannocchiale, bloccato, rete, apertura, host = false, inventario = false }) {
+      abisso.aggiorna(vista, mioId, { mostraInventario: inventario });
       const io = vista.giocatori.find(g => g.id === mioId);
       const ora = performance.now();
       if (ora > scadenzaAvviso) n.avviso.classList.remove('visibile');
@@ -214,8 +220,8 @@ export function creaHud() {
         reliquie.style.top = testoMissione && testoReliquie ? `${missione.offsetTop + missione.offsetHeight + 4}px` : '';
       }
       const bianca = ARMI[arma.tipo]?.bianca;
-      carica.hidden = !bianca;
-      if (bianca) {
+      carica.hidden = !bianca || !!ARMI[arma.tipo]?.meraviglia;
+      if (!carica.hidden) {
         const piena = (io?.carica ?? 0) >= 1;
         vitaCarica.style.width = `${Math.round((io?.carica ?? 0) * 100)}%`;
         carica.classList.toggle('piena', piena);

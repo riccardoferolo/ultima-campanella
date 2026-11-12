@@ -9,7 +9,9 @@ import { VOTO, ORE_DEL_BEATO, ANIME_VEGLIA, oraColpita } from './piazza.js';
 import { CRONACA, ROMANI } from './piazza/cronaca.js';
 import { muoviCerchio } from './fisica.js';
 import { CORPO, colpisciZombie, direzioneDa, disperdi, esplosione, primoMuro, raggioSfera } from './colpi.js';
-import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi } from './arsenale.js';
+import { creaArsenale, armaAttiva, aggiorna as aggiornaArsenale, spara, ricarica, coltellata, cambia, allinea, riempi, azzera, bevi, occupato } from './arsenale.js';
+import { creaClientAbisso } from './abisso/client.js';
+import { statoArmi } from './grafica/abisso/statoArmi.js';
 import { DURATA_BEVUTA } from './grafica/vista1p.js';
 import { illuminaTeschio } from './grafica/teschio3d.js';
 import { ARMA_ELEMENTO, bersagliPalude, invischiato } from './palude.js';
@@ -78,6 +80,7 @@ const TESTI_VIA = {
   giungla: 'Si comincia! La giungla non perdona',
   teatro: 'Si va in scena! Il sipario è chiuso: il generatore è sul palco',
   piazza: 'Piazza Crespi, Cerano: la corrente è saltata, il quadro è in sacrestia',
+  abisso: 'Stazione Abyssus-9, undicimila metri sotto il mare: riaccendete le turbine',
 };
 const FASI_DIVORATORE = {
   2: 'Il Divoratore si copre di scaglie: rompetele con le reliquie!',
@@ -131,6 +134,7 @@ const s = {
 
 const io = { x: 0, z: 0, yaw: Math.PI, pitch: 0, pronto: false, tp: 0, colpi: 0, movimento: 0, corsa: false, inMira: false };
 const arsenale = creaArsenale();
+const abissoClient = creaClientAbisso();
 const locale = { inRianimazione: false, ultimaAssa: 0, ultimoVuoto: 0, sparoForzato: false, ultimoAcquisto: { id: null, quando: 0 }, affondo: null, aspetto: null, caricaTeschio: 0, avvisoHostPerso: 0, prontoChiesto: -Infinity, armiDiverse: 0, teschio: null, prossimoRaggio: 0 };
 const cacheScatole = new Map();
 
@@ -299,6 +303,7 @@ async function iniziaPartita(seme, { mappa = 'scuola' } = {}) {
   s.colpiVisti.clear();
   azzera(arsenale, scelte.get(s.mioId)?.pistola);
   Object.assign(io, { pronto: false, tp: 0, colpi: 0, pitch: 0 });
+  abissoClient.azzera(io);
   Object.assign(locale, { inRianimazione: false, affondo: null, aspetto: null });
   mondo.svuota();
   if (s.sonoHost) {
@@ -356,6 +361,7 @@ function suEventi(eventi) {
   for (const e of eventi) {
     const perMe = e.a === s.mioId;
     if (mappaAttiva === 'palude' && mondo && eventoPalude(e, { hud, audio, mondo, perMe, nomeDi, io })) continue;
+    if (mappaAttiva === 'abisso' && mondo && s.vista && abissoClient.evento(e, { hud, audio, mondo, perMe, vista: s.vista, io, mioId: s.mioId })) continue;
     switch (e.k) {
       case 'round':
         audio.suona('round');
@@ -592,7 +598,7 @@ function suMessaggio(m, da) {
       const ospite = s.sonoHost ? s.ospiti.get(da) : null;
       if (!ospite) return;
       riprendiOspite(da);
-      ospite.remoto = { x: m.x, z: m.z, yaw: m.yaw, pitch: m.pitch, arma: m.arma, colpi: m.colpi, tp: m.tp };
+      ospite.remoto = { x: m.x, z: m.z, yaw: m.yaw, pitch: m.pitch, arma: m.arma, colpi: m.colpi, tp: m.tp, su: m.su ?? 0 };
       return;
     }
     case 'az':
@@ -661,7 +667,7 @@ function tickHost(dt, ora) {
     while (s.accumulo >= R.PASSO) {
       if (s.accumulo < 2 * R.PASSO) s.vistaPrima = espandi(faiIstantanea(p));
       const posizioni = {};
-      if (io.pronto) posizioni[s.mioId] = { x: io.x, z: io.z, yaw: io.yaw, pitch: io.pitch, arma: armaAttiva(arsenale).tipo, colpi: io.colpi, tp: io.tp };
+      if (io.pronto) posizioni[s.mioId] = { x: io.x, z: io.z, yaw: io.yaw, pitch: io.pitch, arma: armaAttiva(arsenale).tipo, colpi: io.colpi, tp: io.tp, su: io.su ?? 0 };
       for (const [id, o] of s.ospiti) if (o.remoto) posizioni[id] = o.remoto;
       const azioni = [...s.azioniLocali.splice(0), ...s.azioniRemote.splice(0)];
       eventi.push(...passo(p, R.PASSO, { posizioni, azioni }));
@@ -680,7 +686,7 @@ function tickHost(dt, ora) {
 
 function tickOspite(ora) {
   if (s.fase !== 'gioco' || !io.pronto || ora - s.ultimoInvioG < GIOCATORE_OGNI_MS) return;
-  s.coll.invia({ t: 'g', x: io.x, z: io.z, yaw: io.yaw, pitch: io.pitch, arma: armaAttiva(arsenale).tipo, colpi: io.colpi, tp: io.tp }, { veloce: true });
+  s.coll.invia({ t: 'g', x: io.x, z: io.z, yaw: io.yaw, pitch: io.pitch, arma: armaAttiva(arsenale).tipo, colpi: io.colpi, tp: io.tp, su: Math.round((io.su ?? 0) * 100) / 100 }, { veloce: true });
   s.ultimoInvioG = ora;
 }
 
@@ -750,13 +756,19 @@ function muovi(lettura, me, dt) {
     io.corsa = false;
     return;
   }
-  io.inMira = vivo && lettura.mira && arsenale.ricarica === 0;
+  io.inMira = vivo && lettura.mira && arsenale.ricarica === 0 && !ARMI[armaAttiva(arsenale).tipo]?.meraviglia;
+  const abisso = mappaAttiva === 'abisso' ? abissoClient.muovi(io, lettura, me, s.vista, dt, ostacoliMovimento(s.vista.porte)) : null;
+  if (abisso?.bloccato) {
+    io.movimento = 0;
+    io.corsa = false;
+    return;
+  }
   const preso = invischiato(s.vista, s.mioId);
   io.corsa = vivo && !preso && lettura.corsa && lettura.avanti > 0 && !io.inMira && !lettura.sparo;
   const lunghezza = Math.hypot(lettura.avanti, lettura.lato);
   io.movimento = vivo && !preso && lunghezza > 0 ? 1 : 0;
   if (!io.movimento) return;
-  const velocita = (io.corsa ? R.VELOCITA_CORSA : R.VELOCITA) * (io.inMira ? 0.6 : 1) * fattoreBevande(me.bevande, 'velocita') * rallentamento(s.vista.teatro, s.mioId);
+  const velocita = (io.corsa ? R.VELOCITA_CORSA : R.VELOCITA) * (io.inMira ? 0.6 : 1) * fattoreBevande(me.bevande, 'velocita') * rallentamento(s.vista.teatro, s.mioId) * (abisso?.fattore ?? 1);
   const avanti = lettura.avanti / lunghezza;
   const lato = lettura.lato / lunghezza;
   const dx = (Math.sin(io.yaw) * avanti - Math.cos(io.yaw) * lato) * velocita * dt;
@@ -821,7 +833,7 @@ function sparaColpo(arma, vista) {
     colpisciDiMischia(bersagliDiMischia(vista, arma.portata, arma.arco, COLPITI_RELIQUIA), arma.danno, { arma: armaAttiva(arsenale).tipo });
     return;
   }
-  const origine = { x: io.x, y: suolo(io.x, io.z) + R.ALTEZZA_OCCHI, z: io.z };
+  const origine = { x: io.x, y: suolo(io.x, io.z) + R.ALTEZZA_OCCHI + (io.su ?? 0), z: io.z };
   const centro = direzioneDa(io.yaw, io.pitch);
   const tipo = armaAttiva(arsenale).tipo;
   if (arma.proiettile) {
@@ -830,6 +842,11 @@ function sparaColpo(arma, vista) {
   }
   const bersagli = mondo.bersagli(vista);
   const ostacoli = scatole(vista.porte, true);
+  if (vista.abisso?.globi?.length) {
+    const globo = abissoClient.globoColpito(origine, centro, vista, primoMuro(origine, centro, ostacoli));
+    if (globo) inviaAzione({ tipo: 'abisso', cosa: 'collassa', id: globo });
+  }
+  const fattoreAbisso = vista.abisso ? abissoClient.fattoreDanno(vista.giocatori.find(g => g.id === s.mioId), arma) : 1;
   if (vista.piazza?.voto?.fase === VOTO.OROLOGIO) {
     if (oraColpita(origine, centro)) inviaAzione({ tipo: 'orologio', yaw: io.yaw, pitch: io.pitch });
   }
@@ -868,7 +885,7 @@ function sparaColpo(arma, vista) {
     }
     mondo.effetti.sangue(punto, d, rosa ? 4 : 10);
     const somma = colpiti.get(colpo.id) ?? { danno: 0, testa: false, gelo: 0 };
-    somma.danno += colpo.testa ? arma.danno * 2 : arma.danno;
+    somma.danno += (colpo.testa ? arma.danno * 2 : arma.danno) * fattoreAbisso;
     somma.testa ||= colpo.testa;
     somma.gelo += arma.gelo ?? 0;
     colpiti.set(colpo.id, somma);
@@ -962,6 +979,11 @@ function usaArmi(lettura, me, vista, dt) {
     else if (azione === 'speciale') speciale(me);
   }
   const arma = ARMI[armaAttiva(arsenale).tipo];
+  if (mappaAttiva === 'abisso' && abissoClient.usaArmi(lettura, me, vista, dt, { tipo: armaAttiva(arsenale).tipo, spara: () => spara(arsenale, me.bevande), occupato: () => occupato(arsenale), invia: inviaAzione, mondo, audio, io, hud })) {
+    statoArmi.carica = abissoClient.carica;
+    if (armaAttiva(arsenale).caricatore === 0) avviaRicarica(me);
+    return;
+  }
   if (arma.teschio) {
     locale.sparoForzato = false;
     usaTeschio(lettura, me, vista, dt);
@@ -1102,6 +1124,10 @@ function scegliInSala(tasto, me, vista) {
 }
 
 function speciale(me) {
+  if (mappaAttiva === 'abisso') {
+    abissoClient.speciale(me, s.vista, { invia: inviaAzione, hud, io });
+    return;
+  }
   if (!ARMI[armaAttiva(arsenale).tipo]?.bianca) return;
   if ((me.carica ?? 0) < 1) {
     hud.avviso(`Colpo speciale al ${Math.round((me.carica ?? 0) * 100)}%: continua a uccidere`);
@@ -1203,7 +1229,7 @@ function ciclo(ora) {
       hud.aggiorna({
         vista, mioId: s.mioId, arma: armaAttiva(arsenale), suggerimento: interazione?.testo ?? null,
         rianimazione: locale.inRianimazione && ferito ? ferito.progressoRianimazione / (me.bevande.includes('ritorno') ? R.RIANIMA_RAPIDO : R.RIANIMA_IN) : null,
-        inMira: io.inMira, cannocchiale, host: s.sonoHost, bloccato: comandi.bloccato || s.fase !== 'gioco', rete: [testoRete(), `${Math.round(fps)} fps`].filter(Boolean).join(' · '),
+        inMira: io.inMira, cannocchiale, host: s.sonoHost, bloccato: comandi.bloccato || s.fase !== 'gioco', inventario: !!lettura.inventario, rete: [testoRete(), `${Math.round(fps)} fps`].filter(Boolean).join(' · '),
         apertura: 6 + (io.movimento ? 6 : 0) + (io.corsa ? 8 : 0) - (io.inMira ? 4 : 0),
       });
     }

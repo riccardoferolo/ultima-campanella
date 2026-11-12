@@ -283,3 +283,37 @@ select {
   border: 1px solid var(--bordo); border-radius: 6px; padding: 8px 10px;
 }
 select option { background: #14181c; color: var(--testo); }
+
+.abisso-strumenti { position: absolute; left: 24px; bottom: 150px; display: grid; gap: 14px; width: 220px; pointer-events: none; }
+.abisso-barra { position: relative; height: 10px; border: 1px solid rgba(160, 230, 255, 0.7); background: rgba(2, 16, 22, 0.7); }
+.abisso-barra[hidden] { display: none; }
+.abisso-barra i { display: block; height: 100%; transition: width 150ms linear; }
+.abisso-barra::before { content: attr(data-testo); position: absolute; left: 0; top: -19px; font-size: 15px; letter-spacing: 0.08em; color: #bfefff; }
+.abisso-barra.ossigeno i { background: linear-gradient(90deg, #1d7fa8, #7fe4ff); }
+.abisso-barra.ossigeno.critico { border-color: #ff5a4a; animation: abisso-pulsa 0.6s ease-in-out infinite alternate; }
+.abisso-barra.ossigeno.critico i { background: linear-gradient(90deg, #a8201a, #ff7a5a); }
+.abisso-barra.scudo i { background: linear-gradient(90deg, #8a6a2a, #e8c46a); }
+.abisso-inventario { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(560px, 92vw); padding: 18px 22px; background: rgba(2, 14, 20, 0.9); border: 1px solid rgba(127, 228, 255, 0.35); border-top: 3px solid #2fd0ff; color: #e2f6ff; font-size: 19px; pointer-events: none; }
+.abisso-inventario[hidden] { display: none; }
+.abisso-inventario h3 { margin: 0 0 10px; font-family: 'Creepster', 'VT323', cursive; font-weight: 400; font-size: 34px; letter-spacing: 0.06em; color: #7fe4ff; }
+.abisso-inventario ol { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.abisso-inventario li { display: flex; align-items: center; gap: 8px; color: #6f8a94; }
+.abisso-inventario li svg { width: 16px; height: 16px; flex: none; }
+.abisso-inventario li.fatto { color: #7ccf6a; }
+.abisso-inventario li.attivo { color: #ffffff; }
+.abisso-inventario li.attivo svg { color: #2fd0ff; }
+.abisso-inventario dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 18px; margin: 0; padding-top: 10px; border-top: 1px solid rgba(127, 228, 255, 0.2); }
+.abisso-inventario dt { color: #9fc4d0; }
+.abisso-inventario dd { margin: 0; color: #e8c46a; text-align: right; }
+.abisso-inventario p { margin: 10px 0 0; color: #8fb2bf; font-size: 16px; }
+.abisso-trofeo { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center; padding: 18px 34px; background: radial-gradient(ellipse at center, rgba(4, 30, 42, 0.92), rgba(2, 10, 16, 0.85)); border: 1px solid #e8c46a; box-shadow: 0 0 40px rgba(47, 208, 255, 0.35); color: #f6ecd2; pointer-events: none; animation: abisso-trofeo 600ms ease-out both; }
+.abisso-trofeo[hidden] { display: none; }
+.abisso-trofeo strong { display: block; font-family: 'Creepster', 'VT323', cursive; font-weight: 400; font-size: clamp(34px, 6vw, 64px); color: #e8c46a; letter-spacing: 0.05em; }
+.abisso-trofeo p { margin: 6px 0 0; font-size: 20px; }
+.abisso-allarme { position: absolute; top: 30%; left: 50%; transform: translateX(-50%); font-family: 'Creepster', cursive; font-size: clamp(28px, 5vw, 52px); color: #ff5a4a; text-shadow: 0 0 14px rgba(255, 60, 40, 0.8); pointer-events: none; animation: abisso-pulsa 0.5s ease-in-out infinite alternate; }
+.abisso-allarme[hidden] { display: none; }
+@keyframes abisso-pulsa { from { opacity: 1; } to { opacity: 0.55; } }
+@keyframes abisso-trofeo { from { opacity: 0; transform: translate(-50%, -12px) scale(0.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .abisso-barra.ossigeno.critico, .abisso-allarme, .abisso-trofeo { animation: none; }
+}

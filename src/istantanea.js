@@ -3,6 +3,7 @@ import { istantanea as istantaneaGiungla, espandi as espandiGiungla } from './gi
 import { istantanea as istantaneaTeatro, espandi as espandiTeatro } from './teatro.js';
 import { istantanea as istantaneaPiazza, espandi as espandiPiazza } from './piazza.js';
 import { istantanea as istantaneaPalude, espandi as espandiPalude } from './palude.js';
+import { istantanea as istantaneaAbisso, espandi as espandiAbisso } from './abisso.js';
 import { ELENCO_TIPI_ZOMBIE, ELENCO_BONUS, BONUS_A_TEMPO } from './regole.js';
 
 export const STATI_ZOMBIE = Object.freeze(['arriva', 'assi', 'scavalca', 'dentro', 'attacco', 'morto', 'emerge']);
@@ -50,6 +51,7 @@ export function faiIstantanea(stato) {
     ...istantaneaTeatro(stato),
     ...istantaneaPalude(stato),
     ...istantaneaPiazza(stato),
+    ...istantaneaAbisso(stato),
   };
 }
 
@@ -81,6 +83,7 @@ export function espandi(ist) {
     teatro: espandiTeatro(ist),
     palude: espandiPalude(ist),
     piazza: espandiPiazza(ist),
+    abisso: espandiAbisso(ist),
     granate: (ist.gr ?? []).map(([id, x, y, z, ragnatela]) => ({ id, x, y, z, ragnatela: !!ragnatela })),
     ragnatele: new Set(ist.rg ?? []),
     proiettili: (ist.pj ?? []).map(([id, x, y, z]) => ({ id, x, y, z })),

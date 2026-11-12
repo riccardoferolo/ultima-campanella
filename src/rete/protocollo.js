@@ -2,6 +2,7 @@ import { ARMI, BEVANDE } from '../regole.js';
 import { ELENCO_MAPPE } from '../mappa.js';
 import { LUNGHEZZA_STATO } from '../giungla.js';
 import { LUNGHEZZA_MISSIONE } from '../palude.js';
+import { valida as validaAbisso, validaAzione as validaAzioneAbisso } from '../abisso.js';
 
 const LETTERE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const NOME_MASSIMO = 16;
@@ -68,7 +69,8 @@ function eIstantanea(ist) {
     && (ist.tq === undefined || (Array.isArray(ist.tq) && ist.tq.every(numero))) && (ist.tn === undefined || elencoNumeri(ist.tn, 5))
     && (ist.cq === undefined || (Array.isArray(ist.cq) && ist.cq.length === 2 && ist.cq.every(numero)))
     && (ist.cv === undefined || (Array.isArray(ist.cv) && ist.cv.length === 4 && ist.cv.every(numero)))
-    && [ist.ts, ist.tg, ist.cs].every(e => e === undefined || (Array.isArray(e) && e.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))));
+    && [ist.ts, ist.tg, ist.cs].every(e => e === undefined || (Array.isArray(e) && e.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))))
+    && validaAbisso(ist);
 }
 
 function eAzione(a) {
@@ -86,6 +88,7 @@ function eAzione(a) {
   if (a.tipo === 'rianima' || a.tipo === 'pronto') return typeof a.attivo === 'boolean';
   if (a.tipo === 'frammento') return numero(a.id);
   if (a.tipo === 'granata') return numero(a.yaw) && numero(a.pitch);
+  if (a.tipo === 'abisso') return validaAzioneAbisso(a);
   return false;
 }
 
@@ -93,7 +96,7 @@ const CONTROLLI = {
   ciao: m => pulisciNome(m.nome) !== null && testo(m.id),
   lobby: m => pulisciNome(m.nomeHost) !== null && (m.mappa === undefined || ELENCO_MAPPE.includes(m.mappa)) && (m.giocatori === undefined || (Array.isArray(m.giocatori) && m.giocatori.length <= 4 && m.giocatori.every(n => typeof n === 'string'))),
   inizia: m => numero(m.seme) && (m.mappa === undefined || ELENCO_MAPPE.includes(m.mappa)),
-  g: m => [m.x, m.z, m.yaw, m.pitch, m.colpi, m.tp].every(numero) && arma(m.arma),
+  g: m => [m.x, m.z, m.yaw, m.pitch, m.colpi, m.tp].every(numero) && arma(m.arma) && (m.su === undefined || numero(m.su)),
   az: m => eAzione(m.a),
   st: m => numero(m.g) && eIstantanea(m.ist),
   ev: m => Array.isArray(m.eventi) && m.eventi.every(e => e && typeof e.k === 'string'),

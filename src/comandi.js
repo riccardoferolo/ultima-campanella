@@ -2,7 +2,7 @@ const SENSIBILITA = 0.0022;
 const SOGLIA_ROTELLA = 60;
 const ATTESA_ROTELLA_MS = 160;
 const PITCH_MASSIMO = 1.45;
-const TASTI_GIOCO = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyR', 'KeyF', 'KeyV', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Enter', 'NumpadEnter', 'KeyG', 'KeyM', 'KeyE']);
+const TASTI_GIOCO = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight', 'Space', 'KeyR', 'KeyF', 'KeyV', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Enter', 'NumpadEnter', 'KeyG', 'KeyM', 'KeyE', 'KeyC', 'Tab']);
 
 export function creaComandi(superficie) {
   const premuti = new Set();
@@ -123,6 +123,9 @@ export function creaComandi(superficie) {
         avanti: (premuto('KeyW', 'ArrowUp') ? 1 : 0) - (premuto('KeyS', 'ArrowDown') ? 1 : 0),
         lato: (premuto('KeyD', 'ArrowRight') ? 1 : 0) - (premuto('KeyA', 'ArrowLeft') ? 1 : 0),
         corsa: premuto('ShiftLeft', 'ShiftRight'),
+        salto: premuto('Space'),
+        giu: premuto('KeyC'),
+        inventario: premuto('Tab'),
         sparo: stato.sparo,
         sparoPremuto: stato.sparoPremuto,
         sparoRilasciato: stato.sparoRilasciato,

@@ -6,6 +6,8 @@ import { quota } from '../mappa.js';
 import { PROCEDURALI, decoraBruto } from './palude/ragni3d.js';
 import { creaOcchi, altezzaLevitazione } from './palude/occhi3d.js';
 import { decoraCapitano } from './piazza/capitano3d.js';
+import { PROCEDURALI_ABISSO } from './abisso/leviatano3d.js';
+import { decoraAnfibio, decoraSommozzatore, decoraElettrico, decoraPalombaro } from './abisso/creature3d.js';
 
 const DISSOLVENZA = 0.25;
 const AFFONDA_DOPO = 2.6;
@@ -70,6 +72,26 @@ const MODELLI = Object.freeze({
     url: './modelli/zombie.glb', scala: 0.015, tinta: 0x9a8a80, alto: 2.15, raggio: 0.56, raggioTesta: 0.25, reazione: 0.35, decora: decoraCapitano,
     clip: { cammina: 'cammina', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
     velocita: { cammina: 0.8, corre: 0.9, attacco: 1.1, attacco2: 1.1, muore: 0.8, fermo: 0.8 },
+  },
+  anfibio: {
+    url: './modelli/zombie.glb', scala: 0.0102, tinta: 0x86a8a4, decora: decoraAnfibio,
+    clip: { cammina: 'cammina', cammina2: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.95, cammina2: 0.85, corre: 1.05, attacco: 1.6, attacco2: 1.7, muore: 1.2, fermo: 1 },
+  },
+  sommozzatore: {
+    url: './modelli/zombi_magro.glb', scala: 0.25, tinta: 0x7f9ea6, decora: decoraSommozzatore,
+    clip: { cammina: 'walk', cammina2: 'walk2', corre: 'run', attacco: 'attack2', attacco2: 'attack1_r', muore: 'dead1', fermo: 'idle' }, velocita: {},
+    riserva: { tinta: 0x7f9ea6, scala: 0.94 },
+  },
+  elettrico: {
+    url: './modelli/zombie.glb', scala: 0.0099, tinta: 0x8fb6d8, decora: decoraElettrico,
+    clip: { cammina: 'cammina', cammina2: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 1.1, corre: 1.15, attacco: 1.8, attacco2: 1.8, muore: 1.3, fermo: 1.2 },
+  },
+  palombaro: {
+    url: './modelli/zombie.glb', scala: 0.0152, tinta: 0x5e5650, alto: 2.2, raggio: 0.62, raggioTesta: 0.34, reazione: 0.25, decora: decoraPalombaro,
+    clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.72, corre: 0.8, attacco: 1, attacco2: 0.95, muore: 0.7, fermo: 0.7 },
   },
 });
 const MATERIALE_FIAMMA = new THREE.SpriteMaterial({ map: texturaFiamma(), color: 0xff8a3a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -156,7 +178,7 @@ export async function caricaZombi() {
       materialiVariante: tinte[0] === null ? null : materialiTinti(gltf.scene, tinte),
     });
   }));
-  for (const [tipo, risorsa] of Object.entries(PROCEDURALI)) risorse.set(tipo, { dati: risorsa.dati, modello: risorsa.modello, costruisci: risorsa.costruisci });
+  for (const [tipo, risorsa] of [...Object.entries(PROCEDURALI), ...Object.entries(PROCEDURALI_ABISSO)]) risorse.set(tipo, { dati: risorsa.dati, modello: risorsa.modello, costruisci: risorsa.costruisci });
   return risorse;
 }
 
@@ -186,7 +208,7 @@ function sfereDi(risorsa) {
   return sfereModelli.get(risorsa);
 }
 
-export function creaGestoreZombi(scena, risorse) {
+export function creaGestoreZombi(scena, risorse, { ombre = false } = {}) {
   const zombi = new Map();
   const occhi = creaOcchi(scena);
   const scorte = new Map();
@@ -195,6 +217,7 @@ export function creaGestoreZombi(scena, risorse) {
     const radice = new THREE.Group();
     scena.add(radice);
     const parti = risorsa.costruisci(z, radice, scena);
+    if (ombre) radice.traverse(o => { if (o.isMesh) o.castShadow = true; });
     const voce = {
       radice, corpo: parti.corpo, testa: parti.testa, busto: null, mixer: parti.mixer, azioni: new Map(), dati: risorsa.dati, aloni: [], attuale: null,
       ultimaPosizione: new THREE.Vector2(z.x, z.z), tempoMorto: 0, fase: 0, vitaPrima: z.vita, sussulto: 0, senzaTesta: false, gelo: null, sollevato: 0, giro: 0,
@@ -234,6 +257,7 @@ export function creaGestoreZombi(scena, risorse) {
       if (/spine2?$/i.test(o.name)) busto = o;
     });
     dati.decora?.(corpo, { testa, busto });
+    if (ombre) corpo.traverse(o => { if (o.isMesh) o.castShadow = true; });
     const mixer = new THREE.AnimationMixer(corpo);
     const azioni = new Map();
     for (const [logico, nome] of Object.entries(dati.clip)) {
@@ -369,7 +393,7 @@ export function creaGestoreZombi(scena, risorse) {
   return {
     aggiorna(vista, dt) {
       const vivi = new Set();
-      const buchi = vista.buchi ?? [];
+      const buchi = vista.abisso ? [...(vista.buchi ?? []), ...vista.abisso.globi.filter(g => g.fermo)] : vista.buchi ?? [];
       const levitati = vista.palude?.levitati ?? null;
       const tempo = performance.now() / 1000;
       let nuovi = 0;
@@ -427,6 +451,13 @@ export function creaGestoreZombi(scena, risorse) {
     nascondi(id) {
       const voce = zombi.get(id);
       if (voce) voce.radice.visible = false;
+    },
+    smembra(id) {
+      const voce = zombi.get(id);
+      if (!voce || voce.dati.alto) return null;
+      const punto = voce.radice.position.clone();
+      voce.radice.visible = false;
+      return punto;
     },
     decapita(id) {
       const voce = zombi.get(id);

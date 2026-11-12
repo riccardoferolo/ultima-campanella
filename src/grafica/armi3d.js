@@ -4,6 +4,7 @@ import { ARMI, armaBase } from '../regole.js';
 import { costruisciAliena, haFormaAliena } from './armiAliene3d.js';
 import { creaReliquia } from './reliquie3d.js';
 import { creaTeschio } from './teschio3d.js';
+import { creaMeraviglia } from './abisso/armi3d.js';
 
 const URL_ARMI = './modelli/armi.glb';
 const URL_ALIENE = './modelli/aliene.glb';
@@ -90,6 +91,7 @@ function vestiArma(gruppo, dati, materiali) {
       if (dati.potenziata) {
         nuovo.color.lerp(VIOLA, colore ? 0.25 : 0.45);
         if (!colore) nuovo.emissive.copy(EMISSIVO_POTENZIATO);
+        if (materiali.mimetica) materiali.mimetica(nuovo);
       }
       return nuovo;
     }));
@@ -99,6 +101,7 @@ function vestiArma(gruppo, dati, materiali) {
 
 export function modelloArma(tipo, materiali) {
   const dati = tipo === 'coltello' ? { modello: MODELLO_COLTELLO } : ARMI[tipo] ?? ARMI[armaBase(tipo)];
+  if (dati.meraviglia) return creaMeraviglia(armaBase(tipo), dati);
   if (dati.bianca) return creaReliquia(armaBase(tipo), dati);
   if (dati.teschio) return creaTeschio(dati);
   const modello = materiali.libreria.get(dati.modello);

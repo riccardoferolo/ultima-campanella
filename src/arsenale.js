@@ -1,9 +1,11 @@
 import { ARMI, COLTELLO, fattoreBevande } from './regole.js';
+import { POTENZIAMENTO } from './mappa.js';
 
 const FATTORE_LAMPO = 0.5;
 const CAMBIO_ARMA = 0.35;
 
-const nuovaArma = tipo => ({ tipo, caricatore: ARMI[tipo].caricatore, riserva: ARMI[tipo].riserva });
+export const capienza = tipo => (ARMI[tipo].potenziata && POTENZIAMENTO?.caricatore ? Math.round(ARMI[tipo].caricatore * POTENZIAMENTO.caricatore) : ARMI[tipo].caricatore);
+const nuovaArma = tipo => ({ tipo, caricatore: capienza(tipo), riserva: ARMI[tipo].riserva });
 
 export function creaArsenale(pistola = 'pistola') {
   return { armi: [nuovaArma(pistola)], attiva: 0, attesa: 0, ricarica: 0, ricaricaTotale: 0, daCaricare: 0, cambio: 0, coltello: 0 };
@@ -21,7 +23,7 @@ export function aggiorna(a, dt) {
   if (a.ricarica > 0) return false;
   a.ricarica = 0;
   const arma = armaAttiva(a);
-  const servono = ARMI[arma.tipo].caricatore - arma.caricatore;
+  const servono = capienza(arma.tipo) - arma.caricatore;
   const prese = Math.min(servono, arma.riserva);
   arma.caricatore += prese;
   arma.riserva -= prese;
@@ -38,10 +40,10 @@ export function spara(a, bevande = []) {
 
 export function ricarica(a, bevande = []) {
   const arma = armaAttiva(a);
-  if (occupato(a) || arma.riserva <= 0 || arma.caricatore >= ARMI[arma.tipo].caricatore) return false;
+  if (occupato(a) || arma.riserva <= 0 || arma.caricatore >= capienza(arma.tipo)) return false;
   a.ricarica = ARMI[arma.tipo].ricarica * (bevande.includes('lampo') ? FATTORE_LAMPO : 1);
   a.ricaricaTotale = a.ricarica;
-  a.daCaricare = Math.min(ARMI[arma.tipo].caricatore - arma.caricatore, arma.riserva);
+  a.daCaricare = Math.min(capienza(arma.tipo) - arma.caricatore, arma.riserva);
   return true;
 }
 

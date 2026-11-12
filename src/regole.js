@@ -162,6 +162,7 @@ const esplode = (raggio, danno, tipo, colore = null) => Object.freeze({ raggio, 
 const aliena = dati => arma({ famiglia: 'aliena', aliena: true, ...dati });
 const teschio = dati => arma({ famiglia: 'teschio', modello: 'teschio', teschio: true, segreta: true, danno: 0, cadenza: 0.3, caricatore: 1, riserva: 0, ricarica: 0, dispersione: 0, ...dati });
 const reliquia = dati => arma({ famiglia: 'reliquia', bianca: true, segreta: true, caricatore: Infinity, riserva: Infinity, ricarica: 0, dispersione: 0, ...dati });
+const meraviglia = dati => arma({ famiglia: 'meraviglia', segreta: true, mappa: 'abisso', dispersione: 0, danno: 0, ...dati });
 
 const ARMI_BASE = Object.freeze({
   pistola: arma({ nome: 'Pistola P9', famiglia: 'pistola', modello: 'Pistol_1', danno: 40, cadenza: 0.22, caricatore: 8, riserva: 48, ricarica: 1.4, dispersione: 0.004 }),
@@ -196,6 +197,8 @@ const ARMI_BASE = Object.freeze({
   singolarita: aliena({ nome: 'Singolarità', modello: 'Gun_Sniper', colore: 0x8a3dff, danno: 0, cadenza: 1.3, caricatore: 2, riserva: 14, ricarica: 3.2, dispersione: 0, proiettile: 'buco', suono: 'buco' }),
   criogeno: aliena({ nome: 'Criogeno', modello: 'Gun_Rifle', colore: 0x7fd8ff, danno: 22, cadenza: 0.09, automatica: true, caricatore: 60, riserva: 300, ricarica: 3, pallini: 3, dispersione: 0.07, portata: 11, gelo: 0.11, suono: 'gelo' }),
   arco: aliena({ nome: 'Arco Voltaico', modello: 'Gun_Revolver', colore: 0x66e6ff, danno: 900, cadenza: 0.55, caricatore: 10, riserva: 70, ricarica: 2.6, dispersione: 0.004, catena: 6, suono: 'arco' }),
+  charybdis: meraviglia({ nome: 'Cannone di Cariddi', modello: 'charybdis', meraviglia: 'cariddi', colore: 0x3fc8ff, cadenza: 0.9, caricatore: 3, riserva: 15, ricarica: 3.2, suono: 'buco' }),
+  tridente: meraviglia({ nome: 'Tridente di Poseidone', modello: 'tridente', meraviglia: 'tridente', bianca: true, colore: 0x5fe8ff, cadenza: 0.55, caricatore: Infinity, riserva: Infinity, ricarica: 0, suono: 'arco' }),
 });
 
 const NOMI_POTENZIATI = Object.freeze({
@@ -208,6 +211,8 @@ const NOMI_POTENZIATI = Object.freeze({
   singolarita: 'Orizzonte degli Eventi',
   criogeno: 'Zero Assoluto',
   arco: 'Tempesta di Giove',
+  charybdis: 'Maelstrom di Cariddi',
+  tridente: 'Ira di Atlantide',
 });
 const EPITETI = Object.freeze(['Furia', 'Spettro', 'Cobra', 'Drago', 'Valanga', 'Inferno', 'Tempesta', 'Lupo', 'Falco', 'Vespa', 'Uragano', 'Tuono', 'Vipera']);
 
@@ -236,7 +241,7 @@ export const armaBase = a => (a.endsWith('+') ? a.slice(0, -1) : a);
 
 export const MODI_RICARICA = Object.freeze({
   pistola: 'caricatore', mitra: 'caricatore', assalto: 'caricatore', battaglia: 'caricatore', mitragliatrice: 'caricatore',
-  precisione: 'otturatore', revolver: 'tamburo', pompa: 'cartucce', aliena: 'capsula',
+  precisione: 'otturatore', revolver: 'tamburo', pompa: 'cartucce', aliena: 'capsula', meraviglia: 'capsula',
 });
 export const modoRicarica = tipo => MODI_RICARICA[ARMI[tipo]?.famiglia] ?? 'caricatore';
 
@@ -286,6 +291,11 @@ export const TIPI_ZOMBIE = Object.freeze({
   bruto: Object.freeze({ mappa: 'palude', nome: 'Bruto corazzato', vita: 4.5, velocita: 0.8, danno: 1.8, portata: 1.25, punti: 4, rompe: 2.5, carica: 1.3, corazza: 0.3 }),
   arachne: Object.freeze({ nome: 'Arachne, la Tessitrice', vita: 1, velocita: 1, danno: 2.2, portata: 2.2, punti: 40, boss: true, finale: true, soglie: Object.freeze([0.5, 0.2]) }),
   capitano: Object.freeze({ mappa: 'piazza', nome: 'Il Capitano del Visconti', vita: 24, velocita: 1, danno: 2, portata: 1.5, punti: 15, boss: true, carica: 1.5, infuria: 0.5 }),
+  anfibio: Object.freeze({ mappa: 'abisso', nome: 'Marinaio annegato', vita: 1, velocita: 1, danno: 1, portata: 1, punti: 1 }),
+  sommozzatore: Object.freeze({ mappa: 'abisso', nome: 'Sommozzatore corrotto', vita: 0.75, velocita: 1.15, danno: 1.1, portata: 1.05, punti: 1.2, corre: true }),
+  elettrico: Object.freeze({ mappa: 'abisso', nome: 'Annegato elettrico', vita: 0.9, velocita: 1.2, danno: 1.25, portata: 1, punti: 1.3, corre: true }),
+  palombaro: Object.freeze({ mappa: 'abisso', nome: 'Il Palombaro Corazzato', vita: 22, velocita: 0.85, danno: 1.9, portata: 1.45, punti: 14, boss: true, carica: 1.4, rompe: 3, infuria: 0.4 }),
+  leviatano: Object.freeze({ mappa: 'abisso', nome: 'Il Leviatano Corrotto', vita: 1, velocita: 0, danno: 0, portata: 0, punti: 50, boss: true, finale: true, immobile: true, soglie: Object.freeze([0.66, 0.33]) }),
 });
 export const ELENCO_TIPI_ZOMBIE = Object.freeze(Object.keys(TIPI_ZOMBIE));
 
