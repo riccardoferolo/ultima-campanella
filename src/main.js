@@ -1138,7 +1138,7 @@ function speciale(me) {
 }
 
 function interagisci(lettura, me, vista) {
-  const interazione = me.stato === 'vivo' && s.fase === 'gioco' ? interazioneVicina({ id: s.mioId, x: io.x, z: io.z, armi: me.armi, bevande: me.bevande, armaAttiva: armaAttiva(arsenale).tipo }, vista) : null;
+  const interazione = me.stato === 'vivo' && s.fase === 'gioco' ? interazioneVicina({ id: s.mioId, x: io.x, z: io.z, su: io.su ?? 0, armi: me.armi, bevande: me.bevande, armaAttiva: armaAttiva(arsenale).tipo }, vista) : null;
   if (locale.inRianimazione && (!lettura.f || interazione?.tipo !== 'rianima')) {
     inviaAzione({ tipo: 'rianima', attivo: false });
     locale.inRianimazione = false;

@@ -9,6 +9,7 @@ import { valida } from '../src/rete/protocollo.js';
 import { griglia, campoVerso, distanzaCampo } from '../src/navigazione.js';
 import { PASSO, A } from '../src/abisso.js';
 import { dentroScatola } from '../src/fisica.js';
+import { interazioneVicina } from '../src/interazioni.js';
 
 function avanza(stato, secondi, ingressi = {}) {
   const eventi = [];
@@ -154,6 +155,31 @@ test("nel pozzo allagato si consuma l'ossigeno, le barre si prendono solo all'al
   assert.equal(abisso(stato).allagamento.livello, 0);
   compra(stato, 'fucina');
   assert.ok(giocatore(stato).armi.includes('charybdis'));
+});
+
+test("per ogni barra e ogni quota di nuoto, l'invito a premere F coincide con la presa dell'host", () => {
+  const stato = partita();
+  protocollo(stato);
+  compra(stato, 'pannello');
+  avanza(stato, A.ALLAGA_IN + 0.2);
+  const g = giocatore(stato);
+  const prese = [];
+  BARRE.forEach((b, i) => {
+    for (const su of [0, 0.4, 0.8, 1.2, 1.55]) {
+      metti(stato, { x: b.x + 0.4, z: b.z });
+      g.su = su;
+      const vista = espandi(faiIstantanea(stato));
+      const invito = interazioneVicina({ id: 'a', x: g.x, z: g.z, su, armi: g.armi, bevande: g.bevande, armaAttiva: g.armaAttiva }, vista);
+      assert.equal(invito?.acquisto, `barra-${i}`);
+      avanza(stato, R.PASSO, { posizioni: { a: { x: g.x, z: g.z, yaw: 0, pitch: 0, arma: g.armaAttiva, colpi: 0, tp: g.teletrasporto, su } }, azioni: [{ da: 'a', tipo: 'compra', acquisto: `barra-${i}` }] });
+      assert.equal(abisso(stato).barre[i], invito.costo === 0, `barra ${i} a quota ${su}: «${invito.testo}»`);
+      if (abisso(stato).barre[i]) {
+        prese.push(i);
+        break;
+      }
+    }
+  });
+  assert.deepEqual(prese, [0, 1, 2]);
 });
 
 test('annegare fa male; respirare in superficie riempie di nuovo i polmoni', () => {

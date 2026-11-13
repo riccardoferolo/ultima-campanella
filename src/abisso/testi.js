@@ -53,7 +53,7 @@ export function descrivi(a, io, vista) {
     }
     case 'turbina': {
       const t = ab.turbine[a.indice];
-      if (t >= 1) return nessuno('Turbina accesa');
+      if (t >= 1) return nascosto;
       if (t > 0) return nessuno(`Turbina in avvio: ${percento(t)}`);
       return { costo: 0, testo: 'Premi F per avviare la turbina' };
     }
