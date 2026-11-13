@@ -343,7 +343,7 @@ function creaBagliori(kit) {
           varying vec3 vColore;
           varying vec3 vPos;
           void main() {
-            float fres = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.0);
+            float fres = pow(max(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0), 2.0);
             float guizzo = 0.85 + 0.15 * sin(uTempo * 23.0 + vPos.y * 9.0);
             vec3 col = vColore * (0.06 + vLuce * 2.3 * guizzo) * (0.55 + 0.9 * fres) + vec3(0.01, 0.02, 0.025);
             gl_FragColor = vec4(col, 1.0);
@@ -486,7 +486,7 @@ function costruisciVasca(kit, m, caso) {
       ${RUMORE_GLSL}
       void main() {
         float n = rumoreAb(vec3(vPos.x * 0.3, vPos.y * 0.15 + uTempo * 0.25, vPos.z * 0.3));
-        float i = pow(1.0 - vUv.y, 2.4) * (0.55 + 0.45 * n);
+        float i = pow(max(1.0 - vUv.y, 0.0), 2.4) * (0.55 + 0.45 * n);
         gl_FragColor = vec4(vec3(0.1, 0.55, 0.9) * i * 0.45 * uForza, 1.0);
         ${USCITA_GLSL}
       }`,
@@ -683,7 +683,7 @@ function materialeCanne(kit) {
         float bolle = smoothstep(0.5, 0.85, rumoreAb(vec3(vPos.x * 5.0, vPos.y * 2.2 - uTempo * 2.6, vPos.z * 5.0)));
         float bolle2 = smoothstep(0.55, 0.9, rumoreAb(vec3(vPos.x * 9.0 + 3.0, vPos.y * 4.0 - uTempo * 4.2, vPos.z * 9.0)));
         float onde = 0.5 + 0.5 * sin(vPos.y * 0.9 - uTempo * 1.4 + rumoreAb(vPos * 0.3) * 2.0);
-        float fres = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.5);
+        float fres = pow(max(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0), 1.5);
         vec3 col = vec3(0.02, 0.14, 0.2) + vec3(0.1, 0.55, 0.75) * (0.25 + 0.75 * onde) * uAttivo * (1.0 - vDecoro * 0.45);
         col += vec3(0.45, 1.0, 1.25) * (bolle * 0.6 + bolle2 * 0.45) * (0.35 + uAttivo);
         float t = vImpulso;

@@ -482,5 +482,8 @@ export function creaGestoreZombi(scena, risorse, { ombre = false } = {}) {
         while (scorta.length < n) scorta.push(costruisci(tipo));
       }
     },
+    esemplari() {
+      return [...scorte.values()].map(scorta => scorta[0]?.radice).filter(Boolean);
+    },
   };
 }

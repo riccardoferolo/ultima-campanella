@@ -1099,7 +1099,7 @@ function creaGruppoArchi(definizioni) {
 const archi = {
   testa: creaGruppoArchi(Array.from({ length: 4 }, (_, i) => ({ centro: TESTA_ZOMBIE.centro, raggio: 0.115, quota: 0.02 - i * 0.025, salto: 1.1 + i * 0.3, larghezza: 0.0035 }))),
   busto: creaGruppoArchi(Array.from({ length: 8 }, (_, i) => ({ centro: v3(0, 1.3, 0), raggio: 0.19, quota: -0.12 + (i % 4) * 0.07, salto: 1.3 + (i % 3) * 0.45, larghezza: 0.005 }))),
-  braccio: creaGruppoArchi(Array.from({ length: 3 }, (_, i) => ({ asse: true, raggio: 5.2, da: 2 + i * 6, a: 12 + i * 6, larghezza: 0.45 }))),
+  braccio: creaGruppoArchi(Array.from({ length: 3 }, (_, i) => ({ asse: true, raggio: 5.2, da: 2 + i * 6, a: 12 + i * 6, salto: 1.4 + i * 0.5, larghezza: 0.45 }))),
 };
 
 const temp = { a: v3(0, 0, 0), b: v3(0, 0, 0), t: v3(0, 0, 0), s: v3(0, 0, 0), u: v3(0, 0, 0), p: v3(0, 0, 0), punti: Array.from({ length: PUNTI_ARCO }, () => v3(0, 0, 0)) };

@@ -33,13 +33,33 @@ float causticaAbisso(vec2 p, float t) {
   for (int n = 0; n < 4; n++) {
     float tt = t * (1.0 - (3.5 / float(n + 1)));
     i = p + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
-    c += 1.0 / length(vec2(p.x / (sin(i.x + tt) / inten), p.y / (cos(i.y + tt) / inten)));
+    vec2 d = max(abs(vec2(sin(i.x + tt), cos(i.y + tt))), vec2(0.001)) / inten;
+    c += 1.0 / max(length(p / d), 0.001);
   }
   c /= 4.0;
-  c = 1.17 - pow(c, 1.4);
+  c = 1.17 - pow(max(c, 0.0), 1.4);
   return clamp(pow(abs(c), 8.0), 0.0, 2.0);
 }
 `;
+
+const NORMALE_MINIMA = 1e-10;
+
+export function sanaNormali(geometria) {
+  const normali = geometria?.attributes?.normal;
+  if (!normali) return 0;
+  let sanate = 0;
+  for (let i = 0; i < normali.count; i++) {
+    const x = normali.getX(i);
+    const y = normali.getY(i);
+    const z = normali.getZ(i);
+    const lunghezza = x * x + y * y + z * z;
+    if (lunghezza > NORMALE_MINIMA && Number.isFinite(lunghezza)) continue;
+    normali.setXYZ(i, 0, 1, 0);
+    sanate++;
+  }
+  if (sanate) normali.needsUpdate = true;
+  return sanate;
+}
 
 export function creaUniformi() {
   return {

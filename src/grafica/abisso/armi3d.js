@@ -94,7 +94,7 @@ void main() {
   float n = fbmAbisso(q * 1.4 + uTempo * 0.15);
   float filamenti = pow(abs(sin(giro * 3.0 + u.y * 7.0 + n * 5.0)), 7.0);
   float occhio = smoothstep(0.55, 1.0, polo);
-  float fresnel = pow(1.0 - abs(dot(normalize(vNormaleVista), normalize(vVerso))), 2.2);
+  float fresnel = pow(max(1.0 - abs(dot(normalize(vNormaleVista), normalize(vVerso))), 0.0), 2.2);
   vec3 c = mix(uProfondo, uColore, smoothstep(0.25, 0.75, n));
   c *= 0.55 + filamenti * 1.3 + occhio * 0.8;
   c += uSchiuma * (filamenti * n * 1.2 + fresnel * 1.4 + occhio * n * n * 1.5);
@@ -117,7 +117,7 @@ const FRAMMENTO_MIMETICA = `
   vec3 iride = mix(vec3(0.1, 0.85, 1.0), vec3(0.62, 0.18, 1.0), 0.5 + 0.5 * sin(fase * 3.14159));
   iride = mix(iride, vec3(0.95, 0.55, 1.0), pow(max(0.0, sin(fase * 6.2831 + 1.0)), 8.0) * 0.5);
   float righe = smoothstep(0.93, 1.0, 0.5 + 0.5 * sin(vPosMimetica.y * 420.0 + tm * 5.0));
-  float passata = pow(1.0 - abs(fract(vPosMimetica.z * 1.6 + tm * 0.35) - 0.5) * 2.0, 24.0);
+  float passata = pow(max(1.0 - abs(fract(vPosMimetica.z * 1.6 + tm * 0.35) - 0.5) * 2.0, 0.0), 24.0);
   float bordoMimetica = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
   diffuseColor.rgb = mix(diffuseColor.rgb * 0.3, iride * 0.16, 0.5 + chiazze * 0.3);
   totalEmissiveRadiance += iride * (chiazze * 0.5 + 0.1 + righe * 0.45 + passata * 1.3 + bordoMimetica * 1.7);

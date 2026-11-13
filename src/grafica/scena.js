@@ -34,6 +34,7 @@ const VERIFICA_OGNI_S = 1.5;
 const FOV = 72;
 const MARGINE_VISTA = 10;
 const LATO_MINI = 128;
+const LATO_RISCALDO = 64;
 const FOV_MIRA = 52;
 const FOV_CANNOCCHIALE = 20;
 const ONDEGGIO = 0.01;
@@ -200,19 +201,35 @@ function creaGranate3d(scena) {
   };
 }
 
-function precompila(renderer, scena, camera, extra) {
+function precompila(renderer, scena, camera, extra, bersaglio = null) {
   const gruppo = new THREE.Group();
   extra.forEach(o => gruppo.add(o));
   gruppo.position.set(-40, 0, 0);
   scena.add(gruppo);
   const nascosti = [];
+  const tagliati = [];
+  const usaEGetta = [];
   scena.traverse(o => {
-    if (o.visible) return;
-    nascosti.push(o);
-    o.visible = true;
+    if (o.userData.soloPrecompila) usaEGetta.push(o);
+    if (!o.visible) {
+      nascosti.push(o);
+      o.visible = true;
+    }
+    if (bersaglio && o.frustumCulled) {
+      tagliati.push(o);
+      o.frustumCulled = false;
+    }
   });
+  renderer.setRenderTarget(bersaglio);
   renderer.compile(scena, camera);
+  if (bersaglio) {
+    renderer.clear();
+    renderer.render(scena, camera);
+  }
+  renderer.setRenderTarget(null);
   nascosti.forEach(o => { o.visible = false; });
+  tagliati.forEach(o => { o.frustumCulled = true; });
+  usaEGetta.forEach(o => o.removeFromParent());
   scena.remove(gruppo);
 }
 
@@ -332,8 +349,11 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const manoPolso = polso ? vista1p.accessorioSinistro(polso.gruppo) : null;
   if (polso) polso.gruppo.position.copy(POLSO_DA).lerp(POLSO_A, 0.3);
   mondoMappa.collegaPost?.(post);
-  precompila(renderer, scena, camera, [...[...risorseZombi.values()].map(r => clonaScheletro(r.modello)), ...personaggi.map(p => clonaScheletro(p.modello))]);
-  precompila(renderer, vista1p.scena, vista1p.camera, []);
+  const bersaglioCaldo = post ? new THREE.WebGLRenderTarget(LATO_RISCALDO, LATO_RISCALDO, { type: THREE.HalfFloatType }) : null;
+  precompila(renderer, scena, camera, [...[...risorseZombi.values()].map(r => clonaScheletro(r.modello)), ...personaggi.map(p => clonaScheletro(p.modello)), ...zombi.esemplari()], bersaglioCaldo);
+  precompila(renderer, vista1p.scena, vista1p.camera, [], bersaglioCaldo);
+  bersaglioCaldo?.dispose();
+  post?.scalda();
   const compagni = new Map();
   const ultimePosizioni = new Map();
   let tempo = 0;
@@ -345,14 +365,19 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
 
   let scala = q.scalaMassima;
   let controlliBassi = 0;
+  const scalaTela = q.scalaMassima;
+  const dimensioneTela = new THREE.Vector2();
   let campioni = 0;
   let sommaDt = 0;
   function dimensiona() {
     if (renderer.domElement.style.display === 'none') return;
     const l = Math.max(1, Math.floor(contenitore.clientWidth * scala));
     const a = Math.max(1, Math.floor(contenitore.clientHeight * scala));
-    renderer.setSize(l, a, false);
-    post?.dimensiona(l, a);
+    const lt = post ? Math.max(1, Math.floor(contenitore.clientWidth * scalaTela)) : l;
+    const at = post ? Math.max(1, Math.floor(contenitore.clientHeight * scalaTela)) : a;
+    renderer.getSize(dimensioneTela);
+    if (dimensioneTela.x !== lt || dimensioneTela.y !== at) renderer.setSize(lt, at, false);
+    post?.dimensiona(l, a, contenitore.clientWidth, contenitore.clientHeight);
     effetti.dimensiona(a);
     camera.aspect = l / a;
     camera.updateProjectionMatrix();

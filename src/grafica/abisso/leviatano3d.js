@@ -1515,7 +1515,7 @@ varying float vAnello;
 void main() {
   float d = length(vAngolo);
   if (d > 1.0) discard;
-  float morbido = pow(1.0 - d, 1.7);
+  float morbido = pow(max(1.0 - d, 0.0), 1.7);
   float bolla = smoothstep(1.0, 0.84, d) * (0.15 + 0.85 * smoothstep(0.55, 0.92, d)) + smoothstep(0.32, 0.0, length(vAngolo - vec2(-0.32, 0.32))) * 0.7;
   gl_FragColor = vec4(vColore.rgb, mix(morbido, bolla, vAnello) * vColore.a);
   #include <tonemapping_fragment>
@@ -1764,6 +1764,12 @@ function creaSchermoLampo(camera) {
 export function creaScenaLeviatano(kit) {
   kitAttivo = kit;
   const scena = kit.scena;
+  const prova = new THREE.Group();
+  prova.visible = false;
+  prova.userData.soloPrecompila = true;
+  scena.add(prova);
+  costruisciLeviatano({ yaw: 0 }, prova, null);
+  istanza = null;
   const geo = geometrieLeviatano();
   const mat = materialiLeviatano(kit);
   const densita = kit.qualita?.densita ?? 1;

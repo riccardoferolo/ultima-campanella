@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { quota } from '../mappa.js';
 import { livelloAcqua } from '../abisso.js';
-import { creaKit } from './abisso/kit.js';
+import { creaKit, sanaNormali } from './abisso/kit.js';
 import { creaMacchine } from './macchine3d.js';
 import { creaFondale } from './abisso/fondale3d.js';
 import { creaCupola } from './abisso/cupola3d.js';
@@ -29,6 +29,9 @@ export function costruisciAbisso(scena, { risorse, materialiArmi, oggetti, luciA
   const macchine = creaMacchine(scena, { materialiArmi, oggetti, metallo: kit.mat.acciaio, legno: kit.mat.paratia, serveCorrente: true, soloMuri: true });
   for (const crea of [creaFondale, creaCupola, creaReattore, creaSantuario, creaAnfiteatro, creaPassaggi, creaScenaLeviatano, creaEffettiAbisso]) crea(kit);
   kit.chiudiLotti();
+  const geometrie = new Set();
+  scena.traverse(o => { if (o.geometry) geometrie.add(o.geometry); });
+  geometrie.forEach(sanaNormali);
 
   const luci = Array.from({ length: luciAccese + LUCI_IN_PIU }, () => {
     const luce = new THREE.PointLight(0xffffff, 0, 10, 1.5);

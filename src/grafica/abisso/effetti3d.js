@@ -90,7 +90,7 @@ void main() {
   float giro = phi - uTempo * vel;
   float maschera = smoothstep(0.34, 0.6, fbmAbisso(vec3(cos(giro) * 1.6, pl.y * 4.0, sin(giro) * 1.6)));
   float faccia = abs(dot(normalize(vNormaleVista), normalize(vVerso)));
-  float a = (fil * maschera * (0.3 + 0.7 * (1.0 - faccia)) * 1.3 + pow(1.0 - faccia, 3.0) * 0.06) * uAlfa;
+  float a = (fil * maschera * (0.3 + 0.7 * (1.0 - faccia)) * 1.3 + pow(max(1.0 - faccia, 0.0), 3.0) * 0.06) * uAlfa;
   gl_FragColor = vec4(uColore * a * 1.6 * (1.0 - fattoreNebbia(vDistanza)), 1.0);
 }
 `;
@@ -107,7 +107,7 @@ ${RUMORE_GLSL}
 ${NEBBIA_GLSL}
 void main() {
   float faccia = abs(dot(normalize(vNormaleVista), normalize(vVerso)));
-  float bordo = pow(1.0 - faccia, 6.0);
+  float bordo = pow(max(1.0 - faccia, 0.0), 6.0);
   float rotture = smoothstep(0.3, 0.75, fbmAbisso(normalize(vLocale) * 5.0 + uTempo * 3.0));
   vec3 c = uColore * bordo * rotture * 1.4 + vec3(1.0) * pow(bordo, 3.0) * rotture * 0.5;
   gl_FragColor = vec4(c * uAlfa * (1.0 - fattoreNebbia(vDistanza)), 1.0);
@@ -260,7 +260,7 @@ void main() {
   if (vForma > 0.5 && vForma < 1.5) {
     a = smoothstep(0.6, 0.86, d) * smoothstep(1.0, 0.9, d) + smoothstep(0.35, 0.0, length(p - vec2(-0.35, -0.35))) * 0.9 + 0.05;
   } else {
-    a = pow(1.0 - d, 2.0) + pow(max(0.0, 1.0 - d * 2.5), 2.0) * 1.5;
+    a = pow(max(1.0 - d, 0.0), 2.0) + pow(max(0.0, 1.0 - d * 2.5), 2.0) * 1.5;
   }
   gl_FragColor = vec4(vColore * a * vAlfa * (1.0 - fattoreNebbia(vDistanza)), 1.0);
 }
@@ -379,8 +379,8 @@ void main() {
   float bordo = fbmAbisso(vec3(p * 3.0, seme)) * 0.22;
   float maschera = smoothstep(1.0, 0.72, r + bordo);
   float n = fbmAbisso(vec3(p * 4.2, uTempo * 0.7 + seme));
-  float vene = pow(1.0 - abs(n * 2.0 - 1.0), 18.0);
-  float vene2 = pow(1.0 - abs(fbmAbisso(vec3(p * 7.0 + 3.1, uTempo * 1.3 - seme)) * 2.0 - 1.0), 20.0);
+  float vene = pow(max(1.0 - abs(n * 2.0 - 1.0), 0.0), 18.0);
+  float vene2 = pow(max(1.0 - abs(fbmAbisso(vec3(p * 7.0 + 3.1, uTempo * 1.3 - seme)) * 2.0 - 1.0), 0.0), 20.0);
   float onde = pow(0.5 + 0.5 * sin(r * 28.0 - uTempo * 5.0 + n * 4.0), 8.0) * 0.25;
   vec3 tinta = mix(uColore, uColoreForte, vDati.z);
   float scatto = 0.75 + 0.25 * sin(uTempo * 37.0 + seme * 11.0) * sin(uTempo * 23.0 + seme);
@@ -1048,9 +1048,9 @@ export function creaEffettiAbisso(kit) {
 {
   vec3 pl = normalize(vLocaleGlobo);
   float n = fbmAbisso(pl * 2.5 + vec3(0.0, uTempo * 0.3 * uVelocita, 0.0));
-  float caustica = pow(1.0 - abs(sin(fbmAbisso(pl * 5.0 + vec3(uTempo * 0.25, -uTempo * 0.4 * uVelocita, 0.0)) * 22.0)), 14.0);
-  caustica += pow(1.0 - abs(sin(fbmAbisso(pl * 9.0 + vec3(-uTempo * 0.3, uTempo * 0.2, 3.0)) * 18.0)), 16.0) * 0.6;
-  float fres = pow(1.0 - abs(dot(normal, normalize(vViewPosition))), 3.0);
+  float caustica = pow(max(1.0 - abs(sin(fbmAbisso(pl * 5.0 + vec3(uTempo * 0.25, -uTempo * 0.4 * uVelocita, 0.0)) * 22.0)), 0.0), 14.0);
+  caustica += pow(max(1.0 - abs(sin(fbmAbisso(pl * 9.0 + vec3(-uTempo * 0.3, uTempo * 0.2, 3.0)) * 18.0)), 0.0), 16.0) * 0.6;
+  float fres = pow(max(1.0 - abs(dot(normal, normalize(vViewPosition))), 0.0), 3.0);
   totalEmissiveRadiance += uColore * (fres * 1.4 + caustica * (0.12 + n * 0.3) + 0.015) * uIntensita;
   diffuseColor.a *= clamp(0.04 + fres * 0.6 + caustica * 0.1, 0.0, 1.0) * uAlfa;
 }`);
@@ -1987,6 +1987,15 @@ export function creaEffettiAbisso(kit) {
     },
     smembra,
   };
+
+  const globoPronto = nuovoGlobo();
+  globoPronto.gruppo.visible = false;
+  poolGlobi.push(globoPronto);
+  for (const [nuovo, pool] of [[nuovoGuscioUrto, poolGusci], [nuovaLama, poolOnde], [nuovaTesta, poolTeste]]) {
+    const mesh = nuovo();
+    mesh.visible = false;
+    pool.push(mesh);
+  }
 
   kit.suEvento((e, v) => {
     const fn = gestori[e?.k];

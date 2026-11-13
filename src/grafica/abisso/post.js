@@ -9,6 +9,8 @@ import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 const FORZA_BLOOM = 0.62;
 const RAGGIO_BLOOM = 0.5;
 const SOGLIA_BLOOM = 0.85;
+const LUCE_MASSIMA_BLOOM = 32;
+const SCALA_BLOOM = 0.42;
 
 class PassaggioArma extends Pass {
   constructor(scena, camera) {
@@ -87,17 +89,30 @@ export function creaPost(renderer, scena, camera, vista1p, { bloom = true } = {}
   composer.addPass(new RenderPass(scena, camera));
   composer.addPass(new PassaggioArma(vista1p.scena, vista1p.camera));
   const fioritura = bloom ? new UnrealBloomPass(new THREE.Vector2(256, 256), FORZA_BLOOM, RAGGIO_BLOOM, SOGLIA_BLOOM) : null;
-  if (fioritura) composer.addPass(fioritura);
+  if (fioritura) {
+    const filtro = fioritura.materialHighPassFilter;
+    filtro.fragmentShader = filtro.fragmentShader
+      .replace('void main', `vec3 pulisci( vec3 c ) { uvec3 bit = floatBitsToUint( c ) & uvec3( 0x7fffffffu ); return any( greaterThan( bit, uvec3( 0x7f800000u ) ) ) ? vec3( 0.0 ) : clamp( c, 0.0, ${LUCE_MASSIMA_BLOOM.toFixed(1)} ); }\n\t\tvoid main`)
+      .replace('vec4 texel = texture2D( tDiffuse, vUv );', 'vec4 texel = texture2D( tDiffuse, vUv );\n\t\t\ttexel.rgb = pulisci( texel.rgb );');
+    fioritura.dimensionaDavvero = fioritura.setSize.bind(fioritura);
+    fioritura.setSize = () => {};
+    composer.addPass(fioritura);
+  }
+  let latoFioritura = '';
   const finale = new ShaderPass(FINALE);
   composer.addPass(finale);
   composer.addPass(new OutputPass());
   const stato = { aberrazione: 0, sottacqua: 0, danno: 0, condotto: 0 };
   return {
     stato,
-    dimensiona(larghezza, altezza) {
+    dimensiona(larghezza, altezza, larghezzaPiena = larghezza, altezzaPiena = altezza) {
       composer.setPixelRatio(1);
       composer.setSize(larghezza, altezza);
-      fioritura?.setSize(Math.max(1, Math.floor(larghezza / 2)), Math.max(1, Math.floor(altezza / 2)));
+      const lato = `${Math.max(1, Math.floor(larghezzaPiena * SCALA_BLOOM))}x${Math.max(1, Math.floor(altezzaPiena * SCALA_BLOOM))}`;
+      if (fioritura && lato !== latoFioritura) {
+        latoFioritura = lato;
+        fioritura.dimensionaDavvero(...lato.split('x').map(Number));
+      }
       finale.uniforms.uRisoluzione.value.set(larghezza, altezza);
     },
     disegna(dt, tempo) {
@@ -110,6 +125,11 @@ export function creaPost(renderer, scena, camera, vista1p, { bloom = true } = {}
       stato.danno = Math.max(0, stato.danno - dt * 1.6);
       stato.aberrazione = Math.max(0, stato.aberrazione - dt * 2);
       composer.render(dt);
+    },
+    scalda() {
+      composer.renderToScreen = false;
+      composer.render(0);
+      composer.renderToScreen = true;
     },
     colpito(forza = 1) {
       stato.danno = Math.min(1, stato.danno + 0.55 * forza);

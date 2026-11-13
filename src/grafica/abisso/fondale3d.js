@@ -1009,7 +1009,7 @@ function leviatano(c) {
       varying vec3 vV;
       void main() {
         vec3 n = normalize(vN);
-        float fres = pow(1.0 - abs(dot(n, normalize(vV))), 2.4);
+        float fres = pow(max(1.0 - abs(dot(n, normalize(vV))), 0.0), 2.4);
         vec3 c = uPelle * (0.45 + 0.55 * max(n.y, 0.0)) + uBordo * fres * 0.8;
         float palpebra = step(0.035, fract(uTempo * 0.09 + vU * 2.0));
         vec3 occhi = uOcchi * (3.0 + 1.5 * sin(uTempo * 1.7 + vU * 60.0)) * palpebra;

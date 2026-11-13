@@ -2115,7 +2115,7 @@ function costruisciCielo(kit) {
         float onde = pow(0.5 + 0.5 * sin(dc * 1.3 - uTempo * 2.0 + rumoreAb(vec3(vPos.xz * 0.15, uTempo * 0.2)) * 3.0), 5.0);
         float eta = uTempo - uImpatto.z;
         float colpo = eta > 0.0 && eta < 3.0 ? exp(-pow(length(vPos.xz - uImpatto.xy) - eta * 6.0, 2.0) * 0.6) * (1.0 - eta / 3.0) : 0.0;
-        float fres = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0);
+        float fres = pow(max(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0), 3.0);
         float tono = fract(fres * 0.8 + caso * 0.18 + uTempo * 0.035 + dc * 0.025);
         vec3 iride = 0.5 + 0.5 * cos(6.2831853 * (tono + vec3(0.0, 0.33, 0.67)));
         vec3 base = mix(vec3(0.12, 0.72, 1.0), iride, 0.45);

@@ -219,7 +219,7 @@ void main() {
     colore += trasmessa * uColoreA * 0.35 * uEnergia;
   }
   vec3 normale = normalize(vec3(ro.x, 0.0, ro.z));
-  float bordo = pow(1.0 - abs(dot(normale, rd)), 2.5);
+  float bordo = pow(max(1.0 - abs(dot(normale, rd)), 0.0), 2.5);
   colore += uColoreB * bordo * 0.45 * uEnergia;
   gl_FragColor = vec4(colore, 1.0);
   ${FINE}
@@ -250,7 +250,7 @@ void main() {
   bool sotto = cameraPosition.y < vMondo.y;
   if (sotto) n = -n;
   float nv = max(dot(n, v), 0.0);
-  float fresnel = 0.04 + 0.96 * pow(1.0 - nv, 5.0);
+  float fresnel = 0.04 + 0.96 * pow(max(1.0 - nv, 0.0), 5.0);
   vec3 rifl = reflect(-v, n);
   vec3 cielo = mix(vec3(0.015, 0.05, 0.065), vec3(0.12, 0.3, 0.36), smoothstep(-0.2, 0.9, rifl.y));
   float vicino = exp(-max(r - 3.0, 0.0) * 0.5);
@@ -261,7 +261,7 @@ void main() {
   colore += vec3(0.65, 0.85, 0.95) * schiuma * 0.55;
   float alfa = mix(0.6, 0.96, fresnel) + schiuma * 0.3;
   if (sotto) {
-    colore = mix(uProfondo * 1.6, vec3(0.3, 0.62, 0.7), pow(1.0 - nv, 1.5)) + uRiflesso * vicino * 0.4;
+    colore = mix(uProfondo * 1.6, vec3(0.3, 0.62, 0.7), pow(max(1.0 - nv, 0.0), 1.5)) + uRiflesso * vicino * 0.4;
     alfa = 0.88;
   }
   gl_FragColor = vec4(colore, clamp(alfa, 0.0, 1.0));
@@ -373,9 +373,9 @@ void main() {
   vec3 v = normalize(cameraPosition - vMondo);
   float centro = pow(abs(dot(normalize(vNormale), v)), 2.0);
   float alto = vUv.y;
-  float sfuma = pow(1.0 - alto, 1.3) * smoothstep(0.0, 0.04, alto);
+  float sfuma = pow(max(1.0 - alto, 0.0), 1.3) * smoothstep(0.0, 0.04, alto);
   float n = rumoreAbisso(vec3(vUv.x * 14.0, alto * 8.0 - uTempo * 1.3, uTempo * 0.25));
-  float filo = pow(1.0 - abs(n * 2.0 - 1.0), 6.0);
+  float filo = pow(max(1.0 - abs(n * 2.0 - 1.0), 0.0), 6.0);
   vec3 colore = uColore * (0.35 + n * 0.6 + filo * 1.3) * centro * sfuma * uForza * 0.85;
   gl_FragColor = vec4(colore, 1.0);
   ${FINE_ADDITIVA}
@@ -422,7 +422,7 @@ void main() {
   }
   float raggi = pow(max(sin(rd.x * 9.0 + rd.z * 7.0 + uTempo * 0.4) * 0.5 + 0.5, 0.0), 8.0) * smoothstep(0.0, 0.8, rd.y + 0.3);
   colore += vec3(0.05, 0.18, 0.22) * raggi;
-  float fresnel = pow(1.0 - abs(dot(rd, normalize(vNormale))), 3.0);
+  float fresnel = pow(max(1.0 - abs(dot(rd, normalize(vNormale))), 0.0), 3.0);
   colore = mix(colore, vec3(0.3, 0.38, 0.4), fresnel * 0.5);
   colore *= 0.75 + fbmAbisso(vMondo * 6.0) * 0.5;
   gl_FragColor = vec4(colore, 1.0);
@@ -450,9 +450,9 @@ const FRAMMENTO_TUBO = `
 uniform float uFlusso;
 void main() {
   vec3 v = normalize(cameraPosition - vMondo);
-  float fresnel = pow(1.0 - abs(dot(normalize(vNormale), v)), 2.5);
+  float fresnel = pow(max(1.0 - abs(dot(normalize(vNormale), v)), 0.0), 2.5);
   float strisce = rumoreAbisso(vec3(vUv.x * 60.0 - uTempo * 4.0 * uFlusso, vUv.y * 10.0, 0.0));
-  float filo = pow(1.0 - abs(strisce * 2.0 - 1.0), 8.0) * uFlusso;
+  float filo = pow(max(1.0 - abs(strisce * 2.0 - 1.0), 0.0), 8.0) * uFlusso;
   float caustica = rumoreAbisso(vMondo * 1.3 + vec3(0.0, uTempo * 0.5, 0.0));
   vec3 colore = vec3(0.2, 0.55, 0.65) * (fresnel * 0.9 + 0.08) + vec3(0.5, 0.9, 1.0) * filo * 0.5 + vec3(0.1, 0.3, 0.35) * caustica * 0.15;
   float alfa = clamp(0.08 + fresnel * 0.6 + filo * 0.3, 0.0, 0.85);
@@ -465,7 +465,7 @@ uniform float uCalore;
 void main() {
   vec3 p = vMondo * 6.0;
   float n = fbmAbisso(p + vec3(uTempo * 0.4, 0.0, uTempo * 0.3));
-  float vene = pow(1.0 - abs(2.0 * rumoreAbisso(p * 1.7 + n * 3.0 - uTempo * 0.6) - 1.0), 5.0);
+  float vene = pow(max(1.0 - abs(2.0 * rumoreAbisso(p * 1.7 + n * 3.0 - uTempo * 0.6) - 1.0), 0.0), 5.0);
   vec3 colore = mix(vec3(0.05, 0.25, 0.4), vec3(0.4, 0.95, 1.2), n) * (0.6 + vene * 1.8);
   colore = mix(colore, vec3(1.4, 0.6, 0.18), smoothstep(0.75, 0.95, n) * 0.4);
   gl_FragColor = vec4(colore * uCalore * 2.2, 1.0);
@@ -476,9 +476,9 @@ const FRAMMENTO_CUORE = `
 uniform float uBattito;
 void main() {
   vec3 v = normalize(cameraPosition - vMondo);
-  float bordo = pow(1.0 - abs(dot(normalize(vNormale), v)), 2.0);
+  float bordo = pow(max(1.0 - abs(dot(normalize(vNormale), v)), 0.0), 2.0);
   float n = fbmAbisso(vMondo * 9.0 + vec3(0.0, uTempo * 0.8, 0.0));
-  float vene = pow(1.0 - abs(2.0 * rumoreAbisso(vMondo * 14.0 - uTempo) - 1.0), 6.0);
+  float vene = pow(max(1.0 - abs(2.0 * rumoreAbisso(vMondo * 14.0 - uTempo) - 1.0), 0.0), 6.0);
   vec3 colore = mix(vec3(0.02, 0.18, 0.35), vec3(0.35, 0.95, 1.3), n) + vec3(0.8, 1.0, 1.0) * vene * 1.5 + vec3(0.3, 0.8, 1.0) * bordo * 1.5;
   gl_FragColor = vec4(colore * (0.8 + uBattito * 1.6), 1.0);
   ${FINE}
