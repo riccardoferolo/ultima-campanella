@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { conCaustiche } from './kit.js';
-import { ALPHA, BOCCAPORTI_ALPHA, LARGO_BOCCAPORTO, VALVOLE, NODI, PARTI_SCUDO, ACQUISTI, DELTA, quota } from '../../mappe/abisso.js';
+import { ALPHA, BOCCAPORTI_ALPHA, LARGO_BOCCAPORTO, VALVOLE, NODI, PARTI_SCUDO, ZONE_PARTI, ZONE, ACQUISTI, DELTA, quota } from '../../mappe/abisso.js';
 
 export const SU = Object.freeze(new THREE.Vector3(0, 1, 0));
 const R = ALPHA.raggio;
@@ -44,6 +44,13 @@ const PROFILO_ESTERNO = Object.freeze([[-1.85, -0.8], [-1.85, 2.75], [-1.15, 3.8
 const LAMPO_INDIZIO = 0.8;
 const PAUSA_INDIZIO = 1.5;
 const AGO_MINIMO = -2.15;
+const ALTEZZA_PEZZO = 1.05;
+const DONDOLO_PEZZO = 0.07;
+const GIRO_PEZZO = 0.9;
+const ALTEZZA_FASCIO = 4.5;
+const SOTTO_IL_TETTO = 0.2;
+const ALTEZZA_NODO = 0.8;
+const SCALA_NODO = 1.5;
 const INSEGNE = Object.freeze(['TUNNEL DI CRISTALLO  -  SETTORE BETA', 'GALLERIA DEL CONSORZIO  -  SETTORE GAMMA', 'ABYSSUS-9  -  CUPOLA ALPHA  -  CONSORZIO TALASSA 1953', 'SPECIMEN N.7  -  MELANOCETUS ABYSSI']);
 const PEZZI_MURO = Object.freeze(ACQUISTI.filter(a => a.zona === 'cupola' && ['arma', 'bevanda', 'valvola'].includes(a.tipo)).map(a => ({
   a: Math.atan2(a.posizione.z - ALPHA.z, a.posizione.x - ALPHA.x), mezzo: a.tipo === 'arma' ? 0.75 : a.tipo === 'bevanda' ? 0.55 : 0.45,
@@ -596,6 +603,41 @@ function texturaAlone() {
     g.fillStyle = r;
     g.fillRect(0, 0, l, l);
   });
+}
+
+function texturaFascio() {
+  const t = tela(4, 64, (g, l, a) => {
+    const v = g.createLinearGradient(0, a, 0, 0);
+    v.addColorStop(0, '#ffffff');
+    v.addColorStop(0.3, '#7a7a7a');
+    v.addColorStop(1, '#000000');
+    g.fillStyle = v;
+    g.fillRect(0, 0, l, a);
+  });
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+function altezzaFascio(idZona, x, z) {
+  const zona = ZONE.find(q => q.id === idZona);
+  return zona ? Math.max(1, Math.min(ALTEZZA_FASCIO, zona.tetto - quota(x, z) - SOTTO_IL_TETTO)) : ALTEZZA_FASCIO;
+}
+
+function segnale(colore, mappaFascio, altezza = ALTEZZA_FASCIO) {
+  const gruppo = new THREE.Group();
+  const fascio = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.32, ALTEZZA_FASCIO, 20, 1, true).translate(0, ALTEZZA_FASCIO / 2, 0),
+    new THREE.MeshBasicMaterial({ color: colore, alphaMap: mappaFascio, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  const anello = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.56, 40).rotateX(-Math.PI / 2).translate(0, 0.035, 0),
+    new THREE.MeshBasicMaterial({ color: colore, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  fascio.scale.y = altezza / ALTEZZA_FASCIO;
+  fascio.renderOrder = 2;
+  anello.renderOrder = 2;
+  gruppo.add(fascio, anello);
+  return { gruppo, fascio, anello };
 }
 
 function materialeQuadranti() {
@@ -1402,25 +1444,32 @@ function scudo(c) {
     return g;
   };
   const posa = [
-    new THREE.Matrix4().makeRotationX(-Math.PI / 2).premultiply(new THREE.Matrix4().makeTranslation(0, 0.13, 0)),
-    new THREE.Matrix4().makeRotationX(-0.9).premultiply(new THREE.Matrix4().makeTranslation(0, 0.18, 0)),
-    new THREE.Matrix4().makeRotationX(-Math.PI / 2).premultiply(new THREE.Matrix4().makeTranslation(0, 0.035, 0)),
+    new THREE.Matrix4().makeScale(1.2, 1.2, 1.2),
+    new THREE.Matrix4().makeScale(2.4, 2.4, 2.4),
+    new THREE.Matrix4().makeRotationX(-0.35).premultiply(new THREE.Matrix4().makeScale(1.8, 1.8, 1.8)),
   ];
+  const mappaFascio = texturaFascio();
   const sparsi = pezzi.map((parti, i) => {
     const radice = new THREE.Group();
+    const giro = new THREE.Group();
+    giro.position.y = ALTEZZA_PEZZO;
     const corpo = gruppo(parti);
     corpo.applyMatrix4(posa[i]);
-    radice.add(corpo);
+    giro.add(corpo);
+    radice.add(giro);
     const alone = new THREE.Sprite(m.alone.clone());
-    alone.scale.setScalar(1.5);
-    alone.position.y = 0.35;
+    alone.scale.setScalar(0.9);
+    alone.position.y = ALTEZZA_PEZZO;
     radice.add(alone);
+    const luce = segnale(CIANO, mappaFascio);
+    radice.add(luce.gruppo);
+    const altezze = PARTI_SCUDO[i].map((p, j) => altezzaFascio(ZONE_PARTI[i][j], p.x, p.z));
     radice.visible = false;
     kit.scena.add(radice);
-    return { radice, alone, posti: PARTI_SCUDO[i].map((p, j) => ({ x: p.x, z: p.z, y: quota(p.x, p.z), ry: i * 2.1 + j * 1.3 })) };
+    return { radice, giro, alone, luce, posti: PARTI_SCUDO[i].map((p, j) => ({ x: p.x, z: p.z, y: quota(p.x, p.z), ry: i * 2.1 + j * 1.3, fascio: altezze[j] / ALTEZZA_FASCIO })) };
   });
   sparsi.forEach((s, i) => s.posti.forEach((p, j) => kit.luce({
-    x: p.x, y: p.y + 0.6, z: p.z, colore: CIANO, intensita: 2.2, portata: 4,
+    x: p.x, y: p.y + ALTEZZA_PEZZO + 0.5, z: p.z, colore: CIANO, intensita: 1.1, portata: 3.5,
     attiva: v => !!v.abisso && v.abisso.scudo.posti[i] === j && !v.abisso.scudo.prese[i] && !v.abisso.scudo.costruito,
   })));
   const montato = new THREE.Group();
@@ -1436,7 +1485,7 @@ function scudo(c) {
   montato.rotation.x = -0.32;
   montato.visible = false;
   kit.scena.add(montato);
-  return { sparsi, montato };
+  return { sparsi, montato, mappaFascio };
 }
 
 function geometriaEscrescenza(kit, grande) {
@@ -1509,13 +1558,20 @@ function nodi(c) {
     const b = basi[i];
     const d = NODI[i].dentro;
     kit.luce({ x: b.luce.x, y: b.luce.y, z: b.luce.z, colore: MAGENTA, intensita: 4.5, portata: 7, attiva: v => !!v.abisso?.protocollo && v.abisso.nodi[i] === 0 });
-    kit.luce({ x: d.x, y: quota(d.x, d.z) + 0.5, z: d.z, colore: MAGENTA, intensita: 4, portata: 5, attiva: v => v.abisso?.nodi?.[i] === 1 });
+    kit.luce({ x: d.x, y: quota(d.x, d.z) + ALTEZZA_NODO + 0.6, z: d.z, colore: MAGENTA, intensita: 1.8, portata: 4, attiva: v => v.abisso?.nodi?.[i] === 1 });
   }
   for (const mesh of [fuori, terra]) {
     mesh.frustumCulled = false;
     kit.scena.add(mesh);
   }
-  return { fuori, terra, basi, caduta: NODI.map(() => 0), zero };
+  const segnali = NODI.map(n => {
+    const l = segnale(MAGENTA, c.mappaFascio, altezzaFascio(n.zona, n.dentro.x, n.dentro.z));
+    l.gruppo.position.set(n.dentro.x, quota(n.dentro.x, n.dentro.z), n.dentro.z);
+    l.gruppo.visible = false;
+    kit.scena.add(l.gruppo);
+    return l;
+  });
+  return { fuori, terra, basi, segnali, caduta: NODI.map(() => 0), zero };
 }
 
 function tunnel(c) {
@@ -1728,6 +1784,7 @@ export function creaCupola(kit) {
   for (const [materiale, lista] of chiodi) metti(materiale, rivetti(lista), { uv: false });
   const quadri = strumenti(c);
   const pezzi = scudo(c);
+  c.mappaFascio = pezzi.mappaFascio;
   const parassiti = nodi(c);
   const stato = { valvole: VALVOLE.map(() => ({ giro: 0, spinta: 0, vapore: 0, lampo: 0, errore: 0, rosso: 0, sbuffo: 0 })), aghi: c.quadranti.map(() => AGO_MINIMO) };
   const dialValvola = VALVOLE.map((_, i) => c.quadranti.findIndex(q => q.chiave === i));
@@ -1859,8 +1916,12 @@ export function creaCupola(kit) {
       if (!visibile) return;
       const p = s.posti[j];
       s.radice.position.set(p.x, p.y, p.z);
-      s.radice.rotation.y = p.ry;
-      s.alone.material.opacity = 0.32 + 0.22 * Math.sin(tempo * 2.4 + i);
+      s.luce.fascio.scale.y = p.fascio;
+      s.giro.rotation.y = p.ry + tempo * GIRO_PEZZO;
+      s.giro.position.y = ALTEZZA_PEZZO + Math.sin(tempo * 1.7 + i) * DONDOLO_PEZZO;
+      s.alone.material.opacity = 0.16 + 0.1 * Math.sin(tempo * 2.4 + i);
+      s.luce.anello.material.opacity = 0.4 + 0.25 * Math.sin(tempo * 3 + i);
+      s.luce.fascio.material.opacity = 0.34 + 0.1 * Math.sin(tempo * 2 + i);
     });
     pezzi.montato.visible = !!scudoAb?.costruito;
 
@@ -1873,11 +1934,13 @@ export function creaCupola(kit) {
         const s = cresce ? 1 + Math.sin(tempo * 2.1 + i) * 0.03 : parassiti.caduta[i];
         parassiti.fuori.setMatrixAt(i, matriceNodo.copy(b.m).multiply(new THREE.Matrix4().makeScale(s, s, s)));
       } else parassiti.fuori.setMatrixAt(i, parassiti.zero);
+      parassiti.segnali[i].gruppo.visible = stadio === 1;
       if (stadio === 1) {
         const d = NODI[i].dentro;
-        const y = quota(d.x, d.z) + 0.16 + Math.sin(tempo * 1.8 + i) * 0.03;
-        const giro = tempo * 0.4 + i;
-        parassiti.terra.setMatrixAt(i, matriceNodo.copy(base(v3(Math.cos(giro), 0, Math.sin(giro)), v3(Math.sin(giro), 0, -Math.cos(giro)), SU, v3(d.x, y, d.z))));
+        const y = quota(d.x, d.z) + ALTEZZA_NODO + Math.sin(tempo * 1.8 + i) * 0.06;
+        const giro = tempo * 0.8 + i;
+        parassiti.terra.setMatrixAt(i, matriceNodo.copy(base(v3(Math.cos(giro), 0, Math.sin(giro)), v3(Math.sin(giro), 0, -Math.cos(giro)), SU, v3(d.x, y, d.z))).multiply(new THREE.Matrix4().makeScale(SCALA_NODO, SCALA_NODO, SCALA_NODO)));
+        parassiti.segnali[i].anello.material.opacity = 0.4 + 0.25 * Math.sin(tempo * 3 + i);
       } else parassiti.terra.setMatrixAt(i, parassiti.zero);
     });
     parassiti.fuori.instanceMatrix.needsUpdate = true;

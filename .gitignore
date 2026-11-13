@@ -14,3 +14,4 @@ _lavoro/*
 !_lavoro/converti-tutto.mjs
 !_lavoro/esegui-conversione.mjs
 !_lavoro/converti/
+!_lavoro/raccolte-abisso.mjs
