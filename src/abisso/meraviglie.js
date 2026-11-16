@@ -218,6 +218,18 @@ export function lanciaDardo(stato, ab, g, azione, eventi) {
 
 const SOTTOPASSI = 3;
 
+function bersaglioVicino(bersagli, punto) {
+  let scelto = -1;
+  let migliore = A.BERSAGLIO_CANNA;
+  bersagli.forEach((b, i) => {
+    const d = Math.hypot(b.x - punto.x, b.z - punto.z);
+    if (d >= migliore) return;
+    migliore = d;
+    scelto = i;
+  });
+  return scelto;
+}
+
 export function aggiornaDardi(stato, ab, dt, eventi, S, suImpatto) {
   if (ab.dardi.length === 0) return;
   const ostacoli = ostacoliPerGiocatori(new Set(stato.porte));
@@ -264,8 +276,8 @@ function fulmine(stato, ab, punto, primo, dardo, eventi, S, suImpatto) {
   }
   const suolo = quota(punto.x, punto.z);
   ab.pozze.push({ id: nuovoId(ab), x: r2(punto.x), z: r2(punto.z), y: r2(suolo), timer: A.POZZA_DURATA, raggio: A.POZZA_RAGGIO * (dardo.potente ? 1.35 : 1), ogni: 0, da: dardo.da, potente: dardo.potente, tipo: 'elettrica' });
-  const canna = CANNE.findIndex(c => Math.hypot(c.x - punto.x, c.z - punto.z) < A.BERSAGLIO_CANNA);
-  const pilone = PILONI.findIndex(p => Math.hypot(p.x - punto.x, p.z - punto.z) < A.BERSAGLIO_CANNA);
+  const canna = bersaglioVicino(CANNE, punto);
+  const pilone = bersaglioVicino(PILONI, punto);
   eventi.push({ k: 'fulmineTridente', a: dardo.da, x: r2(punto.x), y: r2(punto.y), z: r2(punto.z), catena, potente: dardo.potente, canna, pilone });
   suImpatto?.({ canna, pilone, punto, da: dardo.da });
 }

@@ -15,6 +15,7 @@ const BASE_CUPOLA = 5;
 const RAGGIO_SFERA = (DELTA.raggio ** 2 + (DELTA.altezza - BASE_CUPOLA) ** 2) / (2 * (DELTA.altezza - BASE_CUPOLA));
 const CENTRO_SFERA_Y = DELTA.altezza - RAGGIO_SFERA;
 const THETA_BASE = Math.asin(DELTA.raggio / RAGGIO_SFERA);
+export const CUPOLA_DELTA = Object.freeze({ raggio: RAGGIO_SFERA, centroY: CENTRO_SFERA_Y });
 const MURO = Object.freeze({ r0: DELTA.raggio - 0.25, r1: DELTA.raggio + 0.25, y0: -0.5, y1: 4.6 });
 const PASSAGGIO = Object.freeze({ a: Math.PI, mezzo: 0.07 });
 const BOCCAPORTI = Object.freeze(BOCCAPORTI_DELTA.map(a => Object.freeze({ a, mezzo: 0.047, alto: 2.45 })));

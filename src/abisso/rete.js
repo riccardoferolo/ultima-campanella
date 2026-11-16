@@ -27,7 +27,7 @@ export function istantanea(stato) {
     apo: s.portatore ?? '',
     ao: stato.giocatori.map(g => {
       const viaggio = s.condotti[g.id];
-      return [g.id, Math.round((s.ossigeno[g.id] ?? 1) * 100), Math.round(s.scudi[g.id] ?? 0), s.bolle[g.id]?.colpi ?? 0, viaggio?.verso ?? 0, r2(viaggio?.t ?? 0), s.autoRianimazioni[g.id] ?? 0, bit(s.perkaholic.includes(g.id)), r2(g.su ?? 0)];
+      return [g.id, Math.round((s.ossigeno[g.id] ?? 1) * 100), Math.round(s.scudi[g.id] ?? 0), s.bolle[g.id]?.colpi ?? 0, viaggio?.verso ?? 0, r2(viaggio?.t ?? 0), s.autoRianimazioni[g.id] ?? 0, bit(s.perkaholic.includes(g.id)), r2(g.su ?? 0), r2(Math.max(0, (s.attesaCondotto[g.id] ?? 0) - stato.tempo))];
     }),
     ag: s.globi.map(q => [q.id, r2(q.x), r2(q.y), r2(q.z), r2(Math.max(0, q.timer)), r2(q.raggio), bit(q.fermo), bit(q.potente)]),
     ad: s.dardi.map(q => [q.id, r2(q.x), r2(q.y), r2(q.z)]),
@@ -46,8 +46,8 @@ export function istantanea(stato) {
 export function espandi(ist) {
   if (!Array.isArray(ist.ab) || ist.ab.length !== LUNGHEZZA_STATO) return null;
   const v = ist.ab;
-  const giocatori = Object.fromEntries((ist.ao ?? []).map(([id, ossigeno, scudo, bolla, verso, t, rianimazioni, perkaholic, su]) => [id, {
-    ossigeno: ossigeno / 100, scudo, bolla, condotto: verso ? { verso: verso === 1 ? 'delta' : 'beta', t } : null, rianimazioni, perkaholic: !!perkaholic, su: su ?? 0,
+  const giocatori = Object.fromEntries((ist.ao ?? []).map(([id, ossigeno, scudo, bolla, verso, t, rianimazioni, perkaholic, su, ricarica]) => [id, {
+    ossigeno: ossigeno / 100, scudo, bolla, condotto: verso ? { verso: verso === 1 ? 'delta' : 'beta', t } : null, rianimazioni, perkaholic: !!perkaholic, su: su ?? 0, ricaricaCondotto: ricarica ?? 0,
   }]));
   return {
     passo: v[0], protocollo: !!v[1], turbine: v.slice(2, 5),
@@ -78,7 +78,7 @@ export function valida(ist) {
   if (ist.ab === undefined) return ['apo', 'ao', 'ag', 'ad', 'ap', 'as', 'an', 'ac', 'al', 'aa', 'aq'].every(k => ist[k] === undefined);
   return Array.isArray(ist.ab) && ist.ab.length === LUNGHEZZA_STATO && ist.ab.every(numero)
     && (ist.apo === undefined || (typeof ist.apo === 'string' && ist.apo.length <= ID_MASSIMO))
-    && Array.isArray(ist.ao) && ist.ao.length <= 8 && ist.ao.every(e => Array.isArray(e) && e.length === 9 && testo(e[0]) && e.slice(1).every(numero))
+    && Array.isArray(ist.ao) && ist.ao.length <= 8 && ist.ao.every(e => Array.isArray(e) && e.length === 10 && testo(e[0]) && e.slice(1).every(numero))
     && righe(ist.ag, 8) && righe(ist.ad, 4) && righe(ist.ap, 7) && righe(ist.as, 4) && righe(ist.an, 6) && righe(ist.ac, 2) && righe(ist.aq, 3)
     && (ist.al === undefined || (Array.isArray(ist.al) && ist.al.length === 10 && ist.al.every(numero)))
     && (ist.aa === undefined || (Array.isArray(ist.aa) && ist.aa.length <= 16 && ist.aa.every(e => Array.isArray(e) && e.length >= 6 && e.length <= 40 && e.every(numero))));

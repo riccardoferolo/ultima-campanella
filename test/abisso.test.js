@@ -244,6 +244,44 @@ test('durante il protocollo il globo che implode vicino a un nodo lo fa cadere d
   assert.ok(stato.zombie.some(z => z.tipo === 'palombaro'));
 });
 
+test('ogni nodo si abbatte sparando il globo da un punto raggiungibile della sua stanza e si raccoglie dove cade', () => {
+  const stato = partita();
+  protocollo(stato);
+  estraiBarre(stato);
+  const ab = abisso(stato);
+  const g = Object.assign(giocatore(stato), { armi: ['pistola', 'charybdis'], armaAttiva: 'charybdis' });
+  const campo = campoVerso(griglia(new Set(stato.porte)), [PARTENZE[0]]);
+  const bersagli = [
+    { centro: { x: 0, z: 0 }, dentro: 9.2, y: 3.55 },
+    { centro: { x: 0, z: 0 }, dentro: 9.2, y: 3.55 },
+    { centro: DELTA, dentro: 20.5, y: 6.8 },
+    { centro: DELTA, dentro: 20.5, y: 6.8 },
+  ];
+  NODI.forEach((n, i) => {
+    const { centro, dentro, y } = bersagli[i];
+    const a = Math.atan2(n.fuori.z - centro.z, n.fuori.x - centro.x);
+    const piede = Array.from({ length: 10 }, (_, k) => ({ x: centro.x + Math.cos(a) * (dentro - k * 0.5), z: centro.z + Math.sin(a) * (dentro - k * 0.5) }))
+      .find(q => Number.isFinite(distanzaCampo(campo, q.x, q.z)));
+    assert.ok(piede, `nodo ${i}: nessun punto raggiungibile davanti alla vetrata`);
+    metti(stato, piede);
+    const mira = { x: centro.x + Math.cos(a) * (centro === DELTA ? 23.4 : 12.6), z: centro.z + Math.sin(a) * (centro === DELTA ? 23.4 : 12.6) };
+    const yaw = Math.atan2(mira.x - g.x, mira.z - g.z);
+    const pitch = Math.atan2(y - R.ALTEZZA_OCCHI - quota(g.x, g.z), Math.hypot(mira.x - g.x, mira.z - g.z));
+    avanza(stato, R.PASSO, una('abisso', { cosa: 'globo', yaw, pitch }));
+    avanza(stato, 2);
+    avanza(stato, R.PASSO, una('abisso', { cosa: 'collassa' }));
+    assert.equal(ab.nodi[i], 1, `nodo ${i} non abbattuto`);
+    metti(stato, n.dentro);
+    const invito = interazioneVicina({ id: 'a', x: g.x, z: g.z, su: 0, armi: g.armi, bevande: g.bevande, armaAttiva: g.armaAttiva }, espandi(faiIstantanea(stato)));
+    assert.equal(invito?.acquisto, `nodo-${i}`);
+    assert.equal(invito.costo, 0);
+    compra(stato, `nodo-${i}`);
+    assert.equal(ab.nodi[i], 2);
+    avanza(stato, A.GLOBO_CADENZA);
+  });
+  assert.equal(ab.passo, PASSO.AUTOPSIA);
+});
+
 test('il Palombaro è corazzato davanti e debole alle bombole; il suo arpione trascina', () => {
   const stato = partita();
   const g = giocatore(stato);
@@ -398,6 +436,56 @@ test('il Leviatano: corazza, piloni che lo stordiscono, cuore scoperto, e alla m
   assert.equal(stato.fase, 'gioco');
 });
 
+function mira(stato, bersaglio, y) {
+  const g = giocatore(stato);
+  return { yaw: Math.atan2(bersaglio.x - g.x, bersaglio.z - g.z), pitch: Math.atan2(y - R.ALTEZZA_OCCHI - quota(g.x, g.z), Math.hypot(bersaglio.x - g.x, bersaglio.z - g.z)) };
+}
+
+test("l'inno si suona colpendo le canne col dardo da punti raggiungibili, anche di sbieco: conta la canna colpita", () => {
+  for (const piede of [{ x: DELTA.x, z: DELTA.z - 14 }, { x: DELTA.x - 9, z: DELTA.z - 13.5 }, { x: DELTA.x + 9, z: DELTA.z - 13.5 }]) {
+    const stato = partita();
+    const ab = abisso(stato);
+    ab.passo = PASSO.INNO;
+    Object.assign(giocatore(stato), { armi: ['pistola', 'tridente'], armaAttiva: 'tridente' });
+    const campo = campoVerso(griglia(new Set(stato.porte)), [PARTENZE[0]]);
+    assert.ok(Number.isFinite(distanzaCampo(campo, piede.x, piede.z)));
+    metti(stato, piede);
+    for (const simbolo of ab.inno.sequenza) {
+      const k = ab.inno.canne.indexOf(simbolo);
+      const eventi = avanza(stato, R.PASSO, una('abisso', { cosa: 'dardo', ...mira(stato, CANNE[k], 3) }));
+      eventi.push(...avanza(stato, A.DARDO_ATTESA + 0.1));
+      const nota = eventi.find(e => e.k === 'notaOrgano');
+      assert.equal(nota?.canna, k, `da ${piede.x},${piede.z} la canna ${k} risulta ${nota?.canna}`);
+      assert.equal(nota.giusta, true);
+    }
+    assert.equal(ab.passo, PASSO.LEVIATANO);
+  }
+});
+
+test("i piloni si caricano col dardo dal bordo dell'arena e stordiscono il Leviatano", () => {
+  const stato = partita();
+  const ab = abisso(stato);
+  ab.passo = PASSO.LEVIATANO;
+  ab.inizioLeviatano = 0.05;
+  stato.fase = 'gioco';
+  Object.assign(giocatore(stato), { armi: ['pistola', 'tridente'], armaAttiva: 'tridente' });
+  metti(stato, { x: DELTA.x, z: DELTA.z + 20 });
+  avanza(stato, 0.2 + A.RISVEGLIO);
+  assert.equal(ab.leviatano.fase, 'emerso');
+  ab.leviatano.prossimaImmersione = 999;
+  const campo = campoVerso(griglia(new Set(stato.porte)), [PARTENZE[0]]);
+  PILONI.forEach((p, k) => {
+    const a = Math.atan2(p.z - DELTA.z, p.x - DELTA.x);
+    const piede = { x: DELTA.x + Math.cos(a) * 19.5, z: DELTA.z + Math.sin(a) * 19.5 };
+    assert.ok(Number.isFinite(distanzaCampo(campo, piede.x, piede.z)), `pilone ${k}`);
+    metti(stato, piede);
+    avanza(stato, R.PASSO, una('abisso', { cosa: 'dardo', ...mira(stato, p, quota(p.x, p.z) + 1.5) }));
+    avanza(stato, A.DARDO_ATTESA + 0.1);
+    assert.ok(ab.leviatano.piloni[k] > 0 || ab.leviatano.fase === 'stordito', `pilone ${k} non caricato`);
+  });
+  assert.equal(ab.leviatano.fase, 'stordito');
+});
+
 test('le spazzate dei tentacoli si schivano saltando', () => {
   const stato = partita();
   const ab = abisso(stato);
@@ -475,6 +563,26 @@ test('il condotto porta da Beta a Delta in un lampo e apre l\'anfiteatro', () =>
   assert.equal(g.teletrasporto, tp + 2);
   assert.ok(Math.hypot(g.x - CONDOTTI.beta.a.x, g.z - CONDOTTI.beta.a.z) < 0.01);
   assert.equal(zonaDi(g.x, g.z), 'anfiteatro');
+});
+
+test("dopo un viaggio il condotto si ricarica: l'invito lo dice e torna quando si può ripartire", () => {
+  const stato = partita();
+  Object.assign(stato, { corrente: true });
+  const g = giocatore(stato);
+  compra(stato, 'condotto-beta');
+  avanza(stato, A.CONDOTTO_DURATA + 0.1);
+  assert.equal(zonaDi(g.x, g.z), 'anfiteatro');
+  const invito = () => {
+    metti(stato, posto('condotto-delta'));
+    return interazioneVicina({ id: 'a', x: g.x, z: g.z, su: 0, armi: g.armi, bevande: g.bevande, armaAttiva: g.armaAttiva }, espandi(faiIstantanea(stato)));
+  };
+  assert.match(invito().testo, /si ricarica/);
+  assert.equal(invito().costo, Infinity);
+  avanza(stato, A.CONDOTTO_ATTESA);
+  assert.match(invito().testo, /Premi F/);
+  compra(stato, 'condotto-delta');
+  avanza(stato, A.CONDOTTO_DURATA + 0.1);
+  assert.equal(zonaDi(g.x, g.z), 'reattore');
 });
 
 test("lo Scrigno degli Abissi può dare le armi meraviglia; l'istantanea dell'abisso è valida", () => {

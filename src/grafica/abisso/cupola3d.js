@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { conCaustiche } from './kit.js';
+import { CUPOLA_DELTA } from './anfiteatro3d.js';
 import { ALPHA, BOCCAPORTI_ALPHA, LARGO_BOCCAPORTO, VALVOLE, NODI, PARTI_SCUDO, ZONE_PARTI, ZONE, ACQUISTI, DELTA, quota } from '../../mappe/abisso.js';
 
 export const SU = Object.freeze(new THREE.Vector3(0, 1, 0));
@@ -30,6 +31,8 @@ const Y_TUBI = Object.freeze([2.98, 3.26]);
 const Y_ANELLI = Object.freeze([7.0, 9.4]);
 const Y_ARCHI = 6.75;
 const LAMPADE = Object.freeze([1, 4, 6, -7, -5, -3]);
+const Y_NODO_DELTA = 6.8;
+const R_LUCE_NODO_DELTA = 22.4;
 const LAMPADE_OMBRA = Object.freeze([-7, -3]);
 const AMBRA = 0xffb060;
 const ALLARME = 0xff2a1a;
@@ -1547,9 +1550,13 @@ function nodi(c) {
       const y = tangenteMeridiano(t, a);
       return { m: base(y.clone().cross(z), y, z, sulGuscio(t, a, 0.06)), luce: sulCerchio(a, 12.2, 3.3), cima: sulGuscio(t, a, 0.5) };
     }
-    const rad = radiale(a);
-    const p = v3(centro.x + rad.x * 24.5, 2.6, centro.z + rad.z * 24.5);
-    return { m: base(SU.clone().cross(rad), SU, rad, p), luce: v3(centro.x + rad.x * 23.2, 3.0, centro.z + rad.z * 23.2), cima: p.clone().addScaledVector(rad, 0.5) };
+    const coseno = (Y_NODO_DELTA - CUPOLA_DELTA.centroY) / CUPOLA_DELTA.raggio;
+    const seno = Math.sqrt(1 - coseno * coseno);
+    const normale = v3(seno * Math.cos(a), coseno, seno * Math.sin(a));
+    const su = v3(-coseno * Math.cos(a), seno, -coseno * Math.sin(a));
+    const sulVetro = scosta => v3(centro.x, CUPOLA_DELTA.centroY, centro.z).addScaledVector(normale, CUPOLA_DELTA.raggio + scosta);
+    const luce = v3(centro.x + Math.cos(a) * R_LUCE_NODO_DELTA, Y_NODO_DELTA - 0.6, centro.z + Math.sin(a) * R_LUCE_NODO_DELTA);
+    return { m: base(su.clone().cross(normale), su, normale, sulVetro(0.06)), luce, cima: sulVetro(0.5) };
   });
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   for (let i = 0; i < NODI.length; i++) {

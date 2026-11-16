@@ -1,6 +1,6 @@
 import { BEVANDE, armaBase } from '../regole.js';
 import { quota, nomeBevanda } from '../mappa.js';
-import { BARRE, OGGETTI, SIMBOLI } from '../mappe/abisso.js';
+import { BARRE, NODI, OGGETTI, SIMBOLI } from '../mappe/abisso.js';
 import { A, PASSO, NOMI_PASSI } from './costanti.js';
 
 const MARA = 'RADIO · NAVE NEREIDE — Mara Lenzi';
@@ -11,7 +11,7 @@ export const DIALOGHI = Object.freeze({
   corrente: [SANDRI, 'Giorno 211. Se le turbine girano, qualcuno è sceso a cercarci. Non avreste dovuto.', 'Le quattro valvole della Cupola: giratele nell\'ordine in cui si accendono i manometri. Il Protocollo Abisso è l\'unica speranza.'],
   protocollo: [SANDRI, 'Il Protocollo è attivo. Sentite la sirena? Lui la sente ancora meglio.', 'Allagate il pozzo del reattore dal pannello e strappate le tre barre di oricalco dalle turbine. Trattenete il fiato.'],
   allagamento: [MARA, 'L\'acqua invade il pozzo! Avete aria per una ventina di secondi.', 'Spazio per nuotare in su, C per scendere: tornate in superficie a respirare.'],
-  barre: [SANDRI, 'Oricalco puro… il metallo di Atlantide. La fucina del reattore ne farà il Cannone di Cariddi.', 'I nodi parassiti succhiano la pressione dalle vetrate: implodete il globo di Cariddi lì vicino e raccoglieteli.'],
+  barre: [SANDRI, 'Oricalco puro… il metallo di Atlantide. La fucina del reattore ne farà il Cannone di Cariddi.', 'I nodi parassiti succhiano la pressione dalle vetrate: due sulla Cupola d\'Ingresso, due sulla cupola dell\'Anfiteatro. Implodete lì sotto il globo di Cariddi e raccoglieteli.'],
   nodi: [SANDRI, 'Le vetrate respirano di nuovo. Ma il Nucleo Abissale è dentro lo scafandro del Palombaro.', 'Attiratelo nella Camera Stagna, sigillatela dal quadro e decomprimete. Nessun ottone regge l\'abisso.'],
   palombaro: [MARA, 'Sui sensori c\'è qualcosa di pesante: un palombaro corazzato!', 'Le bombole sulla schiena sono il suo punto debole. Attenti all\'arpione e al vapore.'],
   nucleo: [SANDRI, 'Il Nucleo! Ancora caldo. Portatelo all\'altare di Poseidone nel Santuario.', 'Gli atlantidei vi daranno ciò che spetta a chi scende così in basso.'],
@@ -106,6 +106,7 @@ export function descrivi(a, io, vista) {
       return nessuno("Altare di Poseidone: al centro c'è un incavo vuoto");
     case 'condotto':
       if (!vista.corrente) return nessuno('Condotto di propulsione: senza le turbine è fermo');
+      if (ab.giocatori[io.id]?.ricaricaCondotto > 0) return nessuno(`Condotto di propulsione: si ricarica, ${Math.ceil(ab.giocatori[io.id].ricaricaCondotto)} s`);
       return { costo: 0, testo: `Premi F per lanciarti nel condotto verso ${NOMI_CONDOTTI[a.meta]}` };
     case 'consolle':
       if (ab.passo === PASSO.INNO) return nessuno(`Organo idraulico: guardate le colonne e suonate con il fulmine (${ab.inno.progresso}/5)`);
@@ -128,8 +129,9 @@ export function obiettivo(vista, mioId) {
     case PASSO.IMMERSIONE:
       return ab.allagamento.livello < 0.95 ? 'Reattore: allagate il pozzo dal pannello' : `Estraete le barre di oricalco: ${ab.barre.filter(Boolean).length}/3`;
     case PASSO.PURIFICAZIONE: {
-      const caduti = ab.nodi.filter(n => n > 0).length;
-      return `Nodi parassiti: abbattuti ${caduti}/4, raccolti ${ab.nodi.filter(n => n === 2).length}/4`;
+      const restano = NODI.map((n, i) => (ab.nodi[i] === 0 ? n.zona : null)).filter(Boolean);
+      const dove = restano.length ? ` · sulle vetrate: ${[['cupola', 'Cupola'], ['anfiteatro', 'Anfiteatro']].map(([z, nome]) => [restano.filter(q => q === z).length, nome]).filter(([n]) => n).map(([n, nome]) => `${n} ${nome}`).join(', ')}` : '';
+      return `Nodi parassiti: abbattuti ${4 - restano.length}/4, raccolti ${ab.nodi.filter(n => n === 2).length}/4${dove}`;
     }
     case PASSO.AUTOPSIA:
       if (ab.nucleo === 0) return 'Attirate il Palombaro nella Camera Stagna e decomprimete';
