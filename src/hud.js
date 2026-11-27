@@ -5,6 +5,7 @@ import { obiettivoVoto } from './piazza/cronaca.js';
 import { creaSalaScelte } from './salaScelte.js';
 import { obiettivo as obiettivoPalude, secondario as secondarioPalude } from './palude.js';
 import { obiettivo as obiettivoAbisso } from './abisso.js';
+import { obiettivo as obiettivoStazione } from './stazione.js';
 import { creaHudAbisso } from './abisso/hud.js';
 
 const BOSS = Object.freeze(['leviatano', 'arachne', 'divoratore', 'custode', 'guardiano', 'sciamano', 'preside', 'capitano', 'palombaro']);
@@ -42,6 +43,7 @@ function obiettivo(vista, mioId) {
   if (vista.palude) return obiettivoPalude(vista, mioId);
   if (vista.piazza) return obiettivoPiazza(vista, mioId);
   if (vista.abisso) return obiettivoAbisso(vista, mioId);
+  if (vista.stazione) return obiettivoStazione(vista);
   if (vista.mappa !== 'scuola') return '';
   const m = vista.missione;
   if (!m || vista.fase === 'attesa' || vista.fase === 'vinta' || vista.round === 0) return '';

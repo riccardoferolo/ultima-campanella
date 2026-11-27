@@ -12,6 +12,7 @@ import * as teatro from './teatro.js';
 import * as palude from './palude.js';
 import * as piazza from './piazza.js';
 import * as abisso from './abisso.js';
+import * as stazione from './stazione.js';
 import { muoviCerchio, vistaLibera, indiceScatole, scatoleTra, scatoleIntorno } from './fisica.js';
 import { direzioneDa } from './colpi.js';
 import { griglia, nuovoCalcolo, avanzaCalcolo, campoDa, direzione } from './navigazione.js';
@@ -112,6 +113,7 @@ export function creaPartita({ seme, giocatori = [], sala = false, mappa = 'scuol
     palude: nomeMappa === 'palude' ? palude.statoIniziale() : null,
     piazza: nomeMappa === 'piazza' ? piazza.statoIniziale() : null,
     abisso: nomeMappa === 'abisso' ? abisso.statoIniziale(seme) : null,
+    stazione: nomeMappa === 'stazione' ? stazione.statoIniziale() : null,
     finale: null,
   };
   giocatori.forEach(g => aggiungiGiocatore(stato, g));
@@ -204,6 +206,7 @@ function compra(stato, giocatore, idAcquisto, armaInMano, eventi) {
   if (stato.palude && palude.compra(stato, giocatore, acquisto, eventi, S)) return;
   if (stato.piazza && piazza.compra(stato, giocatore, acquisto, eventi, S)) return;
   if (stato.abisso && abisso.compra(stato, giocatore, acquisto, eventi, S)) return;
+  if (stato.stazione && stazione.compra(stato, giocatore, acquisto, eventi, S)) return;
   if (acquisto.tipo === 'munizioni') {
     const costo = ARMI[giocatore.armaAttiva]?.potenziata ? R.COSTO_MUNIZIONI_POTENZIATE : R.COSTO_MUNIZIONI;
     if (giocatore.punti < costo) return;
@@ -486,6 +489,7 @@ function danneggia(stato, giocatore, zombie, dannoRichiesto, opzioni, eventi) {
   if (stato.palude) palude.suUccisione(stato, zombie, giocatore, eventi);
   if (stato.piazza) piazza.suUccisione(stato, zombie, eventi, S);
   if (stato.abisso) abisso.suUccisione(stato, zombie, opzioni, eventi);
+  if (stato.stazione) stazione.suUccisione(stato, zombie, eventi, S);
   if (dati.boss) bossUcciso(stato, zombie, eventi);
   else forseBonus(stato, zombie, eventi);
 }
@@ -916,7 +920,7 @@ function avanzaFase(stato, dt, eventi) {
       eventi.push({ k: 'boss', tipo: 'preside', fusibile: stato.missione.presideFusibile });
     }
   }
-  const generatore = stato.missione?.generatore === 'acceso' || (!!stato.giungla && giungla.difesaAttiva(stato)) || (!!stato.palude && palude.difesaAttiva(stato)) || (!!stato.piazza && piazza.difesaAttiva(stato));
+  const generatore = stato.missione?.generatore === 'acceso' || (!!stato.giungla && giungla.difesaAttiva(stato)) || (!!stato.palude && palude.difesaAttiva(stato)) || (!!stato.piazza && piazza.difesaAttiva(stato)) || (!!stato.stazione && stazione.difesaAttiva(stato));
   if (generatore && stato.daGenerare < 2) stato.daGenerare = 2;
   stato.attesaComparsa -= dt;
   const presenti = stato.zombie.filter(z => z.stato !== 'morto').length;
@@ -1227,6 +1231,7 @@ export function passo(stato, dt, { posizioni = {}, azioni = [] } = {}) {
   if (stato.palude) palude.aggiorna(stato, dt, eventi, S);
   if (stato.piazza) piazza.aggiorna(stato, dt, eventi);
   if (stato.abisso) abisso.aggiorna(stato, dt, eventi, S);
+  if (stato.stazione) stazione.aggiorna(stato, dt, eventi, S);
   if (stato.fase === 'vinta') return eventi;
   if (stato.giocatori.length > 0 && vivi(stato).length === 0 && !(stato.abisso && abisso.rialzoInArrivo(stato))) {
     stato.fase = 'fine';

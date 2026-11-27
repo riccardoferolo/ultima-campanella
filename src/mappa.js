@@ -4,10 +4,11 @@ import * as teatro from './mappe/teatro.js';
 import * as palude from './mappe/palude.js';
 import * as piazza from './mappe/piazza.js';
 import * as abisso from './mappe/abisso.js';
+import * as stazione from './mappe/stazione.js';
 
-export const MAPPE = Object.freeze({ scuola, giungla, teatro, palude, piazza, abisso });
+export const MAPPE = Object.freeze({ scuola, giungla, teatro, palude, piazza, abisso, stazione });
 export const ELENCO_MAPPE = Object.freeze(Object.keys(MAPPE));
-export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla', teatro: "Il Teatro dell'Eclissi", palude: 'Bayou Vermillion', piazza: 'Piazza di Cerano', abisso: 'Abyssus-9' });
+export const NOMI_MAPPE = Object.freeze({ scuola: 'La scuola', giungla: 'Il tempio nella giungla', teatro: "Il Teatro dell'Eclissi", palude: 'Bayou Vermillion', piazza: 'Piazza di Cerano', abisso: 'Abyssus-9', stazione: 'Area di servizio Agogna' });
 const PIANO = () => 0;
 const NESSUN_NOME = Object.freeze({});
 
