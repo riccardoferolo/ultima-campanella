@@ -9,6 +9,8 @@ import { costruisciTeatro } from './teatro3d.js';
 import { costruisciPalude } from './palude3d.js';
 import { costruisciPiazza } from './piazza3d.js';
 import { costruisciAbisso } from './abisso3d.js';
+import { costruisciStazione } from './stazione3d.js';
+import { caricaRisorseStazione } from './stazione/risorse.js';
 import { caricaRisorseAbisso } from './abisso/kit.js';
 import { creaPost } from './abisso/post.js';
 import { vestiAbissale, creaPolso } from './abisso/armi3d.js';
@@ -253,14 +255,15 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const palude = mappa === 'palude';
   const piazza = mappa === 'piazza';
   const abisso = mappa === 'abisso';
-  const scuola = !giungla && !teatro && !palude && !piazza && !abisso;
+  const stazione = mappa === 'stazione';
+  const scuola = !giungla && !teatro && !palude && !piazza && !abisso && !stazione;
   const atmosfera = ATMOSFERA;
   const scena = new THREE.Scene();
   scena.background = new THREE.Color(atmosfera.buio);
   scena.fog = new THREE.Fog(atmosfera.buio, atmosfera.nebbiaVicino, atmosfera.nebbiaDentro);
-  const cieloEmisfero = giungla ? 0x7fa392 : teatro ? 0x8a7a6c : palude ? 0x8aa894 : piazza ? 0x7a88a8 : abisso ? 0x4a8fa8 : 0x7f8ea3;
+  const cieloEmisfero = giungla ? 0x7fa392 : teatro ? 0x8a7a6c : palude ? 0x8aa894 : piazza ? 0x7a88a8 : abisso ? 0x4a8fa8 : stazione ? 0x6f7c98 : 0x7f8ea3;
   const terraEmisfero = giungla ? 0x15200f : palude ? 0x141a10 : abisso ? 0x061016 : 0x1b150f;
-  const emisfero = new THREE.HemisphereLight(cieloEmisfero, terraEmisfero, giungla ? 0.6 : teatro ? 0.42 : palude ? 0.85 : piazza ? 0.5 : 0.55);
+  const emisfero = new THREE.HemisphereLight(cieloEmisfero, terraEmisfero, giungla ? 0.6 : teatro ? 0.42 : palude ? 0.85 : piazza ? 0.5 : stazione ? 0.4 : 0.55);
   scena.add(emisfero);
   const luna = new THREE.DirectionalLight(abisso ? 0x6fc4e0 : 0x7088b8, abisso ? 0.35 : 0.6);
   luna.position.set(-20, 30, -30);
@@ -287,7 +290,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
   const texture = creaTexture();
   const [libreria, risorseZombi, personaggi, oggetti, reali, modelliGiungla] = await Promise.all([
     caricaArmi(), caricaZombi(), caricaPersonaggi(), caricaOggetti(),
-    abisso ? caricaRisorseAbisso(renderer, { piene: q.texturePiene }) : caricaTextureReali(giungla ? TEXTURE_GIUNGLA : teatro ? TEXTURE_TEATRO : palude ? TEXTURE_PALUDE : piazza ? TEXTURE_PIAZZA : TEXTURE_SCUOLA, { piene: q.texturePiene }), giungla || palude ? caricaGiungla() : null,
+    abisso ? caricaRisorseAbisso(renderer, { piene: q.texturePiene }) : stazione ? caricaRisorseStazione(renderer, { piene: q.texturePiene }) : caricaTextureReali(giungla ? TEXTURE_GIUNGLA : teatro ? TEXTURE_TEATRO : palude ? TEXTURE_PALUDE : piazza ? TEXTURE_PIAZZA : TEXTURE_SCUOLA, { piene: q.texturePiene }), giungla || palude ? caricaGiungla() : null,
   ]);
   const mappaPrima = mappaAttiva;
   usaMappa(mappa);
@@ -300,6 +303,10 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
     scena.environment = reali.ambiente;
     scena.environmentIntensity = 0.58;
   }
+  if (stazione && reali.ambiente) {
+    scena.environment = reali.ambiente;
+    scena.environmentIntensity = 0.32;
+  }
   const mondoMappa = giungla
     ? costruisciGiungla(scena, { reali, materialiArmi, oggetti, modelli: modelliGiungla, luciAccese: q.luci })
     : teatro
@@ -310,14 +317,16 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
           ? costruisciPiazza(scena, { reali, texture, materialiArmi, oggetti, luciAccese: q.luci })
           : abisso
             ? costruisciAbisso(scena, { risorse: reali, materialiArmi, oggetti, luciAccese: q.luci, qualita: { ...q, ombre: livello === 'alta', trasmissione: false }, effetti, emisfero, camera })
-            : costruisciScuola(scena, texture, materialiArmi, oggetti, reali, { luciAccese: q.luci });
+            : stazione
+              ? costruisciStazione(scena, { reali, texture, materialiArmi, oggetti, luciAccese: q.luci })
+              : costruisciScuola(scena, texture, materialiArmi, oggetti, reali, { luciAccese: q.luci });
   if (scuola) {
     costruisciArredi(scena, oggetti);
     costruisciSala(scena);
   }
   const bonus3d = creaBonus3d(scena);
   const segreti = scuola ? creaSegreti(scena) : vuoto;
-  const animali = q.animali && !teatro && !piazza && !abisso ? creaAnimali(scena, mappa) : { aggiorna() {}, svuota() {} };
+  const animali = q.animali && !teatro && !piazza && !abisso && !stazione ? creaAnimali(scena, mappa) : { aggiorna() {}, svuota() {} };
   function applicaDensita() {
     scena.traverse(o => {
       if (o.isInstancedMesh && o.userData.pieni) o.count = Math.max(1, Math.round(o.userData.pieni * q.densita));
@@ -586,6 +595,7 @@ export async function creaMondo(contenitore, mappa = mappaAttiva, { suQualita = 
     effetti,
     ragnatela: (x, z, raggio) => ragnatele.scoppio(x, z, raggio),
     campane: () => mondoMappa.campane?.(),
+    stazione: mondoMappa.stazione ?? null,
     evento: (e, vista) => mondoMappa.evento?.(e, vista),
     colpitoSchermo: forza => post?.colpito(forza),
     smembra: id => zombi.smembra(id),

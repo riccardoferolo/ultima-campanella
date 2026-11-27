@@ -6,6 +6,7 @@ import { quota } from '../mappa.js';
 import { PROCEDURALI, decoraBruto } from './palude/ragni3d.js';
 import { creaOcchi, altezzaLevitazione } from './palude/occhi3d.js';
 import { decoraCapitano } from './piazza/capitano3d.js';
+import { decoraCamionista } from './stazione/camionista3d.js';
 import { PROCEDURALI_ABISSO } from './abisso/leviatano3d.js';
 import { decoraAnfibio, decoraSommozzatore, decoraElettrico, decoraPalombaro } from './abisso/creature3d.js';
 
@@ -72,6 +73,11 @@ const MODELLI = Object.freeze({
     url: './modelli/zombie.glb', scala: 0.015, tinta: 0x9a8a80, alto: 2.15, raggio: 0.56, raggioTesta: 0.25, reazione: 0.35, decora: decoraCapitano,
     clip: { cammina: 'cammina', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
     velocita: { cammina: 0.8, corre: 0.9, attacco: 1.1, attacco2: 1.1, muore: 0.8, fermo: 0.8 },
+  },
+  camionista: {
+    url: './modelli/zombie.glb', scala: 0.0158, tinta: 0x8e7a6c, alto: 2.25, raggio: 0.6, raggioTesta: 0.26, reazione: 0.3, decora: decoraCamionista,
+    clip: { cammina: 'cammina2', corre: 'corre', attacco: 'attacco', attacco2: 'attacco2', muore: 'muore', fermo: 'fermo' },
+    velocita: { cammina: 0.78, corre: 0.88, attacco: 1.05, attacco2: 1.05, muore: 0.75, fermo: 0.8 },
   },
   anfibio: {
     url: './modelli/zombie.glb', scala: 0.0102, tinta: 0x86a8a4, decora: decoraAnfibio,
