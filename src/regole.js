@@ -291,6 +291,7 @@ export const TIPI_ZOMBIE = Object.freeze({
   bruto: Object.freeze({ mappa: 'palude', nome: 'Bruto corazzato', vita: 4.5, velocita: 0.8, danno: 1.8, portata: 1.25, punti: 4, rompe: 2.5, carica: 1.3, corazza: 0.3 }),
   arachne: Object.freeze({ nome: 'Arachne, la Tessitrice', vita: 1, velocita: 1, danno: 2.2, portata: 2.2, punti: 40, boss: true, finale: true, soglie: Object.freeze([0.5, 0.2]) }),
   capitano: Object.freeze({ mappa: 'piazza', nome: 'Il Capitano del Visconti', vita: 24, velocita: 1, danno: 2, portata: 1.5, punti: 15, boss: true, carica: 1.5, infuria: 0.5 }),
+  camionista: Object.freeze({ mappa: 'stazione', nome: 'Il Camionista', vita: 30, velocita: 1, danno: 2.1, portata: 1.55, punti: 20, boss: true, carica: 1.6, rompe: 3, infuria: 0.45 }),
   anfibio: Object.freeze({ mappa: 'abisso', nome: 'Marinaio annegato', vita: 1, velocita: 1, danno: 1, portata: 1, punti: 1 }),
   sommozzatore: Object.freeze({ mappa: 'abisso', nome: 'Sommozzatore corrotto', vita: 0.75, velocita: 1.15, danno: 1.1, portata: 1.05, punti: 1.2, corre: true }),
   elettrico: Object.freeze({ mappa: 'abisso', nome: 'Annegato elettrico', vita: 0.9, velocita: 1.2, danno: 1.25, portata: 1, punti: 1.3, corre: true }),

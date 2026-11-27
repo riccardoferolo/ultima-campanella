@@ -7,6 +7,7 @@ import { RUNE } from './storia.js';
 import { descrivi as descriviPalude } from './palude.js';
 import { COSTO_CAMPANILE, COSTO_CAMPANE, STORDIMENTO_CAMPANE, TEMPO_CELLA, VOTO, campaneBenedette } from './piazza.js';
 import { descrivi as descriviAbisso } from './abisso.js';
+import { descrivi as descriviStazione } from './stazione.js';
 
 const DISTANZA_OGGETTO = 1.8;
 const PORTE_CHIUSE = Object.freeze({
@@ -247,6 +248,8 @@ function descrivi(a, io, vista) {
   if (piazza) return piazza;
   const abisso = vista.abisso ? descriviAbisso(a, io, vista) : null;
   if (abisso) return abisso;
+  const stazione = vista.stazione ? descriviStazione(a, io, vista) : null;
+  if (stazione) return stazione;
   if (a.tipo === 'arma') {
     const possiede = io.armi.some(x => armaBase(x) === a.arma);
     const costo = possiede ? a.munizioni : a.costo;

@@ -16,6 +16,7 @@ import { DURATA_BEVUTA } from './grafica/vista1p.js';
 import { illuminaTeschio } from './grafica/teschio3d.js';
 import { ARMA_ELEMENTO, bersagliPalude, invischiato } from './palude.js';
 import { eventoPalude, trofeoPalude } from './palude/eventi.js';
+import { eventoStazione, TESTO_VIA as VIA_STAZIONE, TESTO_BOSS_UCCISO as UCCISO_STAZIONE, IMPRESA as IMPRESA_STAZIONE } from './stazione/eventi.js';
 import { interazioneVicina } from './interazioni.js';
 import { creaPartita, passo, aggiungiGiocatore, rimuoviGiocatore } from './partita.js';
 import { faiIstantanea, espandi, interpola } from './istantanea.js';
@@ -58,7 +59,7 @@ const PORTATA_TRACCIA = 30;
 const FERMATI_PRIMA = 0.55;
 const COLPITI_COLTELLO = 2;
 const COLPITI_RELIQUIA = 3;
-const BOSS_MINORI = new Set(['preside', 'sciamano', 'guardiano', 'capitano']);
+const BOSS_MINORI = new Set(['preside', 'sciamano', 'guardiano', 'capitano', 'camionista']);
 const RAGGIO_LAMPADARIO = 1.4;
 const HOST_PERSO_MS = 8000;
 const AVVISO_HOST_PERSO_MS = 6000;
@@ -75,12 +76,14 @@ const TESTI_BOSS_UCCISO = {
   sciamano: 'Lo Sciamano è caduto!',
   guardiano: 'Il Guardiano del Sole è caduto: ha lasciato una spada!',
   capitano: 'Il Capitano del Visconti è caduto: Cerano è salva!',
+  camionista: UCCISO_STAZIONE,
 };
 const TESTI_VIA = {
   giungla: 'Si comincia! La giungla non perdona',
   teatro: 'Si va in scena! Il sipario è chiuso: il generatore è sul palco',
   piazza: 'Piazza Crespi, Cerano: la corrente è saltata, il quadro è in sacrestia',
   abisso: 'Stazione Abyssus-9, undicimila metri sotto il mare: riaccendete le turbine',
+  stazione: VIA_STAZIONE,
 };
 const FASI_DIVORATORE = {
   2: 'Il Divoratore si copre di scaglie: rompetele con le reliquie!',
@@ -338,7 +341,9 @@ function mostraFine(evento) {
     ? `Avete abbattuto il Divoratore e siete decollati dalla giungla al round ${evento.round}`
     : mappaAttiva === 'palude'
       ? `Avete sepolto Arachne sotto il Bayou Vermillion al round ${evento.round}`
-      : `Avete suonato l'ultima campanella e abbattuto il Custode al round ${evento.round}`;
+      : mappaAttiva === 'stazione'
+        ? IMPRESA_STAZIONE(evento.round)
+        : `Avete suonato l'ultima campanella e abbattuto il Custode al round ${evento.round}`;
   $('t-dettaglio').textContent = evento.vinto
     ? `${impresa}${evento.durata ? ` dopo ${minuti}:${secondi} di battaglia` : ''}.${mappaAttiva === 'palude' ? ` ${trofeoPalude()}` : ''}`
     : evento.round > 1 ? `Siete sopravvissuti fino al round ${evento.round}.` : 'Non siete andati oltre il primo round.';
@@ -361,6 +366,7 @@ function suEventi(eventi) {
   for (const e of eventi) {
     const perMe = e.a === s.mioId;
     if (mappaAttiva === 'palude' && mondo && eventoPalude(e, { hud, audio, mondo, perMe, nomeDi, io })) continue;
+    if (mappaAttiva === 'stazione' && mondo && eventoStazione(e, { hud, audio, mondo, perMe, nomeDi, io })) continue;
     if (mappaAttiva === 'abisso' && mondo && s.vista && abissoClient.evento(e, { hud, audio, mondo, perMe, vista: s.vista, io, mioId: s.mioId })) continue;
     switch (e.k) {
       case 'round':

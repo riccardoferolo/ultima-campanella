@@ -3,6 +3,7 @@ import { ELENCO_MAPPE } from '../mappa.js';
 import { LUNGHEZZA_STATO } from '../giungla.js';
 import { LUNGHEZZA_MISSIONE } from '../palude.js';
 import { valida as validaAbisso, validaAzione as validaAzioneAbisso } from '../abisso.js';
+import { valida as validaStazione } from '../stazione.js';
 
 const LETTERE = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const NOME_MASSIMO = 16;
@@ -70,7 +71,8 @@ function eIstantanea(ist) {
     && (ist.cq === undefined || (Array.isArray(ist.cq) && ist.cq.length === 2 && ist.cq.every(numero)))
     && (ist.cv === undefined || (Array.isArray(ist.cv) && ist.cv.length === 4 && ist.cv.every(numero)))
     && [ist.ts, ist.tg, ist.cs].every(e => e === undefined || (Array.isArray(e) && e.every(v => Array.isArray(v) && v.length === 2 && testo(v[0]) && numero(v[1]))))
-    && validaAbisso(ist);
+    && validaAbisso(ist)
+    && validaStazione(ist);
 }
 
 function eAzione(a) {

@@ -9,6 +9,7 @@ const DESCRIZIONI_MAPPA = Object.freeze({
   palude: 'Il bayou di notte: passerelle, baracche, il cimitero dei relitti e il Teschio di Malakor.',
   piazza: 'Piazza Crespi a Cerano: la chiesa della Natività, il Municipio, il campanile di 45 metri e le sue campane.',
   abisso: 'La Cattedrale degli Abissi: una stazione sul fondo della Fossa, le rovine di Atlantide, il Tridente di Poseidone e il Leviatano.',
+  stazione: "Un autogrill sull'A4 nella nebbia, alle tre di notte: pompe, market, officina, la torre faro e il Camionista.",
 });
 const SFONDI_MAPPA = Object.freeze({
   scuola: 'linear-gradient(180deg, #121a2e 0%, #2a2f45 60%, #3b3326 100%)',
@@ -17,8 +18,16 @@ const SFONDI_MAPPA = Object.freeze({
   palude: 'linear-gradient(180deg, #0c1712 0%, #1b3124 55%, #14211a 100%)',
   piazza: 'linear-gradient(180deg, #0a1224 0%, #1d2a44 55%, #4a3418 100%)',
   abisso: 'linear-gradient(180deg, #020a10 0%, #06303e 55%, #0a1a22 100%)',
+  stazione: 'linear-gradient(180deg, #07090f 0%, #1a2230 55%, #3a2c12 100%)',
 });
 const DISEGNI_MAPPA = Object.freeze({
+  stazione: '<svg viewBox="0 0 120 60"><rect width="120" height="60" fill="#0b0f18"/><rect y="48" width="120" height="12" fill="#22252b"/>'
+    + '<rect x="10" y="16" width="64" height="5" fill="#d8dde2"/><rect x="10" y="20" width="64" height="2" fill="#e2312f"/><g fill="#fff6d8" opacity="0.25"><path d="M14 22 H70 L78 48 H6 Z"/></g>'
+    + '<g fill="#5c6670"><rect x="14" y="22" width="2" height="26"/><rect x="68" y="22" width="2" height="26"/></g><g fill="#c9ced4"><rect x="26" y="36" width="6" height="12"/><rect x="50" y="36" width="6" height="12"/></g>'
+    + '<g fill="#e2312f"><rect x="27" y="38" width="4" height="3"/><rect x="51" y="38" width="4" height="3"/></g><rect x="84" y="6" width="10" height="42" fill="#30353d"/>'
+    + '<rect x="85" y="8" width="8" height="10" fill="#ffd84a"/><g fill="#0b0f18"><rect x="86" y="20" width="6" height="3"/><rect x="86" y="25" width="6" height="3"/></g>'
+    + '<g fill="#9be15d"><rect x="86.5" y="20.5" width="5" height="2"/><rect x="86.5" y="25.5" width="5" height="2"/></g><rect x="100" y="30" width="18" height="18" fill="#3a3f47"/>'
+    + '<rect x="102" y="40" width="6" height="8" fill="#ffe9a8" opacity="0.6"/><rect y="44" width="120" height="3" fill="#8a8f96" opacity="0.4"/></svg>',
   abisso: '<svg viewBox="0 0 120 60"><rect width="120" height="60" fill="#03141c"/><g fill="#2fd0ff" opacity="0.18"><path d="M20 0 L32 60 L26 60 L14 0 Z"/><path d="M74 0 L90 60 L82 60 L68 0 Z"/></g>'
     + '<path d="M0 52 Q20 44 40 50 T80 48 T120 52 V60 H0 Z" fill="#0a2630"/><path d="M30 52 A30 30 0 0 1 90 52 Z" fill="#0b3a4a" stroke="#7fe4ff" stroke-width="1" opacity="0.9"/>'
     + '<g stroke="#c4954a" stroke-width="1.2" fill="none"><path d="M60 22 V52"/><path d="M45 26 Q52 36 50 52"/><path d="M75 26 Q68 36 70 52"/><path d="M33 42 Q60 34 87 42"/></g>'

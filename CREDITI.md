@@ -9,5 +9,6 @@
 | `aliene.glb` | «Sci-Fi Essentials Kit», Quaternius | CC0 |
 | `arredi.glb`, `giungla.glb`, `public/texture/*` | Poly Haven (polyhaven.com) | CC0 |
 | `public/abisso/texture/*`, `public/abisso/hdri/notte.hdr` (Abyssus-9) | Poly Haven (polyhaven.com), scaricate da `scripts/abisso/scarica-risorse.mjs` | CC0 |
+| `public/stazione/texture/*`, `public/stazione/hdri/notte.hdr`, `public/stazione/modelli.glb` (Area di servizio Agogna; elenco in `public/stazione/fonti.json`) | Poly Haven (polyhaven.com), scaricati e compressi da `scripts/stazione/scarica-risorse.mjs` | CC0 |
 
 Le armi, i nomi, la mappa e le regole del gioco sono originali.
