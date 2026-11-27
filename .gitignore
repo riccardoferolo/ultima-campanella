@@ -6,6 +6,7 @@ _lavoro/*
 !_lavoro/vetrina3.mjs
 !_lavoro/teatro.mjs
 !_lavoro/piazza.mjs
+!_lavoro/stazione.mjs
 !_lavoro/voto.mjs
 !_lavoro/collaudo-voto.mjs
 !_lavoro/bellezza.mjs

@@ -19,7 +19,7 @@ npm test
 - Difficoltà a crescere: nei primi tre round solo zombie che camminano, poi arrivano gli Scuoiati e i corridori
   (20% in più a round); nella giungla vita, numero, danno e velocità salgono dal 4° al 9° round fino al massimo.
 - Zombie fluidi: simulazione a passo fisso con disegno interpolato fra gli ultimi due passi.
-- Cinque mappe: La scuola, Il tempio nella giungla, Il Teatro dell'Eclissi, Bayou Vermillion e la Piazza di Cerano. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
+- Sette mappe: La scuola, Il tempio nella giungla, Il Teatro dell'Eclissi, Bayou Vermillion, la Piazza di Cerano, Abyssus-9 e l'Area di servizio Agogna. Nella giungla i confini sono vegetazione vera (ciuffi di foglie,
   alberi con la chioma che sporge, palme e felci) e la mappa è piena di animaletti che scappano quando arrivi:
   pappagalli sulle palme, pipistrelli in grotta e nel tempio, lucciole, farfalle blu, rane sulle ninfee del fiume;
   nella scuola corvi e pipistrelli.
@@ -151,6 +151,29 @@ transenne di via Vittime della Mafia, del vicolo delle Scuole, della strada vers
   campane gratis ogni 30 secondi. Le date della cronaca vengono dalle voci di Wikipedia su Cerano, sulla chiesa e sul
   Beato Pacifico.
 
+### Area di servizio Agogna
+
+Mappa piccola e notturna: un'area di servizio sulla A4 Torino-Milano fra Novara Ovest e Biandrate, a corrente
+saltata, con l'Isoradio che racconta la chiusura dell'autostrada. Si parte sul piazzale sotto la pensilina
+NOVAPETROLI, fra le tre isole di erogatori, il totem dei prezzi e le auto abbandonate; gli zombie scavalcano il
+guardrail dell'autostrada, la recinzione dei campi e le finestre sbarrate.
+
+- **Market e bar** (porte scorrevoli, 750): scaffali, frigo delle bibite, banco del bar, la cassa delle armi a sorpresa e
+  il magazzino sul retro (1000).
+- **Officina e gommista** (serranda 1000, o porta interna 750 dal market): ponte sollevatore, pneumatici, carrelli
+  degli attrezzi, il quadro elettrico che riaccende la corrente e il potenziatore in fondo.
+- **Parcheggio dei camion** (porte sul retro, 1000): rimorchio, autocisterna, container, la torre faro col suo
+  gruppo elettrogeno.
+- **Mini-missione**: tre taniche di benzina nascoste fra market, officina e parcheggio; versate nel gruppo
+  elettrogeno, lo si avvia durante un round e lo si difende per 60 secondi restandogli vicini. La torre faro
+  s'accende, un camion sfonda la recinzione in fondo al parcheggio e ne scende il **Camionista** (berretto, gilet
+  arancione e catena): boss lento che carica, rompe le barricate e s'infuria a metà vita. Abbatterlo vince la partita.
+- **Trappola**: con la corrente, il pulsante d'emergenza degli erogatori (1500) allaga di benzina la pensilina e le dà
+  fuoco per 15 secondi; brucia anche chi ci resta sotto.
+- **Resa grafica**: texture, cielo notturno (HDRI) e modelli veri da Poly Haven (taniche, gruppo elettrogeno,
+  pneumatici, new jersey, fusti, lampioni, fari, cassa, attrezzi), scaricati e compressi da
+  `scripts/stazione/scarica-risorse.mjs` in `public/stazione/` (`--da-capo` per riscaricare tutto).
+
 ## Strumenti
 
 `_lavoro/` contiene gli script di collaudo e di conversione (Playwright con Edge, server Vite su 5421):
@@ -159,6 +182,7 @@ transenne di via Vittime della Mafia, del vicolo delle Scuole, della strada vers
 - `vetrina3.mjs`, `mani.mjs` – schermate di sala, armi in mano, zombie e mappa;
 - `teatro.mjs` – giro di foto del Teatro dell'Eclissi (Edge su GPU) e misura degli fps in platea con un'orda;
 - `piazza.mjs` – giro di foto della Piazza di Cerano, dentro e fuori, fino alla cella campanaria;
+- `stazione.mjs` – giro di foto dell'Area di servizio Agogna, dal buio alla torre faro, al Camionista e all'incendio;
 - `bellezza.mjs` – stesse viste fisse della piazza prima e dopo un lavoro grafico (`node bellezza.mjs <cartella>`), con
   gli fps di ogni vista;
 - `voto.mjs`, `collaudo-voto.mjs` – foto degli ingombri e del Voto del Beato con gli spari veri all'orologio, e la
