@@ -1,0 +1,33 @@
+{
+  "texture": {
+    "asfalto": "asphalt_02",
+    "officina": "garage_floor",
+    "piastrelle": "large_grey_tiles",
+    "intonaco": "painted_plaster_wall",
+    "lamiera": "corrugated_iron_02",
+    "serranda": "painted_metal_shutter",
+    "cemento": "concrete_wall_008",
+    "erba": "sparse_grass",
+    "metallo": "metal_plate"
+  },
+  "hdri": "rogland_moonlit_night",
+  "modelli": [
+    "metal_jerrycan",
+    "portable_generator",
+    "old_tyre",
+    "concrete_road_barrier",
+    "Barrel_01",
+    "street_lamp_01",
+    "security_light",
+    "CashRegister_01",
+    "WetFloorSign_01",
+    "tool_cart",
+    "cardboard_box_01",
+    "plastic_crate_01",
+    "metal_toolbox",
+    "tire_pump",
+    "mounted_fluorescent_lights",
+    "hand_truck"
+  ],
+  "licenza": "CC0 (polyhaven.com)"
+}
