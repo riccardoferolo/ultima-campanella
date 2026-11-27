@@ -336,6 +336,18 @@ const SCENE = Object.freeze({
     chiuso: { taglio: 900, volume: 0.4, umido: 0.35 },
     sottoMusica: 0,
   },
+  stazione: {
+    letti: [{ chiave: 's_vento', volume: 0.16, bus: 'esterno' }, { chiave: 's_neon', volume: 0.1, bus: 'interno' }],
+    eventi: [
+      { chiave: 'a_corvo', ogni: 40, spazio: [25, 50], volume: 0.18, bus: 'esterno' },
+      { chiave: 'a_gufo', ogni: 30, spazio: [20, 45], volume: 0.2, bus: 'esterno' },
+      { chiave: 'a_scricchiolio', ogni: 12, spazio: [4, 14], volume: 0.26, bus: 'interno', soloChiuso: true },
+      { chiave: 'a_goccia', ogni: 7, spazio: [3, 12], volume: 0.22, bus: 'interno', soloChiuso: true },
+    ],
+    aperto: { taglio: 11000, volume: 1, umido: 0.22 },
+    chiuso: { taglio: 900, volume: 0.4, umido: 0.35 },
+    sottoMusica: 0,
+  },
   abisso: {
     letti: [
       { chiave: 'u_profondo', volume: 0.42, bus: 'interno' },
